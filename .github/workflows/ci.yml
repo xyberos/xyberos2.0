@@ -60,3 +60,67 @@ jobs:
         run: python -m unittest discover -s tests -p "test_*.py"
       - name: Audit Python dependencies
         run: pip-audit
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Build wheel and source distribution
+        run: |
+          python -m pip install "build>=1,<2"
+          python -m build
+      - name: Install wheel in a clean environment
+        run: |
+          python -m venv "$RUNNER_TEMP/xyberos-wheel-env"
+          "$RUNNER_TEMP/xyberos-wheel-env/bin/python" -m pip install dist/*.whl
+      - name: Smoke-test installed public API outside the checkout
+        working-directory: ${{ runner.temp }}
+        run: |
+          "$RUNNER_TEMP/xyberos-wheel-env/bin/python" -c '
+          from importlib.metadata import version
+          import xyberos
+          from xyberos import http, kernel, providers, subsystems
+          from xyberos.http.health import create_health_routes
+          from xyberos.http.middleware import (
+              IdentityResolver,
+              KernelAdmissionMiddleware,
+              XyberosContextMiddleware,
+          )
+          from xyberos.kernel import (
+              AuthenticatedIdentity,
+              Capability,
+              ExecutionContext,
+              PolicyEngine,
+              XyberosKernel,
+          )
+          from xyberos.subsystems.database import (
+              Database,
+              DatabaseSubsystem,
+              SchemaMigrator,
+          )
+
+          assert xyberos.__version__ == version("xyberos-minimal")
+          assert all((kernel, http, providers, subsystems))
+          assert create_health_routes is not None
+          assert all(
+              (
+                  IdentityResolver,
+                  KernelAdmissionMiddleware,
+                  XyberosContextMiddleware,
+              )
+          )
+          assert all(
+              (
+                  AuthenticatedIdentity,
+                  Capability,
+                  ExecutionContext,
+                  PolicyEngine,
+                  XyberosKernel,
+              )
+          )
+          assert all((Database, DatabaseSubsystem, SchemaMigrator))
+          '

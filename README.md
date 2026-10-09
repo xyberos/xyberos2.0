@@ -49,9 +49,15 @@ The normal test suite does not require Ollama or an external database.
   request identity, health routes, graceful admission control, and optional Ollama.
 - **[Deployment runbook](docs/deployment.md):** dependency readiness, schema
   migrations, TLS/secrets, backup and restore, shutdown, and provider maturity.
+- **[Architecture review](ARCHITECTURE.md):** current runtime boundaries,
+  lifecycle, request security, subsystem contracts, and operational limitations.
 - **[Implementation plan](docs/implementation.md):** implemented phases, target
   structure, operational behavior, and remaining scope.
 - **[Architecture notes](docs/xyberos2.0.md):** original platform goals and design.
+- **[Public API policy](docs/public-api.md):** supported imports, Python matrix,
+  versioning, and deprecation expectations.
+- **[P2P threat model](docs/p2p-threat-model.md):** current relay protections,
+  residual risks, and security decisions still awaiting review.
 
 The example application is in [`apps/example_crud_app/`](apps/example_crud_app/).
 Its routes show parameterized SQL and tenant scoping. It includes public health
@@ -117,6 +123,29 @@ required inside the application.
 
 See the tutorial for complete code samples and configuration details.
 
+## Public API and versioning
+
+The package exposes a small, stable root API for application code:
+
+```python
+import xyberos
+
+print(xyberos.__version__)
+from xyberos import kernel, http, providers, subsystems
+```
+
+This keeps the runtime entry points discoverable while leaving optional
+subsystems and providers behind their own module boundaries. Public API stability
+is intentionally focused on the kernel, HTTP adapter, and the subsystem/provider
+contracts that applications actually depend on. Internal implementation details
+remain free to change without forcing a breaking change across the framework.
+
+When external integrations are added, they should follow a documented
+compatibility policy: keep supported extension points explicit, deprecate in a
+bounded way, and avoid promoting every internal helper to a long-term public API.
+See the [public API policy](docs/public-api.md) for the supported surface and
+release compatibility rules.
+
 ## Security notes
 
 - `ExecutionContext` carries request-scoped metadata; it is **not itself
@@ -136,6 +165,8 @@ See the tutorial for complete code samples and configuration details.
 - P2P currently provides a local-first synchronization foundation and an
   optional HTTPS relay for manually paired one-to-one devices. The relay route must
   be hosted by the application and configured with pinned peer keys.
+- The [P2P threat model](docs/p2p-threat-model.md) is preliminary, not an
+  independent cryptographic review or production approval.
 
 ## Current limitations
 
@@ -149,8 +180,12 @@ See the tutorial for complete code samples and configuration details.
 - P2P does not provide dynamic device discovery, group messaging, key rotation, or
   managed key recovery. The relay sees routing metadata and stores append-only
   ciphertext; its 100-envelope pages use local retry cursors, not delivery receipts
-  or relay deletion. Retention and peer rate limits are not implemented, and local
-  device message storage is not encrypted at rest.
+  or relay deletion. Protocol V2 applies configurable per-peer request and mailbox
+  limits (defaults: 60 requests/minute with burst 10; 10,000 envelopes and 256 MiB
+  of serialized envelope payload per recipient). This is not a total database-size
+  cap. V1 is scheduled to retire on 2027-03-31; operators should migrate clients
+  and relay configuration to V2 before that date and treat V1 as a transition-only
+  compatibility path. Local device message storage is not encrypted at rest.
 - Secure relay clients require the optional crypto extra:
   `python -m pip install -e ".[p2p-crypto]"`. See the tutorial for manual pairing
   and hosting guidance.

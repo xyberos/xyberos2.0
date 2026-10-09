@@ -116,8 +116,18 @@ automation.
   store. In-memory memory and keyword-knowledge providers are bounded
   demonstration/test implementations and are not durable.
 - The HTTPS P2P relay is an early protocol foundation, not a managed messaging
-  service. Review [the implementation plan](implementation.md) and [README](../README.md)
-  for its retention, rate-limit, encryption-at-rest, and key lifecycle gaps.
+  service. V2 enforces configurable per-peer request and per-recipient mailbox
+  limits; V1 remains temporarily available without those limits, and the project
+  has set a V1 retirement date of 2027-03-31. Operators must publish and enforce
+  this date before relying on the quotas for all relay traffic. Migration plan:
+  (1) deploy V2-capable relay and clients with a dual-stack transition window,
+  (2) monitor quota rejections and mailbox usage during rollout, (3) update client
+  configuration to require V2 and disable V1 once the retirement date arrives,
+  and (4) keep backup/restore and replay checks in place throughout the migration.
+  Mailboxes are append-only, local message storage is plaintext, and there is no
+  automated key rotation or recovery. Review [the implementation plan](implementation.md),
+  [README](../README.md), and the [preliminary P2P threat model](p2p-threat-model.md).
+  The threat model is not an independent cryptographic review or production approval.
 - CI is configured for Python 3.10–3.13. This is the intended tested matrix; the
   current local validation only establishes behavior for the interpreter used in
   this checkout. Consult successful CI runs before asserting a version is verified.

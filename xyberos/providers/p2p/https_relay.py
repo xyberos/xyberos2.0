@@ -4,6 +4,7 @@ import asyncio
 import base64
 import hashlib
 import json
+import logging
 import math
 import re
 import time
@@ -40,6 +41,16 @@ _MAX_ENVELOPES_PER_REQUEST = 100
 _MAX_TIMESTAMP_SKEW_SECONDS = 300
 _NONCE_PATTERN = re.compile(r"^[A-Fa-f0-9]{32,128}$")
 _PEER_ID_PATTERN = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
+_MAILBOX_USAGE_BATCH_SIZE = 500
+logger = logging.getLogger("xyberos.p2p.relay")
+
+
+def _positive_integer(value: object, name: str) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+        raise ValueError(f"{name} must be a positive integer.")
+    return value
+
+
 def _canonical_json(value: object) -> bytes:
     return json.dumps(
         value,
@@ -114,13 +125,14 @@ class HTTPSRelayTransportProvider(PeerTransportProvider):
                 raise ValueError(f"Pinned public keys do not match peer '{peer_id}'.")
         self._relay_url: str | None = None
         self._timeout_seconds = 30.0
+        self._protocol_version = 2
 
     @property
     def provider_name(self) -> str:
         return "https_relay"
 
     async def initialize(self, config: dict[str, object]) -> None:
-        unknown = set(config) - {"relay_url", "timeout_seconds"}
+        unknown = set(config) - {"relay_url", "timeout_seconds", "protocol_version"}
         if unknown:
             raise ValueError(
                 f"Unknown HTTPS relay config keys: {', '.join(sorted(unknown))}."
@@ -139,9 +151,17 @@ class HTTPSRelayTransportProvider(PeerTransportProvider):
             finite_timeout = False
         if not finite_timeout:
             raise ValueError("'timeout_seconds' must be a positive finite number.")
+        protocol_version = config.get("protocol_version", 2)
+        if (
+            not isinstance(protocol_version, int)
+            or isinstance(protocol_version, bool)
+            or protocol_version not in {1, 2}
+        ):
+            raise ValueError("'protocol_version' must be 1 or 2.")
         await self._envelope_cache.initialize({})
         self._relay_url = relay_url
         self._timeout_seconds = float(timeout)
+        self._protocol_version = protocol_version
 
     async def close(self) -> None:
         self._relay_url = None
@@ -173,7 +193,9 @@ class HTTPSRelayTransportProvider(PeerTransportProvider):
             )
             outgoing.append(envelope.to_dict())
         batches = _batch_envelopes(outgoing, cursor)
-        response_body = b""
+        payload: dict[str, object] | None = None
+        has_more: bool | None = None
+        rejected_message_ids: list[str] = []
         for batch in batches:
             response_body = await asyncio.to_thread(
                 self._exchange_sync,
@@ -181,17 +203,42 @@ class HTTPSRelayTransportProvider(PeerTransportProvider):
                 peer_id,
                 batch,
                 cursor,
+                self._protocol_version,
             )
-        try:
-            payload = json.loads(response_body)
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise PeerSyncError("Relay returned invalid JSON.") from exc
-        if (
-            not isinstance(payload, dict)
-            or set(payload) != {"messages", "next_cursor", "has_more"}
-            or not isinstance(payload["has_more"], bool)
-        ):
-            raise PeerSyncError("Relay response has an invalid shape.")
+            try:
+                batch_payload = json.loads(response_body)
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise PeerSyncError("Relay returned invalid JSON.") from exc
+            expected_keys = (
+                {"messages", "next_cursor", "has_more"}
+                if self._protocol_version == 1
+                else {
+                    "messages",
+                    "next_cursor",
+                    "has_more",
+                    "rejected_message_ids",
+                }
+            )
+            if not isinstance(batch_payload, dict) or set(batch_payload) != expected_keys:
+                raise PeerSyncError("Relay response has an invalid shape.")
+            batch_has_more = batch_payload["has_more"]
+            if not isinstance(batch_has_more, bool):
+                raise PeerSyncError("Relay response has an invalid shape.")
+            if self._protocol_version == 2:
+                rejected_value = batch_payload["rejected_message_ids"]
+                if (
+                    not isinstance(rejected_value, list)
+                    or not all(
+                        isinstance(message_id, str) and message_id
+                        for message_id in rejected_value
+                    )
+                ):
+                    raise PeerSyncError("Relay rejection list is invalid.")
+                rejected_message_ids.extend(rejected_value)
+            payload = batch_payload
+            has_more = batch_has_more
+        if payload is None or has_more is None:
+            raise PeerSyncError("Relay returned no synchronization response.")
         incoming = payload["messages"]
         next_cursor = payload["next_cursor"]
         if next_cursor is not None and (
@@ -231,7 +278,8 @@ class HTTPSRelayTransportProvider(PeerTransportProvider):
             return PeerExchangePage(
                 tuple(decrypted),
                 next_cursor,
-                payload["has_more"],
+                has_more,
+                tuple(dict.fromkeys(rejected_message_ids)),
             )
         except (TypeError, ValueError) as exc:
             raise PeerSyncError("Relay response page metadata is invalid.") from exc
@@ -247,8 +295,9 @@ class HTTPSRelayTransportProvider(PeerTransportProvider):
         peer_id: str,
         outgoing: list[dict[str, str]],
         cursor: str | None,
+        protocol_version: int = 2,
     ) -> bytes:
-        path = f"/v1/peers/{quote(peer_id, safe='')}/sync"
+        path = f"/v{protocol_version}/peers/{quote(peer_id, safe='')}/sync"
         body = _canonical_json({"messages": outgoing, "cursor": cursor})
         if len(body) > _MAX_REQUEST_BYTES:
             raise PeerSyncError("Synchronization request exceeds the 4 MiB limit.")
@@ -296,7 +345,25 @@ class HTTPSRelayService:
         database: Database,
         trusted_peers: Mapping[str, PeerPublicKeys],
         allowed_pairs: Mapping[str, Sequence[str]],
+        *,
+        requests_per_minute: int = 60,
+        request_burst: int = 10,
+        mailbox_max_envelopes: int = 10_000,
+        mailbox_max_bytes: int = 256 * 1024 * 1024,
     ) -> None:
+        self._requests_per_minute = _positive_integer(
+            requests_per_minute,
+            "requests_per_minute",
+        )
+        self._request_burst = _positive_integer(request_burst, "request_burst")
+        self._mailbox_max_envelopes = _positive_integer(
+            mailbox_max_envelopes,
+            "mailbox_max_envelopes",
+        )
+        self._mailbox_max_bytes = _positive_integer(
+            mailbox_max_bytes,
+            "mailbox_max_bytes",
+        )
         self._database = database
         self._trusted_peers = dict(trusted_peers)
         for peer_id, keys in self._trusted_peers.items():
@@ -328,7 +395,12 @@ class HTTPSRelayService:
         return [
             Route(
                 "/v1/peers/{recipient_peer_id}/sync",
-                self.handle_sync,
+                self.handle_sync_v1,
+                methods=["POST"],
+            ),
+            Route(
+                "/v2/peers/{recipient_peer_id}/sync",
+                self.handle_sync_v2,
                 methods=["POST"],
             )
         ]
@@ -377,6 +449,32 @@ class HTTPSRelayService:
         )
         await self._database.execute(
             """
+            CREATE TABLE IF NOT EXISTS xyberos_relay_mailbox_usage (
+                recipient_peer_id TEXT PRIMARY KEY,
+                envelope_count INTEGER NOT NULL,
+                payload_bytes INTEGER NOT NULL
+            )
+            """
+        )
+        await self._database.execute(
+            """
+            CREATE TABLE IF NOT EXISTS xyberos_relay_rate_buckets (
+                peer_id TEXT PRIMARY KEY,
+                tokens REAL NOT NULL,
+                updated_at REAL NOT NULL
+            )
+            """
+        )
+        await self._database.execute(
+            """
+            CREATE TABLE IF NOT EXISTS xyberos_relay_state (
+                name TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+            """
+        )
+        await self._database.execute(
+            """
             INSERT INTO xyberos_relay_envelope_order
                 (recipient_peer_id, message_id, sequence, created_at)
             SELECT recipient_peer_id, message_id, 0, created_at
@@ -385,12 +483,111 @@ class HTTPSRelayService:
             ON CONFLICT(recipient_peer_id, message_id) DO NOTHING
             """
         )
+        await self._initialize_mailbox_usage()
+        now = time.time()
+        for peer_id in self._trusted_peers:
+            await self._database.execute(
+                """
+                INSERT INTO xyberos_relay_rate_buckets (peer_id, tokens, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(peer_id) DO NOTHING
+                """,
+                (peer_id, float(self._request_burst), now),
+            )
         self._initialized = True
 
     async def close(self) -> None:
         self._initialized = False
 
-    async def handle_sync(self, request: StarletteRequest) -> JSONResponse:
+    async def _initialize_mailbox_usage(self) -> None:
+        state = await self._database.fetch_one(
+            "SELECT value FROM xyberos_relay_state WHERE name = ?",
+            ("mailbox-usage-v1",),
+        )
+        if state is not None and state["value"] != "complete":
+            raise RuntimeError("Relay mailbox usage migration state is invalid.")
+        if state is None:
+            recipient_rows = await self._database.fetch_all(
+                "SELECT DISTINCT recipient_peer_id FROM xyberos_relay_envelopes"
+            )
+            recipients = set(self._trusted_peers)
+            for row in recipient_rows:
+                recipient_peer_id = row["recipient_peer_id"]
+                if not isinstance(recipient_peer_id, str):
+                    raise TypeError("Relay mailbox recipient ID must be text.")
+                recipients.add(recipient_peer_id)
+
+            for recipient_peer_id in sorted(recipients):
+                message_id = ""
+                envelope_count = 0
+                payload_bytes = 0
+                while True:
+                    rows = await self._database.fetch_all(
+                        """
+                        SELECT message_id, payload
+                        FROM xyberos_relay_envelopes
+                        WHERE recipient_peer_id = ? AND message_id > ?
+                        ORDER BY message_id
+                        LIMIT ?
+                        """,
+                        (
+                            recipient_peer_id,
+                            message_id,
+                            _MAILBOX_USAGE_BATCH_SIZE,
+                        ),
+                    )
+                    if not rows:
+                        break
+                    for row in rows:
+                        message_id_value = row["message_id"]
+                        payload_value = row["payload"]
+                        if not isinstance(message_id_value, str) or not isinstance(
+                            payload_value,
+                            str,
+                        ):
+                            raise TypeError("Stored relay envelope fields must be text.")
+                        envelope_count += 1
+                        payload_bytes += len(payload_value.encode("utf-8"))
+                        message_id = message_id_value
+                await self._database.execute(
+                    """
+                    INSERT INTO xyberos_relay_mailbox_usage
+                        (recipient_peer_id, envelope_count, payload_bytes)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(recipient_peer_id) DO UPDATE SET
+                        envelope_count = excluded.envelope_count,
+                        payload_bytes = excluded.payload_bytes
+                    """,
+                    (recipient_peer_id, envelope_count, payload_bytes),
+                )
+            await self._database.execute(
+                "INSERT INTO xyberos_relay_state (name, value) VALUES (?, ?)",
+                ("mailbox-usage-v1", "complete"),
+            )
+        else:
+            for peer_id in self._trusted_peers:
+                await self._database.execute(
+                    """
+                    INSERT INTO xyberos_relay_mailbox_usage
+                        (recipient_peer_id, envelope_count, payload_bytes)
+                    VALUES (?, 0, 0)
+                    ON CONFLICT(recipient_peer_id) DO NOTHING
+                    """,
+                    (peer_id,),
+                )
+
+    async def handle_sync_v1(self, request: StarletteRequest) -> JSONResponse:
+        return await self._handle_sync(request, protocol_version=1)
+
+    async def handle_sync_v2(self, request: StarletteRequest) -> JSONResponse:
+        return await self._handle_sync(request, protocol_version=2)
+
+    async def _handle_sync(
+        self,
+        request: StarletteRequest,
+        *,
+        protocol_version: int,
+    ) -> JSONResponse:
         if not self._initialized:
             return JSONResponse({"detail": "Relay is not ready."}, status_code=503)
         recipient_peer_id = request.path_params["recipient_peer_id"]
@@ -407,7 +604,23 @@ class HTTPSRelayService:
         try:
             body = await _read_limited_body(request)
             self._verify_request(request, sender_peer_id, body)
-            await self._consume_nonce(request, sender_peer_id)
+            if protocol_version == 1:
+                await self._consume_nonce(request, sender_peer_id)
+            else:
+                retry_after = await self._consume_rate_and_nonce(
+                    request,
+                    sender_peer_id,
+                )
+                if retry_after is not None:
+                    logger.warning(
+                        "P2P relay rejected a peer request at its configured rate limit.",
+                        extra={"event": "p2p.relay.rate_limited"},
+                    )
+                    return JSONResponse(
+                        {"detail": "Peer request rate limit exceeded."},
+                        status_code=429,
+                        headers={"retry-after": str(retry_after)},
+                    )
             payload = json.loads(body)
             envelopes, cursor = _parse_request_messages(payload)
             for envelope in envelopes:
@@ -419,7 +632,14 @@ class HTTPSRelayService:
                 public_keys = self._trusted_peers[sender_peer_id]
                 if not _verify_envelope(envelope, public_keys):
                     raise ValueError("Envelope signature is invalid.")
-            await self._store_envelopes(envelopes)
+            rejected_message_ids: tuple[str, ...] = ()
+            if protocol_version == 1:
+                await self._store_envelopes(envelopes)
+            else:
+                rejected_message_ids = await self._store_envelopes(
+                    envelopes,
+                    enforce_quota=True,
+                )
             cursor_values = _decode_cursor(cursor) if cursor is not None else None
             cursor_sql = ""
             cursor_parameters: tuple[object, ...] = ()
@@ -473,13 +693,14 @@ class HTTPSRelayService:
                     last_row["created_at"],
                     last_row["message_id"],
                 )
-            response = JSONResponse(
-                {
-                    "messages": inbox,
-                    "next_cursor": next_cursor,
-                    "has_more": has_more,
-                }
-            )
+            response_body: dict[str, object] = {
+                "messages": inbox,
+                "next_cursor": next_cursor,
+                "has_more": has_more,
+            }
+            if protocol_version == 2:
+                response_body["rejected_message_ids"] = list(rejected_message_ids)
+            response = JSONResponse(response_body)
             if len(response.body) > _MAX_REQUEST_BYTES:
                 return JSONResponse(
                     {"detail": "Peer inbox exceeds the relay response size limit."},
@@ -546,13 +767,122 @@ class HTTPSRelayService:
             if result.rowcount == 0:
                 raise _ReplayError
 
+    async def _consume_rate_and_nonce(
+        self,
+        request: StarletteRequest,
+        sender_peer_id: str,
+    ) -> int | None:
+        now = time.time()
+        refill_per_second = self._requests_per_minute / 60
+        async with self._database.transaction() as transaction:
+            lock_result = await transaction.execute(
+                "UPDATE xyberos_relay_rate_buckets "
+                "SET tokens = tokens WHERE peer_id = ?",
+                (sender_peer_id,),
+            )
+            if lock_result.rowcount != 1:
+                raise RuntimeError("Relay rate-limit state is missing for a trusted peer.")
+            row = await transaction.fetch_one(
+                "SELECT tokens, updated_at FROM xyberos_relay_rate_buckets "
+                "WHERE peer_id = ?",
+                (sender_peer_id,),
+            )
+            if row is None:
+                raise RuntimeError("Relay rate-limit state disappeared during request.")
+            current_tokens = row["tokens"]
+            updated_at = row["updated_at"]
+            if not isinstance(current_tokens, (int, float)) or not isinstance(
+                updated_at,
+                (int, float),
+            ):
+                raise TypeError("Relay rate-limit state fields must be numeric.")
+            elapsed = max(0.0, now - float(updated_at))
+            available_tokens = min(
+                float(self._request_burst),
+                float(current_tokens) + elapsed * refill_per_second,
+            )
+            if available_tokens < 1.0:
+                retry_after = max(
+                    1,
+                    math.ceil((1.0 - available_tokens) / refill_per_second),
+                )
+                await transaction.execute(
+                    "UPDATE xyberos_relay_rate_buckets "
+                    "SET tokens = ?, updated_at = ? WHERE peer_id = ?",
+                    (available_tokens, now, sender_peer_id),
+                )
+                return retry_after
+
+            nonce = request.headers["x-peer-nonce"]
+            nonce_result = await transaction.execute(
+                "INSERT INTO xyberos_relay_nonces (peer_id, nonce, seen_at) "
+                "VALUES (?, ?, ?) ON CONFLICT(peer_id, nonce) DO NOTHING",
+                (sender_peer_id, nonce, int(now)),
+            )
+            if nonce_result.rowcount == 0:
+                raise _ReplayError
+            await transaction.execute(
+                "DELETE FROM xyberos_relay_nonces WHERE seen_at < ?",
+                (int(now) - _MAX_TIMESTAMP_SKEW_SECONDS * 2,),
+            )
+            await transaction.execute(
+                "UPDATE xyberos_relay_rate_buckets "
+                "SET tokens = ?, updated_at = ? WHERE peer_id = ?",
+                (available_tokens - 1.0, now, sender_peer_id),
+            )
+        return None
+
     async def _store_envelopes(
         self,
         envelopes: Sequence[EncryptedPeerEnvelope],
-    ) -> None:
-        async with self._database.transaction() as transaction:
-            for envelope in envelopes:
-                serialized = _canonical_json(envelope.to_dict()).decode("utf-8")
+        *,
+        enforce_quota: bool = False,
+    ) -> tuple[str, ...]:
+        rejected_message_ids: list[str] = []
+        for envelope in envelopes:
+            serialized = _canonical_json(envelope.to_dict()).decode("utf-8")
+            serialized_bytes = len(serialized.encode("utf-8"))
+            async with self._database.transaction() as transaction:
+                lock_result = await transaction.execute(
+                    "UPDATE xyberos_relay_mailbox_usage "
+                    "SET envelope_count = envelope_count "
+                    "WHERE recipient_peer_id = ?",
+                    (envelope.recipient_peer_id,),
+                )
+                if lock_result.rowcount != 1:
+                    raise RuntimeError("Relay mailbox usage state is missing.")
+                existing = await transaction.fetch_one(
+                    "SELECT payload FROM xyberos_relay_envelopes "
+                    "WHERE recipient_peer_id = ? AND message_id = ?",
+                    (envelope.recipient_peer_id, envelope.message_id),
+                )
+                if existing is not None:
+                    if existing["payload"] != serialized:
+                        raise ValueError("Message ID conflicts with a stored envelope.")
+                    continue
+                usage = await transaction.fetch_one(
+                    "SELECT envelope_count, payload_bytes "
+                    "FROM xyberos_relay_mailbox_usage "
+                    "WHERE recipient_peer_id = ?",
+                    (envelope.recipient_peer_id,),
+                )
+                if usage is None:
+                    raise RuntimeError("Relay mailbox usage state disappeared.")
+                envelope_count = usage["envelope_count"]
+                payload_bytes = usage["payload_bytes"]
+                if (
+                    not isinstance(envelope_count, int)
+                    or isinstance(envelope_count, bool)
+                    or not isinstance(payload_bytes, int)
+                    or isinstance(payload_bytes, bool)
+                ):
+                    raise TypeError("Relay mailbox usage fields must be integers.")
+                if enforce_quota and (
+                    envelope_count >= self._mailbox_max_envelopes
+                    or payload_bytes + serialized_bytes > self._mailbox_max_bytes
+                ):
+                    rejected_message_ids.append(envelope.message_id)
+                    continue
                 result = await transaction.execute(
                     "INSERT INTO xyberos_relay_envelopes "
                     "(recipient_peer_id, message_id, sender_peer_id, created_at, payload) "
@@ -567,14 +897,9 @@ class HTTPSRelayService:
                     ),
                 )
                 if result.rowcount == 0:
-                    existing = await transaction.fetch_one(
-                        "SELECT payload FROM xyberos_relay_envelopes "
-                        "WHERE recipient_peer_id = ? AND message_id = ?",
-                        (envelope.recipient_peer_id, envelope.message_id),
+                    raise RuntimeError(
+                        "Relay envelope changed concurrently outside mailbox locking."
                     )
-                    if existing is None or existing["payload"] != serialized:
-                        raise ValueError("Message ID conflicts with a stored envelope.")
-                    continue
                 sequence_row = await transaction.fetch_one(
                     """
                     INSERT INTO xyberos_relay_sequences (recipient_peer_id, sequence)
@@ -598,6 +923,19 @@ class HTTPSRelayService:
                         envelope.created_at.isoformat(),
                     ),
                 )
+                await transaction.execute(
+                    "UPDATE xyberos_relay_mailbox_usage "
+                    "SET envelope_count = envelope_count + 1, "
+                    "payload_bytes = payload_bytes + ? "
+                    "WHERE recipient_peer_id = ?",
+                    (serialized_bytes, envelope.recipient_peer_id),
+                )
+        if rejected_message_ids:
+            logger.warning(
+                "P2P relay rejected envelopes because a mailbox reached its configured quota.",
+                extra={"event": "p2p.relay.mailbox_quota_rejected"},
+            )
+        return tuple(rejected_message_ids)
 
 
 class _PayloadTooLargeError(ValueError):

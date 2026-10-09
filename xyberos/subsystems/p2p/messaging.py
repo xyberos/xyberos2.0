@@ -7,6 +7,7 @@ from .contracts import (
     PeerIdentityProvider,
     PeerMessage,
     PeerMessageStore,
+    PeerMessageSubmissionError,
     PeerSyncError,
     PeerTransportProvider,
 )
@@ -52,6 +53,7 @@ class OfflineMessagingService:
             raise ValueError("A peer cannot synchronize with itself.")
         local_log = await self._store.all_messages()
         merged_total = 0
+        rejected_message_ids: list[str] = []
         page_cursor: str | None = None
         outbound = local_log
         while True:
@@ -71,6 +73,7 @@ class OfflineMessagingService:
                 raise PeerSyncError(
                     f"Peer '{peer_id}' returned an invalid or conflicting message log."
                 ) from exc
+            rejected_message_ids.extend(page.rejected_message_ids)
             try:
                 await self._transport.acknowledge(peer_id, page.next_cursor)
             except Exception as exc:
@@ -78,6 +81,12 @@ class OfflineMessagingService:
                     f"Could not persist synchronization progress with peer '{peer_id}'."
                 ) from exc
             if not page.has_more:
+                if rejected_message_ids:
+                    raise PeerMessageSubmissionError(
+                        peer_id,
+                        rejected_message_ids,
+                        merged_total,
+                    )
                 return merged_total
             page_cursor = page.next_cursor
             outbound = ()

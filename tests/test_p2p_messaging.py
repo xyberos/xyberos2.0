@@ -1,6 +1,7 @@
 import asyncio
 import tempfile
 import unittest
+from collections.abc import Sequence
 from dataclasses import replace
 from pathlib import Path
 
@@ -14,12 +15,76 @@ from xyberos.providers.p2p import (
 from xyberos.subsystems.p2p import (
     OfflineMessagingService,
     P2PSubsystem,
+    PeerExchangePage,
     PeerMessage,
+    PeerMessageSubmissionError,
     PeerSyncError,
+    PeerTransportProvider,
 )
 
 
 class TestOfflineMessaging(unittest.TestCase):
+    def test_rejected_outbound_messages_are_reported_after_inbound_progress(self):
+        async def scenario():
+            database = SQLiteProvider()
+            await database.initialize({"path": ":memory:"})
+            store = SQLitePeerMessageStore(database)
+            await store.initialize({})
+            identity = ConfiguredPeerIdentityProvider()
+            await identity.initialize({"peer_id": "device-a"})
+
+            class RejectingTransport(PeerTransportProvider):
+                @property
+                def provider_name(self) -> str:
+                    return "rejecting_test_transport"
+
+                async def initialize(self, config: dict[str, object]) -> None:
+                    del config
+
+                async def close(self) -> None:
+                    pass
+
+                async def exchange(
+                    self,
+                    peer_id: str,
+                    messages: Sequence[PeerMessage],
+                    cursor: str | None = None,
+                ) -> PeerExchangePage:
+                    del peer_id, messages, cursor
+                    return PeerExchangePage(
+                        (),
+                        None,
+                        False,
+                        ("pending-message",),
+                    )
+
+                async def acknowledge(
+                    self,
+                    peer_id: str,
+                    cursor: str | None,
+                ) -> None:
+                    del peer_id, cursor
+
+            transport = RejectingTransport()
+            messaging = OfflineMessagingService(identity, store, transport)
+            message = await messaging.send("conversation", "retry me")
+            with self.assertRaises(PeerMessageSubmissionError) as raised:
+                await messaging.synchronize("device-b")
+            self.assertEqual(
+                raised.exception.rejected_message_ids,
+                ("pending-message",),
+            )
+            self.assertEqual(raised.exception.merged_count, 0)
+            self.assertEqual(
+                await store.list_messages("conversation"),
+                (message,),
+            )
+            await store.close()
+            await identity.close()
+            await database.close()
+
+        asyncio.run(scenario())
+
     def test_messages_are_saved_offline_then_synced_idempotently(self):
         async def scenario():
             database_a = SQLiteProvider()

@@ -57,6 +57,7 @@ class PeerExchangePage:
     messages: tuple[PeerMessage, ...]
     next_cursor: str | None
     has_more: bool
+    rejected_message_ids: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not isinstance(self.messages, tuple) or not all(
@@ -69,6 +70,11 @@ class PeerExchangePage:
             raise ValueError("Peer exchange cursor must be non-empty text when supplied.")
         if not isinstance(self.has_more, bool):
             raise TypeError("Peer exchange has_more must be a boolean.")
+        if not isinstance(self.rejected_message_ids, tuple) or not all(
+            isinstance(message_id, str) and message_id
+            for message_id in self.rejected_message_ids
+        ):
+            raise TypeError("Rejected message IDs must be a tuple of non-empty strings.")
         if self.has_more and (not self.messages or self.next_cursor is None):
             raise ValueError("A continued peer exchange page must include messages and a cursor.")
 
@@ -141,6 +147,24 @@ class PeerTransportProvider(Provider, ABC):
 
 class PeerSyncError(RuntimeError):
     """Peer synchronization could not complete."""
+
+
+class PeerMessageSubmissionError(PeerSyncError):
+    """Some outbound messages were rejected while inbound messages were merged."""
+
+    def __init__(
+        self,
+        peer_id: str,
+        rejected_message_ids: Sequence[str],
+        merged_count: int,
+    ) -> None:
+        self.peer_id = peer_id
+        self.rejected_message_ids = tuple(rejected_message_ids)
+        self.merged_count = merged_count
+        super().__init__(
+            f"Peer '{peer_id}' rejected {len(self.rejected_message_ids)} "
+            "message submission(s); inbound synchronization completed."
+        )
 
 
 class P2PShutdownError(RuntimeError):

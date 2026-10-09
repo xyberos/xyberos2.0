@@ -1,14 +1,14 @@
 import asyncio
 import importlib.util
 import json
-import tempfile
 import socket
+import tempfile
 import time
 import unittest
-from unittest.mock import patch
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from unittest.mock import patch
 
 import uvicorn
 from starlette.applications import Starlette
@@ -53,6 +53,66 @@ class TestHTTPSRelay(unittest.TestCase):
             self.assertEqual(restored, identity.public_keys)
             self.assertEqual(restored.fingerprint, identity.public_keys.fingerprint)
             await identity.close()
+
+        asyncio.run(scenario())
+
+    def test_v2_transport_collects_rejections_across_outgoing_batches(self):
+        async def scenario():
+            database = SQLiteProvider()
+            await database.initialize({"path": ":memory:"})
+            sender = SodiumPeerIdentityProvider()
+            recipient = SodiumPeerIdentityProvider()
+            await sender.initialize({"peer_id": "sender"})
+            await recipient.initialize({"peer_id": "recipient"})
+            cache = SQLitePeerEnvelopeCache(database)
+            transport = HTTPSRelayTransportProvider(
+                sender,
+                {"recipient": recipient.public_keys},
+                cache,
+            )
+            await transport.initialize({"relay_url": "http://localhost:8000"})
+            now = datetime.now(timezone.utc)
+            messages = tuple(
+                PeerMessage(
+                    f"message-{index}",
+                    "conversation",
+                    "sender",
+                    f"body-{index}",
+                    now + timedelta(microseconds=index),
+                )
+                for index in range(101)
+            )
+            response = _canonical_json(
+                {
+                    "messages": [],
+                    "next_cursor": None,
+                    "has_more": False,
+                    "rejected_message_ids": ["message-0"],
+                }
+            )
+            final_response = _canonical_json(
+                {
+                    "messages": [],
+                    "next_cursor": None,
+                    "has_more": False,
+                    "rejected_message_ids": ["message-100"],
+                }
+            )
+            with patch.object(
+                transport,
+                "_exchange_sync",
+                side_effect=[response, final_response],
+            ) as exchange_sync:
+                page = await transport.exchange("recipient", messages)
+            self.assertEqual(exchange_sync.call_count, 2)
+            self.assertEqual(
+                page.rejected_message_ids,
+                ("message-0", "message-100"),
+            )
+            await transport.close()
+            await sender.close()
+            await recipient.close()
+            await database.close()
 
         asyncio.run(scenario())
 
@@ -122,6 +182,343 @@ class TestHTTPSRelay(unittest.TestCase):
             await identity_b.close()
 
         asyncio.run(close())
+
+    def test_v2_rejects_over_quota_sends_but_still_returns_inbox_page(self):
+        async def scenario():
+            relay_database = SQLiteProvider()
+            await relay_database.initialize({"path": ":memory:"})
+            sender = SodiumPeerIdentityProvider()
+            recipient = SodiumPeerIdentityProvider()
+            await sender.initialize({"peer_id": "sender"})
+            await recipient.initialize({"peer_id": "recipient"})
+            relay = HTTPSRelayService(
+                relay_database,
+                {
+                    "sender": sender.public_keys,
+                    "recipient": recipient.public_keys,
+                },
+                {"sender": ("recipient",), "recipient": ("sender",)},
+                mailbox_max_envelopes=1,
+            )
+            await relay.initialize()
+            now = datetime.now(timezone.utc)
+            await relay._store_envelopes(
+                (
+                    encrypt_message(
+                        sender,
+                        recipient.public_keys,
+                        PeerMessage("existing", "conversation", "sender", "stored", now),
+                    ),
+                    encrypt_message(
+                        recipient,
+                        sender.public_keys,
+                        PeerMessage(
+                            "inbound",
+                            "conversation",
+                            "recipient",
+                            "reply",
+                            now,
+                        ),
+                    ),
+                )
+            )
+            app = Starlette(routes=relay.routes)
+            new_message = encrypt_message(
+                sender,
+                recipient.public_keys,
+                PeerMessage(
+                    "rejected",
+                    "conversation",
+                    "sender",
+                    "new",
+                    now + timedelta(seconds=1),
+                ),
+            )
+            status, response = await _post_sync(
+                app,
+                sender,
+                "recipient",
+                {"messages": [new_message.to_dict()], "cursor": None},
+                nonce="1" * 32,
+                protocol_version=2,
+            )
+            self.assertEqual(status, 200)
+            self.assertEqual(response["rejected_message_ids"], ["rejected"])
+            self.assertEqual(
+                [message["message_id"] for message in response["messages"]],
+                ["inbound"],
+            )
+            self.assertFalse(response["has_more"])
+            usage = await relay_database.fetch_one(
+                "SELECT envelope_count FROM xyberos_relay_mailbox_usage "
+                "WHERE recipient_peer_id = ?",
+                ("recipient",),
+            )
+            assert usage is not None
+            self.assertEqual(usage["envelope_count"], 1)
+            await relay.close()
+            await sender.close()
+            await recipient.close()
+            await relay_database.close()
+
+        asyncio.run(scenario())
+
+    def test_mailbox_usage_backfill_applies_limits_to_existing_envelopes(self):
+        async def scenario():
+            relay_database = SQLiteProvider()
+            await relay_database.initialize({"path": ":memory:"})
+            sender = SodiumPeerIdentityProvider()
+            recipient = SodiumPeerIdentityProvider()
+            await sender.initialize({"peer_id": "sender"})
+            await recipient.initialize({"peer_id": "recipient"})
+            now = datetime.now(timezone.utc)
+            existing = encrypt_message(
+                sender,
+                recipient.public_keys,
+                PeerMessage("existing", "conversation", "sender", "stored", now),
+            )
+            serialized = _canonical_json(existing.to_dict()).decode("utf-8")
+            await relay_database.execute(
+                """
+                CREATE TABLE xyberos_relay_envelopes (
+                    recipient_peer_id TEXT NOT NULL,
+                    message_id TEXT NOT NULL,
+                    sender_peer_id TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    payload TEXT NOT NULL,
+                    PRIMARY KEY (recipient_peer_id, message_id)
+                )
+                """
+            )
+            await relay_database.execute(
+                """
+                INSERT INTO xyberos_relay_envelopes
+                    (recipient_peer_id, message_id, sender_peer_id, created_at, payload)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    "recipient",
+                    "existing",
+                    "sender",
+                    now.isoformat(),
+                    serialized,
+                ),
+            )
+            relay = HTTPSRelayService(
+                relay_database,
+                {
+                    "sender": sender.public_keys,
+                    "recipient": recipient.public_keys,
+                },
+                {"sender": ("recipient",), "recipient": ("sender",)},
+                mailbox_max_envelopes=1,
+            )
+            await relay.initialize()
+            usage = await relay_database.fetch_one(
+                "SELECT envelope_count, payload_bytes "
+                "FROM xyberos_relay_mailbox_usage WHERE recipient_peer_id = ?",
+                ("recipient",),
+            )
+            assert usage is not None
+            self.assertEqual(usage["envelope_count"], 1)
+            self.assertEqual(usage["payload_bytes"], len(serialized.encode("utf-8")))
+
+            new_message = encrypt_message(
+                sender,
+                recipient.public_keys,
+                PeerMessage(
+                    "new",
+                    "conversation",
+                    "sender",
+                    "over quota",
+                    now + timedelta(seconds=1),
+                ),
+            )
+            status, response = await _post_sync(
+                Starlette(routes=relay.routes),
+                sender,
+                "recipient",
+                {"messages": [new_message.to_dict()], "cursor": None},
+                nonce="5" * 32,
+                protocol_version=2,
+            )
+            self.assertEqual(status, 200)
+            self.assertEqual(response["rejected_message_ids"], ["new"])
+            await relay.close()
+            await sender.close()
+            await recipient.close()
+            await relay_database.close()
+
+        asyncio.run(scenario())
+
+    def test_concurrent_v2_submissions_cannot_exceed_mailbox_quota(self):
+        async def scenario():
+            relay_database = SQLiteProvider()
+            await relay_database.initialize({"path": ":memory:"})
+            sender = SodiumPeerIdentityProvider()
+            recipient = SodiumPeerIdentityProvider()
+            await sender.initialize({"peer_id": "sender"})
+            await recipient.initialize({"peer_id": "recipient"})
+            relay = HTTPSRelayService(
+                relay_database,
+                {
+                    "sender": sender.public_keys,
+                    "recipient": recipient.public_keys,
+                },
+                {"sender": ("recipient",), "recipient": ("sender",)},
+                mailbox_max_envelopes=1,
+            )
+            await relay.initialize()
+            app = Starlette(routes=relay.routes)
+            now = datetime.now(timezone.utc)
+            messages = [
+                encrypt_message(
+                    sender,
+                    recipient.public_keys,
+                    PeerMessage(
+                        f"message-{index}",
+                        "conversation",
+                        "sender",
+                        f"body-{index}",
+                        now + timedelta(seconds=index),
+                    ),
+                )
+                for index in range(2)
+            ]
+            responses = await asyncio.gather(
+                *(
+                    _post_sync(
+                        app,
+                        sender,
+                        "recipient",
+                        {"messages": [message.to_dict()], "cursor": None},
+                        nonce=f"{index + 6:x}" * 32,
+                        protocol_version=2,
+                    )
+                    for index, message in enumerate(messages)
+                )
+            )
+            self.assertEqual([status for status, _ in responses], [200, 200])
+            rejected = [
+                message_id
+                for _, response in responses
+                for message_id in response["rejected_message_ids"]
+            ]
+            self.assertEqual(len(rejected), 1)
+            stored = await relay_database.fetch_one(
+                "SELECT COUNT(*) AS envelope_count FROM xyberos_relay_envelopes "
+                "WHERE recipient_peer_id = ?",
+                ("recipient",),
+            )
+            assert stored is not None
+            self.assertEqual(stored["envelope_count"], 1)
+            await relay.close()
+            await sender.close()
+            await recipient.close()
+            await relay_database.close()
+
+        asyncio.run(scenario())
+
+    def test_v2_rate_limit_is_persisted_and_v1_remains_compatible(self):
+        async def scenario():
+            relay_database = SQLiteProvider()
+            await relay_database.initialize({"path": ":memory:"})
+            sender = SodiumPeerIdentityProvider()
+            recipient = SodiumPeerIdentityProvider()
+            await sender.initialize({"peer_id": "sender"})
+            await recipient.initialize({"peer_id": "recipient"})
+            relay = HTTPSRelayService(
+                relay_database,
+                {
+                    "sender": sender.public_keys,
+                    "recipient": recipient.public_keys,
+                },
+                {"sender": ("recipient",), "recipient": ("sender",)},
+                request_burst=1,
+            )
+            await relay.initialize()
+            app = Starlette(routes=relay.routes)
+            responses = await asyncio.gather(
+                _post_sync(
+                    app,
+                    sender,
+                    "recipient",
+                    {"messages": [], "cursor": None},
+                    nonce="2" * 32,
+                    protocol_version=2,
+                ),
+                _post_sync(
+                    app,
+                    sender,
+                    "recipient",
+                    {"messages": [], "cursor": None},
+                    nonce="3" * 32,
+                    protocol_version=2,
+                ),
+            )
+            self.assertEqual(sorted(status for status, _ in responses), [200, 429])
+            accepted_response = next(
+                response for status, response in responses if status == 200
+            )
+            limited_response = next(
+                response for status, response in responses if status == 429
+            )
+            self.assertEqual(accepted_response["rejected_message_ids"], [])
+            self.assertIn("rate limit", limited_response["detail"])
+
+            await relay.close()
+            relay = HTTPSRelayService(
+                relay_database,
+                {
+                    "sender": sender.public_keys,
+                    "recipient": recipient.public_keys,
+                },
+                {"sender": ("recipient",), "recipient": ("sender",)},
+                request_burst=1,
+            )
+            await relay.initialize()
+            app = Starlette(routes=relay.routes)
+            status, response = await _post_sync(
+                app,
+                sender,
+                "recipient",
+                {"messages": [], "cursor": None},
+                nonce="4" * 32,
+                protocol_version=2,
+            )
+            self.assertEqual(status, 429)
+            self.assertIn("rate limit", response["detail"])
+
+            legacy_message = encrypt_message(
+                sender,
+                recipient.public_keys,
+                PeerMessage(
+                    "legacy",
+                    "conversation",
+                    "sender",
+                    "v1 remains available during transition",
+                    datetime.now(timezone.utc),
+                ),
+            )
+            status, response = await _post_sync(
+                app,
+                sender,
+                "recipient",
+                {"messages": [legacy_message.to_dict()], "cursor": None},
+                nonce="5" * 32,
+                protocol_version=1,
+            )
+            self.assertEqual(status, 200)
+            self.assertEqual(
+                set(response),
+                {"messages", "next_cursor", "has_more"},
+            )
+            await relay.close()
+            await sender.close()
+            await recipient.close()
+            await relay_database.close()
+
+        asyncio.run(scenario())
 
     def test_relay_paginates_large_inbox_with_stable_cursors(self):
         async def scenario():
@@ -522,10 +919,17 @@ def _unused_port() -> int:
         return listener.getsockname()[1]
 
 
-async def _post_sync(app, sender, recipient_peer_id, payload, nonce):
+async def _post_sync(
+    app,
+    sender,
+    recipient_peer_id,
+    payload,
+    nonce,
+    protocol_version=1,
+):
     if "cursor" not in payload:
         payload = {**payload, "cursor": None}
-    path = f"/v1/peers/{recipient_peer_id}/sync"
+    path = f"/v{protocol_version}/peers/{recipient_peer_id}/sync"
     body = _canonical_json(payload)
     timestamp = str(int(time.time()))
     signature = sender.sign(

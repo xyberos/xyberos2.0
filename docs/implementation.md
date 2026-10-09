@@ -31,19 +31,20 @@ Priority levels match the document:
 - P1: provider ecosystem and AI subsystem
 - P2: P2P and production hardening
 
-Phases 1–11 have implemented the platform foundation and the core relay reliability
-slice, but this does not mean the platform is production-ready. The remaining
-review-driven priorities are:
+Phases 1–12 have delivered the platform foundation, core relay reliability, and
+deployment/persistence baseline. Phase 13's secure P2P application boundary and
+the implementation/documentation work from Phase 14 are present in the current
+working tree. These milestones do not mean the platform or relay is production-
+ready; Phase 14's target-user and product-scope decisions still require owner
+confirmation. The remaining review-driven priorities are:
 
-1. Use the Phase 10 generic capability authorization boundary for exposed
-   operations and retain domain-level checks before adding public APIs.
-2. Establish reproducible deployment, schema migration, CI, and backend validation
-   before making production-readiness claims.
+1. Establish a release compatibility promise and verify the package can be
+   installed and used through its documented public API.
+2. Complete a P2P threat-model and operational-control review before exposing the
+   relay as a user-facing or production service.
 3. Add further persistence, workflow, retrieval, or UI capabilities only to meet a
    documented user need; interfaces and demos are not guarantees of durable
    production services.
-4. Complete relay operational controls, retention policy, key lifecycle design, and
-   independent cryptographic review before presenting P2P as a user-facing service.
 
 ## 2. Implementation milestones
 
@@ -531,9 +532,11 @@ The initial engine is sequential and in-process, with a configurable bound on co
 
 ## 3. Review-driven gaps, risks, and next phases
 
-The following work is prioritized from the engineering review. Phase 10 is now
-implemented; Phases 11–14 remain planned. Phase 11 is the reliability gate before
-promoting the relay to a user-facing feature.
+The following phases record review-driven work and its current status. Phases
+10–12 are implemented or delivered as a baseline; the Phase 13 secure reference
+boundary and Phase 14 API/documentation work are present in the current working
+tree. P2P operational controls and product-owner decisions remain open; do not
+interpret phase completion as production approval.
 
 ### Phase 10 — Mandatory capability authorization boundary
 
@@ -728,6 +731,174 @@ duplicating mature ecosystems while multiplying maintenance and security costs.
   behavior/operational acceptance criteria.
 - Xyberos is positioned as a composable platform rather than as feature-equivalent
   to mature web, workflow, AI, or messaging systems.
+
+### Forward roadmap — proposed next work
+
+The following phases are proposed from the current implementation and documented
+gaps. They are not implemented work, release commitments, or authorization to
+expand scope without product-owner agreement. Prioritize the release/API work
+first. The P2P phase is conditional on an actual deployment use case; broader
+subsystem expansion remains gated on Phase 14's user/problem selection.
+
+#### Phase 15 — Release contract and installable package validation
+
+**Status: implementation delivered; hosted CI validation pending.**
+
+##### Gap and risk
+
+The repository has a small root API, version metadata, CI, and public API notes,
+but these do not yet amount to a tested compatibility promise. Passing tests in a
+checkout does not prove that a built distribution includes the right files or
+that documented imports work after installation.
+
+##### Scope
+
+- Decide and document which modules and symbols are supported public API, which
+  are provisional, and which are internal. Keep optional subsystem APIs explicit.
+- Choose compatibility rules for releases: versioning policy, deprecation period,
+  removal process, and minimum Python support. Reflect the decision consistently
+  in package metadata, README, and CI.
+- Add a clean-build/package-install CI job that builds the wheel and source
+  distribution, installs the wheel in a clean environment, and runs smoke tests
+  against documented imports and version metadata.
+- Add regression coverage for the documented API entry points and the
+  install/build artifact. Avoid freezing incidental internal implementation
+  details as public API.
+- Validate the supported Python range using hosted CI results; report only
+  versions and optional extras actually exercised.
+
+**Delivered:** [`docs/public-api.md`](public-api.md) defines the supported import
+surface, SemVer and deprecation expectations, and the distinction between the
+declared Python floor and tested CI matrix. README links to this policy. CI now
+builds wheel and source distributions, installs the wheel in a clean Python 3.12
+environment, and smoke-tests documented imports from outside the checkout.
+Regression tests cover documented core and database imports. Local Python 3.12
+validation has built both distributions, passed the focused tests, and installed
+and smoke-tested the wheel; hosted matrix/CI results remain pending.
+
+##### Exit criteria
+
+- An engineer can identify supported imports and compatibility expectations from
+  the docs without inferring them from implementation details.
+- A clean CI job builds and installs the distribution and verifies its documented
+  public API.
+- Package metadata, documentation, and CI agree on version and Python support.
+- No new dependency or API is added solely to make the release checklist pass.
+
+#### Phase 16 — P2P threat model and operational readiness gate
+
+**Priority: conditional; do not expand the protocol before completing review and deployment validation.**
+**Status: the relay threat model, V2 control choices, and V1 retirement/migration guidance are documented; independent cryptographic review and formal production approval remain separate external gates.**
+
+##### Gap and risk
+
+The encrypted relay is an early one-to-one foundation. V2 now has bounded
+per-peer request rates and per-recipient mailbox quotas, but V1 remains temporarily
+unmetered. Append-only retention, plaintext local message storage, static keys,
+and the lack of recovery remain explicit limitations. The cryptographic
+construction has not had independent review. Shipping new protocol features
+before validating operations and completing that review could increase risk.
+
+##### Scope
+
+**Delivered:** [`docs/p2p-threat-model.md`](p2p-threat-model.md) records the
+current trust boundaries, assets, existing controls, residual risks, cryptographic
+claim limits, and owner-selected policies. It is explicitly preliminary and is
+not an independent cryptographic assessment or production approval. Protocol V2
+implements the selected rate and mailbox quotas, returns rejected message IDs
+while still serving fetched messages, and reports submission rejection through
+the messaging API. V1 remains compatible without the V2 limits during transition.
+
+- Obtain an independent cryptographic review before making confidentiality,
+  forward-secrecy, or production-suitability claims. Track findings as explicit
+  changes or documented accepted risks.
+- Validate database transaction and concurrency behavior on supported deployment
+  backends; add restart, backup/restore, and operational deployment coverage.
+- Publish a V1 retirement date and migration guidance before depending on V2
+  quotas for all relay traffic. The project has set V1 retirement for 2027-03-31
+  and documents the migration path in the deployment and threat-model guidance.
+- Decide any future local message-store encryption and key lifecycle behavior
+  before representing device data as protected at rest.
+- Preserve V1/V2 compatibility tests and version future wire-format changes.
+
+##### Exit criteria
+
+- A reviewed threat model and independent cryptographic assessment exist, with
+  findings resolved or explicitly accepted by the project owner.
+- Relay quotas, retention, and key lifecycle have documented decisions and
+  automated tests for the chosen behavior.
+- Documentation makes remaining limitations and metadata exposure explicit.
+- No production-readiness claim exceeds verified test and review evidence.
+
+#### Phase 17 — Product-validated vertical slice
+
+**Priority: conditional; begins only after Phase 14 product direction is agreed.**
+
+##### Gap and risk
+
+The repository contains several optional capability areas, but breadth alone does
+not establish which developer problem should be optimized. Building durable
+workflow, retrieval, UI scaffolding, cloud blob storage, or further P2P features
+without a named user and acceptance criteria would add maintenance and support
+cost without proving value.
+
+##### Scope
+
+- Agree on one target developer, one concrete use case, and one application
+  workflow that the existing kernel/subsystems should make meaningfully safer or
+  simpler.
+- Document the workflow's requirements, threat boundaries, provider/durability
+  expectations, failure behavior, operational owner, and measurable acceptance
+  criteria before selecting a feature.
+- Implement only the smallest end-to-end slice needed to validate the use case.
+  Prefer existing contracts; revise them only when the validated workflow
+  demonstrates a real mismatch.
+- Include application-level authorization, persistence/recovery behavior,
+  observability, deployment instructions, and integration tests in the slice.
+- Reassess the roadmap after user validation. Do not infer that the first slice
+  justifies a general-purpose subsystem or plugin ecosystem.
+
+##### Exit criteria
+
+- A named use case and acceptance criteria are approved before implementation.
+- The slice works end-to-end in a reproducible example and has tests for its
+  security, failure, and persistence boundaries.
+- Provider maturity and operational responsibilities are documented honestly.
+- Follow-on investment is based on user validation rather than assumed demand.
+
+##### Selected product slice for Phase 17
+
+The Phase 17 slice is a local-first secure messaging workflow for a small team
+running a single-tenant app with two manually paired devices. The use case is:
+
+- a trusted operator creates a tenant-scoped conversation
+- each peer is pinned by public key and allowed pair list
+- the app sends and retrieves messages through the tenant wrapper, not the raw
+  P2P service
+- the relay only carries encrypted payloads and routing metadata; the application
+  remains responsible for authorization, retention, and key management
+
+This is intentionally narrower than a generic messaging platform. It validates
+that the kernel, HTTP identity boundary, tenant-scoped app layer, and P2P relay
+work together in an end-to-end workflow without implying a broader product
+surface or plugin ecosystem.
+
+##### Acceptance criteria for the slice
+
+- A single tenant can authorize only a fixed list of paired peers and conversation
+  IDs through the app wrapper.
+- A peer can send and fetch messages through the secure app route with the relay
+  returning partial sync failures as `207` responses and rejected IDs.
+- Cross-tenant, cross-conversation, and unauthorized peer requests are rejected
+  before the raw P2P layer is called.
+- The example app documents persistence and recovery expectations, and the relay
+  metadata limitations remain explicit in operation notes.
+- Follow-on investment is based on this slice's success rather than assumptions
+  about broader group messaging, discovery, or managed key rotation.
+
+The project has already implemented the reference app and tenant-scoped wrapper
+that exercise this slice: [`apps/example_p2p_app/app.py`](../apps/example_p2p_app/app.py)
+plus the security tests in [`tests/test_p2p_application.py`](../tests/test_p2p_application.py).
 
 ## 4. Enhancement suggestions to the plan
 

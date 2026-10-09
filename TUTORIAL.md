@@ -1,29 +1,363 @@
-# Xyberos 2.0 Tutorial
+﻿# Xyberos 2.0 Tutorial for Beginners
 
-This guide walks through the current APIs: setting up the kernel and SQLite
-subsystem, attaching trusted identity to HTTP requests, adding liveness/readiness
-routes and request draining, and making an optional policy-checked model call.
+Welcome! This tutorial is written in a simple, beginner-friendly style like W3Schools.
 
-For installation, supported Python versions, project layout, and limitations, see
-the [README](README.md). Code samples assume commands are run from the repository
-root.
+We will teach you in small steps:
 
-## 1. Install and test
+- Start with the minimal setup
+- Move to a real traditional app
+- Learn P2P messaging
+- Learn AI integration
+- Keep each section separate so you are not overwhelmed
+
+Before you start, read the project basics in [README.md](README.md).
+
+This tutorial assumes you are inside the project root.
+
+---
+
+# 1. Install Xyberos
+
+First, create a virtual environment and install the project.
 
 ```powershell
 py -3 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -e .
+```
+
+Now run the test suite:
+
+```powershell
 python -m unittest discover -s tests -p "test_*.py"
 ```
 
-No model server is needed for the tests or the database example.
+If the tests pass, your environment is ready.
 
-## 2. Create a kernel with SQLite
+---
 
-Subsystems own initialization and cleanup; providers implement the concrete
-storage/API contract. Configure the provider explicitly, register its subsystem,
-then bootstrap the kernel:
+## 1.1 Big picture: kernel, subsystems, providers, HTTP, P2P, and flows
+
+Xyberos is easier to understand if you think of it like a small operating system for your app.
+
+### The main pieces
+
+- Kernel: the boss that starts, runs, and stops everything.
+- Subsystems: major feature groups such as database, HTTP, P2P, or flows.
+- Providers: the actual implementation behind a subsystem, like SQLite or an in-memory peer transport.
+- HTTP: the trusted request boundary between the outside world and your app.
+- P2P: peer-to-peer messaging for devices or services that need offline-safe communication.
+- Flows: named step-by-step business workflows that execute safely and predictably.
+
+Think of it like this:
+
+```text
+browser / client
+       |
+       v
+HTTP routes
+       |
+       v
+Xyberos kernel
+       |
+   +--- subsystems (database, p2p, flows, etc.)
+       |
+   +--- providers (SQLite, relay, peer store, etc.)
+```
+
+### 1.1.1 What is the kernel?
+
+The kernel is the main runtime object. It manages:
+
+- lifecycle state
+- dependency injection
+- subsystem startup and shutdown
+- execution context for requests
+- capability execution
+
+The simplest example is:
+
+```python
+from xyberos.kernel import XyberosKernel
+
+kernel = XyberosKernel()
+print(type(kernel).__name__)
+```
+
+The kernel does not contain your business logic. It is the organizer, not the app itself.
+
+### 1.1.2 What is a subsystem?
+
+A subsystem is a feature area. For example:
+
+- database subsystem
+- P2P subsystem
+- flow subsystem
+- AI subsystem
+
+A subsystem usually wraps one or more providers and registers services into the dependency container.
+
+```python
+from xyberos.kernel import XyberosKernel
+from xyberos.providers.database import SQLiteProvider
+from xyberos.subsystems.database import DatabaseSubsystem
+
+kernel = XyberosKernel()
+provider = SQLiteProvider()
+subsystem = DatabaseSubsystem(provider)
+
+kernel.register_subsystem("database", subsystem)
+```
+
+This does not start the subsystem yet. It only tells the kernel, "I have a database subsystem and here is its provider."
+
+### 1.1.3 What is a provider?
+
+A provider is the concrete implementation behind a subsystem.
+
+Examples:
+
+- SQLiteProvider for database storage
+- InMemoryPeerTransport for quick P2P tests
+- ConfiguredPeerIdentityProvider for a known peer ID
+- HTTPSRelayTransportProvider for a relay-backed transport
+
+Provider objects are usually initialized with configuration and then used by the subsystem.
+
+```python
+from xyberos.providers.database import SQLiteProvider
+
+provider = SQLiteProvider()
+await provider.initialize({"path": "./data/demo.db"})
+print(provider.provider_name)
+```
+
+The important idea is:
+
+- subsystem = the contract and lifecycle wrapper
+- provider = the implementation behind the contract
+
+### 1.1.4 How the kernel starts everything
+
+A subsystem is initialized when the kernel bootstraps.
+
+```python
+kernel = XyberosKernel()
+kernel.register_subsystem("database", DatabaseSubsystem(SQLiteProvider()))
+
+await kernel.bootstrap({
+    "xyberos": {
+        "subsystems": {
+            "database": {
+                "enabled": True,
+                "provider": "sqlite",
+                "config": {"path": "./data/demo.db"},
+            }
+        }
+    }
+})
+```
+
+The config tells the kernel:
+
+- enable the database subsystem
+- use the `sqlite` provider
+- pass the provider config
+
+After bootstrap, the subsystem can resolve and use the provider through the dependency container.
+
+### 1.1.5 How to use stored services from the container
+
+Once the kernel is running, you can resolve services registered by the subsystem.
+
+```python
+from xyberos.subsystems.database import Database
+
+# database = kernel.container.resolve(Database)
+# await database.execute("SELECT 1")
+```
+
+This is the usual pattern in Xyberos:
+
+1. register subsystem
+2. bootstrap kernel with config
+3. resolve services from `kernel.container`
+4. use them safely inside your app
+
+### 1.1.6 HTTP boundary
+
+HTTP is how requests enter the app. Xyberos gives you HTTP middleware helpers so that only trusted identities become execution context.
+
+```python
+from starlette.applications import Starlette
+from xyberos.http.middleware import XyberosContextMiddleware, KernelAdmissionMiddleware
+from xyberos.http.health import create_health_routes
+from xyberos.kernel.security import AuthenticatedIdentity
+
+async def my_identity_resolver(request):
+    token = request.headers.get("authorization")
+    if token == "demo-token":
+        return AuthenticatedIdentity(actor_id="alice", tenant_id="tenant-a")
+    return None
+
+app = Starlette()
+app.add_middleware(XyberosContextMiddleware, identity_resolver=my_identity_resolver)
+app.add_middleware(KernelAdmissionMiddleware, kernel=kernel)
+app.router.routes.extend(create_health_routes(kernel))
+```
+
+In plain English:
+
+- the request comes in through HTTP
+- the identity resolver checks whether the caller is who they say they are
+- if valid, Xyberos creates an `ExecutionContext`
+- that context is then available to policy checks and safe internal code
+
+This keeps untrusted HTTP input from directly becoming trusted app state.
+
+### 1.1.7 P2P in plain English
+
+P2P means peer-to-peer communication. This is useful when two devices need to exchange messages without always depending on a central app server.
+
+Xyberos does not let raw messaging fly around freely. It keeps the P2P layer guarded and application-aware.
+
+```python
+from xyberos.providers.database import SQLiteProvider
+from xyberos.providers.p2p import (
+    ConfiguredPeerIdentityProvider,
+    InMemoryPeerTransport,
+    SQLitePeerMessageStore,
+)
+from xyberos.subsystems.p2p import P2PSubsystem
+
+kernel = XyberosKernel()
+db = SQLiteProvider()
+await db.initialize({"path": ":memory:"})
+
+identity = ConfiguredPeerIdentityProvider()
+await identity.initialize({"peer_id": "device-a"})
+
+transport = InMemoryPeerTransport()
+await transport.initialize({})
+
+store = SQLitePeerMessageStore(db)
+await store.initialize({})
+
+kernel.register_subsystem(
+    "p2p",
+    P2PSubsystem(identity_provider=identity, message_store=store, transport_provider=transport),
+)
+```
+
+This creates a local peer identity, a local message store, and a transport layer. The subsystem is then initialized by the kernel at bootstrap time.
+
+Important rule:
+
+> Do not expose raw P2P messaging directly to app routes.
+
+Instead, wrap it in a tenant-aware service that checks allowed peers, tenants, and conversations before sending or reading messages.
+
+### 1.1.8 Flows
+
+A flow is a named workflow made of steps. Each step does a small job, and the engine runs them in order with optional conditions, retries, or concurrency policies.
+
+```python
+from xyberos.subsystems.flows import FlowDefinition, FlowEngine, FlowStep
+
+async def main():
+    def load_value(state):
+        return state.input
+
+    def add_one(state):
+        return state.outputs["load_value"] + 1
+
+    flow = FlowDefinition(
+        "demo-flow",
+        (
+            FlowStep("load_value", load_value),
+            FlowStep("add_one", add_one),
+        ),
+    )
+
+    result = await FlowEngine().run(flow, 10)
+    print(result.state.outputs["add_one"])
+```
+
+This is a simple workflow:
+
+1. take the input value
+2. pass it into the next step
+3. produce the final output
+
+Flows are useful when a business process has several stages and you want clear logging, retries, and step-level control.
+
+### 1.1.9 The big picture in one example
+
+Here is a small end-to-end pattern:
+
+```python
+from xyberos.kernel import XyberosKernel
+from xyberos.providers.database import SQLiteProvider
+from xyberos.subsystems.database import Database, DatabaseSubsystem
+
+kernel = XyberosKernel()
+provider = SQLiteProvider()
+subsystem = DatabaseSubsystem(provider)
+
+kernel.register_subsystem("database", subsystem)
+
+await kernel.bootstrap({
+    "xyberos": {
+        "subsystems": {
+            "database": {
+                "enabled": True,
+                "provider": "sqlite",
+                "config": {"path": "./data/app.db"},
+            }
+        }
+    }
+})
+
+# Later, inside your app code:
+database = kernel.container.resolve(Database)
+print("Kernel and database subsystem are ready.")
+```
+
+That is the core idea of Xyberos:
+
+- build the app around a kernel
+- attach subsystems
+- connect providers
+- enforce trust boundaries at HTTP and application layers
+- use flows for multi-step work
+
+### 1.1.10 Best practice reminders
+
+- Keep the kernel small and focused.
+- Register providers before bootstrapping.
+- Use trusted identity resolution before making request-scoped decisions.
+- Keep tenant boundaries strict.
+- Do not expose raw low-level services directly to the public app layer.
+- Start with one subsystem, then grow carefully.
+
+Now that we understand the building blocks, let us move to a normal app example and then build up to P2P and AI patterns.
+
+---
+
+# 2. Traditional Apps Tutorial
+
+This section teaches you how to build the normal app style: database + HTTP + tenant-scoped data.
+
+## 2.1 Minimal traditional app
+
+A traditional app usually needs:
+
+- a kernel
+- a database subsystem
+- a trusted identity resolver
+- HTTP routes
+
+Here is the smallest useful example.
 
 ```python
 from xyberos.kernel import XyberosKernel
@@ -39,9 +373,7 @@ kernel = XyberosKernel(
                     "enabled": True,
                     "provider": "sqlite",
                     "config": {
-                        "path": "./data/tutorial.db",
-                        "journal_mode": "WAL",
-                        "busy_timeout_ms": 30_000,
+                        "path": "./data/demo.db"
                     },
                 }
             }
@@ -53,13 +385,19 @@ kernel.register_subsystem("database", DatabaseSubsystem(provider))
 await kernel.bootstrap()
 ```
 
-After bootstrap, the `Database` contract is registered in the dependency
-container. Create application-owned tables and use parameterized statements:
+### What this means
+
+- `SQLiteProvider` gives you a database backend
+- `DatabaseSubsystem` exposes the database contract
+- `XyberosKernel` manages startup and shutdown
+
+### Add a table
 
 ```python
 from xyberos.subsystems.database import Database
 
 database = kernel.container.resolve(Database)
+
 await database.execute(
     """
     CREATE TABLE IF NOT EXISTS notes (
@@ -69,309 +407,332 @@ await database.execute(
     )
     """
 )
-await database.execute(
-    "INSERT INTO notes (id, tenant_id, body) VALUES (?, ?, ?)",
-    ("note-1", "tenant-demo", "First note"),
-)
-rows = await database.fetch_all(
-    "SELECT id, body FROM notes WHERE tenant_id = ? ORDER BY id",
-    ("tenant-demo",),
-)
 ```
 
-Close the kernel in a `finally` block so initialized subsystems release resources:
+### Insert and read data
+
+```python
+await database.execute(
+    "INSERT INTO notes (id, tenant_id, body) VALUES (?, ?, ?)",
+    ("note-1", "tenant-a", "Hello Xyberos"),
+)
+
+rows = await database.fetch_all(
+    "SELECT id, body FROM notes WHERE tenant_id = ? ORDER BY id",
+    ("tenant-a",),
+)
+print(rows)
+```
+
+### Clean shutdown
 
 ```python
 try:
-    # Serve requests or execute application work.
-    ...
+    # app work here
+    pass
 finally:
     await kernel.shutdown()
 ```
 
-SQLite's default path is `./data/app.db`; file-backed databases default to WAL.
-The provider creates the parent directory. The example application's schema is
-created by its Starlette lifespan, not by `DatabaseSubsystem`.
+---
 
-## 3. Keep tenant identity trusted
+## 2.2 Beginner traditional app with routes
 
-HTTP middleware accepts identity only from an injected authentication resolver.
-The resolver should validate a session, signed token, or another trusted
-credential, then return an `AuthenticatedIdentity`:
+Now let us build a small Starlette app with tenant-scoped data.
 
 ```python
-from xyberos.kernel.security import AuthenticatedIdentity
-
-
-async def resolve_identity(request):
-    principal = await your_authentication_service.authenticate(request)
-    if principal is None:
-        return None
-    return AuthenticatedIdentity(
-        actor_id=principal.user_id,
-        tenant_id=principal.tenant_id,
-    )
-```
-
-`your_authentication_service` represents application-owned authentication code;
-it is not a Xyberos function. Never use `x-tenant-id` or `x-actor-id` directly as
-trusted identity. `XyberosContextMiddleware` creates an `ExecutionContext` after
-the resolver succeeds and clears it when the request finishes.
-
-The CRUD reference app uses this middleware. Its runnable local-only entry point
-is `apps.example_crud_app.demo`; it has a fixed demo credential, not real
-authentication.
-
-```python
-from apps.example_crud_app.app import create_app
-from xyberos.kernel.security import AuthenticatedIdentity
-
-# Demo-only token mapping. Replace this with real authentication before deployment.
-DEMO_IDENTITIES = {
-    "Bearer demo-alice": AuthenticatedIdentity("alice", "tenant-a"),
-}
-
-
-async def resolve_identity(request):
-    return DEMO_IDENTITIES.get(request.headers.get("authorization"))
-
-
-app = create_app(
-    identity_resolver=resolve_identity,
-    database_path="./data/tutorial-crud.db",
-)
-```
-
-Run the custom app you created, or use the built-in local-only demo:
-
-```powershell
-python -m uvicorn tutorial_app:app --reload
-```
-
-Alternatively, launch the bundled demo (its only credential is for local
-demonstration and is not real authentication):
-
-```powershell
-python -m uvicorn apps.example_crud_app.demo:app --reload
-```
-
-The public health endpoints work without a credential:
-
-```powershell
-Invoke-RestMethod http://127.0.0.1:8000/health/live
-Invoke-RestMethod http://127.0.0.1:8000/health/ready
-```
-
-For the bundled demo, set its local-only credential and create/list an item:
-
-```powershell
-$headers = @{ Authorization = "Bearer demo-alice" }
-# Override the custom-app credential when using the bundled demo entry point.
-$headers = @{ Authorization = "Bearer xyberos-local-demo" }
-$item = Invoke-RestMethod `
-  -Method Post `
-  -Uri http://127.0.0.1:8000/items `
-  -Headers $headers `
-  -ContentType "application/json" `
-  -Body '{"title":"First item"}'
-
-$item
-Invoke-RestMethod -Uri http://127.0.0.1:8000/items -Headers $headers
-```
-
-The example's SQL always filters rows by the authenticated tenant. The demo token
-is not a secure credential; do not expose this resolver outside local development.
-The reference app includes kernel admission middleware: requests receive `503`
-before startup or after shutdown, while health routes remain available to report
-the lifecycle and the configured database dependency probe. Readiness probes are
-application-supplied async callables and each is bounded to one second by default.
-See the [deployment runbook](docs/deployment.md) for schema migration, backup,
-restore, and operational guidance.
-
-## 4. Execute a guarded application capability
-
-Register each public capability with its handler before kernel startup, and
-register an application-owned policy. Invoke the operation through the kernel;
-the executor requires a trusted execution context, checks policy, then calls the
-handler. Keep resource authorization and tenant filters in the handler as well:
-the policy check does not replace domain or data-access enforcement.
-
-```python
-from xyberos.kernel import (
-    Capability,
-    ExecutionContext,
-    ExecutionContextAccessor,
-    PolicyEngine,
-)
-from xyberos.subsystems.database import Database
-
-
-class ItemsPolicy(PolicyEngine):
-    async def authorize(
-        self,
-        context: ExecutionContext,
-        capability: Capability,
-        resource: object = None,
-    ) -> bool:
-        return (
-            capability.name == "items.list"
-            and bool(context.actor_id.strip())
-            and bool(context.tenant_id.strip())
-        )
-
-
-async def list_tenant_items():
-    context = ExecutionContextAccessor.get()
-    database = kernel.container.resolve(Database)
-    return await database.fetch_all(
-        "SELECT id, title FROM items WHERE tenant_id = ? ORDER BY title, id",
-        (context.tenant_id,),
-    )
-
-
-# Do this before `await kernel.bootstrap()`.
-kernel.register_capability(Capability("items.list"), list_tenant_items)
-kernel.container.register_utility(PolicyEngine, ItemsPolicy())
-
-# Call from a route after XyberosContextMiddleware has established trusted context.
-items = await kernel.execute_capability("items.list")
-```
-
-The executor denies missing context or policy, unregistered capabilities, and
-policy denials. A capability marked `requires_authentication=False` still requires
-a context and explicit policy decision; it only omits the executor's non-empty
-actor/tenant check. The application policy must explicitly decide whether that
-context is allowed. Calls through `execute_capability` are tracked as active kernel
-work and are drained during shutdown. Direct calls to handlers bypass this boundary.
-
-## 5. Add health routes and graceful HTTP admission
-
-`create_health_routes(kernel)` builds `GET /health/live` and `GET /health/ready`.
-`KernelAdmissionMiddleware` tracks requests while the kernel is running and returns
-`503` for new application requests during startup or shutdown. It excludes those
-two default health paths so probes can still read state:
-
-```python
-from contextlib import asynccontextmanager
-
 from starlette.applications import Starlette
-from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 
-from xyberos.http.health import create_health_routes
-from xyberos.http.middleware import KernelAdmissionMiddleware
 from xyberos.kernel import XyberosKernel
+from xyberos.providers.database import SQLiteProvider
+from xyberos.subsystems.database import Database, DatabaseSubsystem
 
-kernel = XyberosKernel(
-    {
-        "xyberos": {
-            "runtime": {"shutdown_drain_timeout_seconds": 20},
-            "subsystems": {},
+provider = SQLiteProvider()
+kernel = XyberosKernel({
+    "xyberos": {
+        "subsystems": {
+            "database": {
+                "enabled": True,
+                "provider": "sqlite",
+                "config": {"path": "./data/tutorial.db"},
+            }
         }
     }
-)
+})
+kernel.register_subsystem("database", DatabaseSubsystem(provider))
 
+async def create_table():
+    database = kernel.container.resolve(Database)
+    await database.execute(
+        """
+        CREATE TABLE IF NOT EXISTS items (
+            id TEXT PRIMARY KEY,
+            tenant_id TEXT NOT NULL,
+            title TEXT NOT NULL
+        )
+        """
+    )
 
-async def index(request: Request) -> JSONResponse:
-    return JSONResponse({"ready": request.app.state.kernel.health.ready})
+async def list_items(request):
+    database = kernel.container.resolve(Database)
+    rows = await database.fetch_all(
+        "SELECT id, title FROM items WHERE tenant_id = ? ORDER BY id",
+        ("tenant-a",),
+    )
+    return JSONResponse({"items": rows})
 
-
-@asynccontextmanager
-async def lifespan(app):
+async def startup():
     await kernel.bootstrap()
-    try:
-        yield
-    finally:
-        await kernel.shutdown()
-
+    await create_table()
 
 app = Starlette(
     routes=[
-        *create_health_routes(kernel),
-        Route("/", index),
+        Route("/items", list_items, methods=["GET"]),
     ],
-    lifespan=lifespan,
+    on_startup=[startup],
 )
-app.state.kernel = kernel
-app.add_middleware(KernelAdmissionMiddleware, kernel=kernel)
 ```
 
-For another app, use the same `kernel` instance for subsystem setup, lifespan
-bootstrap/shutdown, health routes, and middleware. If changing the health route
-prefix, pass the matching full paths through the middleware's `excluded_paths`.
+### Why this matters
 
-`kernel.work()` is also available to track non-HTTP work:
+Real applications need relationship between:
+
+- actor (who is making the request)
+- tenant (whose data is being accessed)
+- resource (the specific record)
+
+This is where Xyberos enforces safe boundaries.
+
+---
+
+## 2.3 Trusted identity and tenant checks
+
+A request is not trusted just because it contains a header.
+
+Bad example:
 
 ```python
-async with kernel.work():
-    await perform_application_work()
+# Dangerous
+# request.headers["x-tenant-id"]
 ```
 
-Shutdown first stops new work admissions, then waits for tracked work for the
-configured timeout (30 seconds by default). A `ShutdownDrainTimeoutError` leaves
-subsystems open and the kernel in `STOPPING`; finish or cancel remaining work and
-retry `await kernel.shutdown()`. The kernel does not forcibly terminate arbitrary
-tasks, threads, or processes. Liveness/readiness only report lifecycle state; they
-do not check database or model-server health.
-
-## 6. Configure optional Ollama model generation
-
-The OpenAI-compatible provider defaults to the local Ollama endpoint and `llama3.2`.
-Install Ollama separately, start the service, and pull the model:
-
-```powershell
-ollama pull llama3.2
-```
-
-The bundled demo entry point has an optional `POST /ai/generate` endpoint wired to
-that provider and a policy restricted to the demo identity. After starting
-`apps.example_crud_app.demo`, call it with the demo credential:
-
-```powershell
-$headers = @{ Authorization = "Bearer xyberos-local-demo" }
-Invoke-RestMethod `
-  -Method Post `
-  -Uri http://127.0.0.1:8000/ai/generate `
-  -Headers $headers `
-  -ContentType "application/json" `
-  -Body '{"prompt":"Give me a one-sentence greeting."}'
-```
-
-Ollama is not required to run the default test suite or CRUD routes. To enable AI in
-your own `create_app` instance, pass both a `ModelProvider` and an application-owned
-`PolicyEngine`; the `/ai/generate` route is absent unless both are supplied.
-Requests use the same trusted identity middleware as CRUD, and the guarded model
-facade checks `ai.generate` before calling the provider.
-
-Register a policy engine before starting `AISubsystem`. This example policy allows
-all `ai.generate` requests and is **only for illustrating wiring**; production
-policy must check the authenticated actor, tenant, and requested resource:
+Good example:
 
 ```python
-from xyberos.kernel import (
-    Capability,
-    ExecutionContext,
-    PolicyEngine,
-    XyberosKernel,
+from xyberos.kernel.security import AuthenticatedIdentity
+
+
+def resolve_identity(request):
+    token = request.headers.get("authorization")
+    if token == "demo-token":
+        return AuthenticatedIdentity(actor_id="alice", tenant_id="tenant-a")
+    return None
+```
+
+### Rule
+
+- Only a trusted authentication layer should create `AuthenticatedIdentity`
+- Never trust caller-controlled tenant headers directly
+- Always filter queries by the authenticated tenant
+
+---
+
+## 2.4 Advanced traditional app pattern
+
+Now let us build a more realistic app:
+
+- create item
+- list item
+- get item
+- delete item
+- use kernel capability execution with policy
+
+The example app already exists here:
+
+- [apps/example_crud_app/app.py](apps/example_crud_app/app.py)
+
+Use it as a reference. It shows:
+
+- startup and shutdown lifecycle
+- health checks
+- trusted execution context
+- tenant-scoped database queries
+- request validation
+
+### Example flow
+
+```python
+from apps.example_crud_app.app import create_app
+
+app = create_app(
+    identity_resolver=my_identity_resolver,
+    database_path="./data/example.db",
 )
+```
+
+### Best practice
+
+Keep business logic in application services. Keep policy checks at the boundary. Keep DB calls tenant-safe.
+
+---
+
+# 3. P2P Tutorial
+
+This section is for peer-to-peer messaging. P2P in Xyberos is intentionally small and secure by design.
+
+## 3.1 Minimal P2P setup
+
+Start with the raw P2P primitives.
+
+```python
+from xyberos.providers.p2p import (
+    ConfiguredPeerIdentityProvider,
+    InMemoryPeerTransport,
+)
+from xyberos.providers.database import SQLiteProvider
+from xyberos.providers.p2p import SQLitePeerMessageStore
+from xyberos.subsystems.p2p import OfflineMessagingService
+
+async def main():
+    db = SQLiteProvider()
+    await db.initialize({"path": ":memory:"})
+
+    store = SQLitePeerMessageStore(db)
+    await store.initialize({})
+
+    identity = ConfiguredPeerIdentityProvider()
+    await identity.initialize({"peer_id": "device-a"})
+
+    transport = InMemoryPeerTransport()
+    await transport.initialize({})
+
+    messaging = OfflineMessagingService(identity, store, transport)
+    message = await messaging.send("conversation-1", "hello from device-a")
+    print(message)
+```
+
+### What this does
+
+- creates a local peer identity
+- stores messages locally
+- sends a message in a conversation
+- uses in-memory transport for offline sync tests
+
+---
+
+## 3.2 Beginner P2P pattern: offline message sync
+
+P2P is useful when devices may be offline.
+
+```python
+# device A
+message = await messaging_a.send("conversation-1", "offline note")
+
+# device B is offline
+# later, when online
+count = await messaging_a.synchronize("device-b")
+print(count)
+```
+
+### Important idea
+
+The low-level P2P service stores messages locally and retries sync when peers reconnect.
+This is good for offline-first apps, not as a full chat product by itself.
+
+---
+
+## 3.3 Secure application boundary
+
+This is the important security rule for Phase 13:
+
+> Do not expose raw `OfflineMessagingService` directly to application routes.
+
+Instead, use a tenant-scoped wrapper.
+
+```python
+from xyberos.subsystems.p2p import TenantScopedMessagingService
+
+secure_messaging = TenantScopedMessagingService(
+    messaging,
+    tenant_peer_map={
+        "tenant-a": ("device-b",),
+    },
+    allowed_conversations={
+        "tenant-a": ("conversation-1",),
+    },
+)
+```
+
+Then you can do:
+
+```python
+await secure_messaging.send_message(
+    "tenant-a",
+    "conversation-1",
+    "hello from tenant-a",
+)
+```
+
+### Why this wrapper is needed
+
+It rejects:
+
+- cross-tenant access
+- disallowed conversations
+- unauthorized peer IDs
+- missing trusted execution context
+
+This is the secure application boundary pattern.
+
+---
+
+## 3.4 Advanced P2P app pattern
+
+Use the example app:
+
+- [apps/example_p2p_app/app.py](apps/example_p2p_app/app.py)
+
+It demonstrates:
+
+- tenant scoped message routes
+- read/send/sync endpoints
+- restricted peer access
+- application-layer authorization before raw P2P access
+
+### Example route concept
+
+```text
+POST /tenants/{tenant_id}/conversations/{conversation_id}/messages
+GET /tenants/{tenant_id}/conversations/{conversation_id}/messages
+POST /tenants/{tenant_id}/conversations/{conversation_id}/sync/{peer_id}
+```
+
+This keeps the raw messaging layer protected.
+
+The example sync endpoint returns **207 Multi-Status** when the relay rejected
+one or more outbound messages. The response includes `rejected_message_ids` and
+the number of inbound messages merged locally; it does not mean every message
+was delivered. Keep rejected messages for retry and check the relay mailbox's
+capacity and operational logs before retrying.
+
+---
+
+# 4. AI Tutorial
+
+This section teaches you how to add AI in a safe and controlled way.
+
+## 4.1 Minimal AI setup
+
+The AI subsystem is optional and should be enabled only when needed.
+
+```python
+from xyberos.kernel import XyberosKernel, PolicyEngine
 from xyberos.providers.ai import OpenAICompatibleProvider
-from xyberos.subsystems.ai import AISubsystem, ModelMessage, ModelProvider
-from xyberos.kernel.contracts import ExecutionContextAccessor
-
-
-class DemoPolicy(PolicyEngine):
-    async def authorize(
-        self,
-        context: ExecutionContext,
-        capability: Capability,
-        resource=None,
-    ) -> bool:
-        return capability.name == "ai.generate"
-
+from xyberos.subsystems.ai import AISubsystem
 
 provider = OpenAICompatibleProvider()
-ai = AISubsystem(provider)
 kernel = XyberosKernel(
     {
         "xyberos": {
@@ -382,229 +743,210 @@ kernel = XyberosKernel(
                     "config": {
                         "base_url": "http://localhost:11434/v1",
                         "model": "llama3.2",
-                        "timeout_seconds": 30,
-                        "max_input_chars": 100_000,
-                        "max_output_tokens": 2_048,
                     },
                 }
             }
         }
     }
 )
+
+class DemoPolicy(PolicyEngine):
+    async def authorize(self, context, capability, resource=None):
+        return True
+
+kernel.register_provider("ai", provider)
+kernel.register_subsystem("ai", AISubsystem(provider))
 kernel.container.register_utility(PolicyEngine, DemoPolicy())
-kernel.register_subsystem("ai", ai)
+```
 
-await kernel.bootstrap()
+### Important note
+
+This is a local demo pattern only. Real apps should use a trusted policy engine and validated request context.
+
+---
+
+## 4.2 Beginner AI usage pattern
+
+Use a model provider only through the guarded AI subsystem.
+
+```python
+from xyberos.kernel import ExecutionContext, ExecutionContextAccessor
+from xyberos.subsystems.ai import ModelMessage, ModelProvider
+
+context = ExecutionContext("request-a", "tenant-a", "actor-a")
+token = ExecutionContextAccessor.set(context)
+
 try:
-    # In an HTTP app, XyberosContextMiddleware sets this only after trusted auth.
-    token = ExecutionContextAccessor.set(
-        ExecutionContext(
-            request_id="tutorial-request",
-            tenant_id="tenant-demo",
-            actor_id="actor-demo",
-        )
-    )
-    try:
-        model = kernel.container.resolve(ModelProvider)
-        response = await model.generate(
-            [ModelMessage(role="user", content="Give me a one-sentence greeting.")]
-        )
-        print(response.content)
-    finally:
-        ExecutionContextAccessor.reset(token)
+    provider = kernel.container.resolve(ModelProvider)
+    result = await provider.generate([
+        ModelMessage(role="user", content="Write a short welcome message")
+    ])
+    print(result.content)
 finally:
-    await kernel.shutdown()
+    ExecutionContextAccessor.reset(token)
 ```
 
-`ModelProvider` resolved from the container is a guarded facade. It requires a
-trusted execution context and policy approval for `ai.generate`; avoid passing the
-raw provider directly into application flows. The snippet sets context manually to
-make the example standalone. In a server, rely on authenticated middleware, not
-caller-supplied IDs.
+### Why this is safe
 
-To use a hosted OpenAI-compatible endpoint, set `base_url` to that provider's
-HTTPS `/v1` base URL, set `model` to an available model, and provide `api_key` via
-your application's secret-management/configuration path. Do not place credentials
-in source code or committed configuration. The provider does not automatically
-retry with a vendor-specific API if an endpoint lacks a requested feature.
+The guarded provider checks:
 
-## 7. Manually pair devices for encrypted P2P messaging
+- trusted execution context exists
+- actor and tenant are valid
+- policy approves the `ai.generate` capability
 
-Install the optional crypto dependency:
+This prevents the model from being used without app authorization.
 
-```powershell
-python -m pip install -e ".[p2p-crypto]"
-```
+---
 
-Each device has an Ed25519 signing key and a sealed-box encryption key. Provision
-and persist both private keys in application-managed protected storage; do not
-commit them or regenerate them on each start. Generate an identity once, save its
-private keys securely, and exchange only the public bundle over a trusted channel:
+## 4.3 Intermediate AI: intent resolution
+
+Xyberos can also resolve intent from model output.
 
 ```python
-from xyberos.providers.p2p import SodiumPeerIdentityProvider
+from xyberos.subsystems.ai import IntentSubsystem
 
-identity_a = SodiumPeerIdentityProvider()
-await identity_a.initialize({"peer_id": "device-a"})
-public_bundle_a = identity_a.public_keys.to_dict()
-fingerprint_a = identity_a.public_keys.fingerprint
-
-# Persist these values in a secret manager; never print or commit them.
-signing_key_to_store = identity_a.signing_private_key.hex()
-encryption_key_to_store = identity_a.encryption_private_key.hex()
-await identity_a.close()
-```
-
-On later starts, load both private keys from that protected store and pass them
-with the stable peer ID to `initialize`. Compare each device's public-key
-fingerprint out of band before pinning the exchanged bundle. A fingerprint is
-for comparison only; it does not provide key discovery, revocation, or recovery.
-
-Configure the relay with the public bundles for both devices and a mutual allowlist.
-The `Database` instance must already be initialized before `relay.initialize()`:
-
-```python
-from contextlib import asynccontextmanager
-
-from starlette.applications import Starlette
-from xyberos.providers.database import SQLiteProvider
-from xyberos.providers.p2p import HTTPSRelayService, PeerPublicKeys
-
-relay_database = SQLiteProvider()
-trusted_peers = {
-    "device-a": PeerPublicKeys.from_dict(public_bundle_a),
-    "device-b": PeerPublicKeys.from_dict(public_bundle_b),
-}
-relay = HTTPSRelayService(
-    database=relay_database,
-    trusted_peers=trusted_peers,
-    allowed_pairs={
-        "device-a": ("device-b",),
-        "device-b": ("device-a",),
-    },
+intent_subsystem = IntentSubsystem()
+await intent_subsystem.initialize(
+    {"allowed_intents": ["search", "help"]},
+    kernel.container,
 )
-
-
-@asynccontextmanager
-async def lifespan(app):
-    await relay_database.initialize({"path": "./data/relay.db"})
-    try:
-        await relay.initialize()
-        yield
-    finally:
-        await relay.close()
-        await relay_database.close()
-
-
-app = Starlette(routes=relay.routes, lifespan=lifespan)
 ```
 
-Host that route behind TLS for any remote use. The transport rejects non-loopback
-HTTP relay URLs; loopback HTTP exists only for local development and tests. Keep the
-relay database and its lifecycle under the hosting application's control.
+The model output must match the allowed intent format. Invalid or unknown intents are rejected.
 
-On each client, pass the other device's manually verified public bundle to the
-transport and use the same local database for the message store and exact-envelope
-retry cache. Register these providers as the P2P subsystem alongside the database
-subsystem, with the database initialized first:
+### Example valid intent
 
-```python
-from xyberos.providers.p2p import (
-    HTTPSRelayTransportProvider,
-    PeerPublicKeys,
-    SodiumPeerIdentityProvider,
-    SQLitePeerEnvelopeCache,
-    SQLitePeerMessageStore,
-)
-from xyberos.providers.database import SQLiteProvider
-from xyberos.subsystems.database import DatabaseSubsystem
-from xyberos.subsystems.p2p import OfflineMessagingService, P2PSubsystem
-
-# `pinned_device_b` was exchanged and verified out of band.
-database_provider = SQLiteProvider()
-identity = SodiumPeerIdentityProvider()
-store = SQLitePeerMessageStore(database_provider)
-envelope_cache = SQLitePeerEnvelopeCache(database_provider)
-transport = HTTPSRelayTransportProvider(
-    identity,
-    {"device-b": PeerPublicKeys.from_dict(pinned_device_b)},
-    envelope_cache,
-)
-p2p = P2PSubsystem(identity, store, transport)
-```
-
-Enable it in kernel configuration. Private-key values below must come from your
-secret store; remote relay URLs must use HTTPS:
-
-```python
-config = {
-    "xyberos": {
-        "subsystems": {
-            "database": {
-                "enabled": True,
-                "provider": "sqlite",
-                "config": {"path": "./data/device-a.db"},
-            },
-            "p2p": {
-                "enabled": True,
-                "identity": {
-                    "peer_id": "device-a",
-                    "signing_private_key": load_secret("device-a-signing-key"),
-                    "encryption_private_key": load_secret("device-a-encryption-key"),
-                },
-                "message_store": {},
-                "transport": {
-                    "relay_url": "https://relay.example.net",
-                    "timeout_seconds": 30,
-                },
-            },
-        }
-    }
+```json
+{
+  "name": "search",
+  "parameters": {
+    "query": "weather in Tokyo"
+  },
+  "confidence": 0.86
 }
 ```
 
-Construct the kernel from that config, register both subsystems before startup,
-then bootstrap:
+### Key rule
+
+AI output is still untrusted input. It cannot directly authorize actions.
+Your application must validate the result and then enforce policy through the normal capability boundary.
+
+---
+
+## 4.4 Advanced AI app pattern
+
+The example app in this repo includes the safe pattern: model generation behind a trusted policy boundary and tenant-scoped execution context.
+
+Look at:
+
+- [apps/example_crud_app/app.py](apps/example_crud_app/app.py)
+
+It shows how to build a route that sends a prompt to the model provider only after the request has been authorized and the execution context is trusted.
+
+---
+
+# 5. Best Practices
+
+Here are the most important rules when using Xyberos.
+
+## 5.1 Keep the kernel small
+
+Do not put everything in the kernel.
+
+Good:
+
+- runtime lifecycle
+- execution context
+- capability registry
+- subsystem/provider wiring
+
+Avoid:
+
+- app-specific business logic
+- custom web frameworks inside the kernel
+- broad public API surface for every helper class
+
+## 5.2 Use trusted execution context
+
+Always require an application-owned identity resolver before routes execute.
+
+## 5.3 Keep tenant boundaries strict
+
+In your database queries and P2P access, always filter by tenant.
+
+## 5.4 Do not expose raw capabilities
+
+- Do not expose raw `OfflineMessagingService` directly
+- Do not expose raw model provider directly
+- Use guarded wrappers and application policies
+
+## 5.5 Start small
+
+Start with:
+
+1. one database model
+2. one authenticated tenant
+3. one route
+4. one policy check
+5. then add AI or P2P later
+
+---
+
+# 6. Quick Start Cheat Sheet
+
+## Traditional app
 
 ```python
 from xyberos.kernel import XyberosKernel
+from xyberos.providers.database import SQLiteProvider
+from xyberos.subsystems.database import DatabaseSubsystem
 
-kernel = XyberosKernel(config)
-kernel.register_subsystem("database", DatabaseSubsystem(database_provider))
-kernel.register_subsystem("p2p", p2p)
+provider = SQLiteProvider()
+kernel = XyberosKernel({
+    "xyberos": {"subsystems": {"database": {"enabled": True, "provider": "sqlite", "config": {"path": "./data/app.db"}}}}
+})
+kernel.register_subsystem("database", DatabaseSubsystem(provider))
 await kernel.bootstrap()
 ```
 
-After bootstrap, messages are saved locally first. Synchronization sends local
-messages and merges authenticated messages from the selected pinned peer:
+## P2P app
 
 ```python
-messaging = kernel.container.resolve(OfflineMessagingService)
-await messaging.send("conversation-1", "Hello from device A.")
-await messaging.synchronize("device-b")
+from xyberos.subsystems.p2p import TenantScopedMessagingService
+
+secure = TenantScopedMessagingService(
+    messaging,
+    tenant_peer_map={"tenant-a": ("device-b",)},
+    allowed_conversations={"tenant-a": ("conversation-1",)},
+)
 ```
 
-The relay stores ciphertext but can see peer IDs, message IDs, timestamps, sizes,
-and traffic timing. The endpoint message store remains plaintext on each device.
-The relay pages inboxes in batches of at most 100 envelopes, with a 4 MiB
-per-request/response cap. Each device merges a page before persisting its local
-cursor; if synchronization stops before that cursor is saved, the page is replayed
-and idempotently merged on retry. This cursor is not a delivery receipt: the relay
-retains messages append-only and does not delete them when a device advances.
-Pairing is static, and there are no groups, key recovery, retention controls,
-peer-level rate limits, or delivery acknowledgements. This is a protocol foundation,
-not a managed messaging service. Plan retention, rate limits, backups, and key
-recovery before exposing a relay to real users.
+## AI app
 
-## 8. Where to go next
+```python
+from xyberos.subsystems.ai import ModelMessage
 
-- Read [the implementation plan](docs/implementation.md) for each subsystem's
-  maturity and operational constraints.
-- Use [the architecture notes](docs/xyberos2.0.md) for the original design intent.
-- Explore `tests/` for executable examples of lifecycle rollback, tenant isolation,
-  flow retries/timeouts, provider contracts, AI policy checks, and local/relay P2P sync.
+result = await provider.generate([
+    ModelMessage(role="user", content="Give me a summary")
+])
+```
 
-The in-memory P2P transport is still test-only. The HTTPS relay supports manually
-paired one-to-one devices, but needs application-hosted TLS, secure device-key
-storage, and operational retention/rate limits before production deployment. The
-in-memory memory/knowledge providers are bounded baselines, not durable services.
+---
+
+# 7. Next steps
+
+After you understand the basics, try these:
+
+- build a simple CRUD app with login and tenant filtering
+- add a P2P message boundary for a single team or tenant
+- add a guarded AI route with policy approval
+- read the implementation plan in [docs/implementation.md](docs/implementation.md)
+
+The main idea is simple:
+
+- Kernel manages runtime and lifecycle
+- Subsystems expose capabilities
+- Providers implement the real work
+- Application code stays secure by validating tenant, actor, and resource boundaries
+
+If you follow these rules, you will build apps that are easier to reason about and much safer than raw access to providers.
