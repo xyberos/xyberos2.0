@@ -51,13 +51,33 @@ class OfflineMessagingService:
         if peer_id == identity.peer_id:
             raise ValueError("A peer cannot synchronize with itself.")
         local_log = await self._store.all_messages()
-        try:
-            remote_log = await self._transport.exchange(peer_id, local_log)
-        except Exception as exc:
-            raise PeerSyncError(f"Synchronization with peer '{peer_id}' failed.") from exc
-        try:
-            return await self._store.merge(remote_log)
-        except (TypeError, ValueError) as exc:
-            raise PeerSyncError(
-                f"Peer '{peer_id}' returned an invalid or conflicting message log."
-            ) from exc
+        merged_total = 0
+        page_cursor: str | None = None
+        outbound = local_log
+        while True:
+            try:
+                page = await self._transport.exchange(
+                    peer_id,
+                    outbound,
+                    cursor=page_cursor,
+                )
+            except Exception as exc:
+                raise PeerSyncError(
+                    f"Synchronization with peer '{peer_id}' failed."
+                ) from exc
+            try:
+                merged_total += await self._store.merge(page.messages)
+            except (TypeError, ValueError) as exc:
+                raise PeerSyncError(
+                    f"Peer '{peer_id}' returned an invalid or conflicting message log."
+                ) from exc
+            try:
+                await self._transport.acknowledge(peer_id, page.next_cursor)
+            except Exception as exc:
+                raise PeerSyncError(
+                    f"Could not persist synchronization progress with peer '{peer_id}'."
+                ) from exc
+            if not page.has_more:
+                return merged_total
+            page_cursor = page.next_cursor
+            outbound = ()

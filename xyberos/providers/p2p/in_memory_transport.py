@@ -4,6 +4,7 @@ import asyncio
 from collections.abc import Sequence
 
 from xyberos.subsystems.p2p.contracts import (
+    PeerExchangePage,
     PeerMessage,
     PeerMessageStore,
     PeerSyncError,
@@ -61,14 +62,22 @@ class InMemoryPeerTransport(PeerTransportProvider):
         self,
         peer_id: str,
         messages: Sequence[PeerMessage],
-    ) -> tuple[PeerMessage, ...]:
+        cursor: str | None = None,
+    ) -> PeerExchangePage:
+        if cursor is not None:
+            raise PeerSyncError("In-memory peer transport does not support cursors.")
         self._require_initialized()
         async with self._lock:
             if peer_id not in self._online:
                 raise PeerSyncError(f"Peer '{peer_id}' is offline or unavailable.")
             store = self._stores[peer_id]
         await store.merge(messages)
-        return await store.all_messages()
+        return PeerExchangePage(await store.all_messages(), None, False)
+
+    async def acknowledge(self, peer_id: str, cursor: str | None) -> None:
+        del peer_id
+        if cursor is not None:
+            raise PeerSyncError("In-memory peer transport does not support cursors.")
 
     def _require_initialized(self) -> None:
         if not self._initialized:

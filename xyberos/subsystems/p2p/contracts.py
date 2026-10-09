@@ -52,6 +52,27 @@ class PeerMessage:
         object.__setattr__(self, "created_at", self.created_at.astimezone(timezone.utc))
 
 
+@dataclass(frozen=True)
+class PeerExchangePage:
+    messages: tuple[PeerMessage, ...]
+    next_cursor: str | None
+    has_more: bool
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.messages, tuple) or not all(
+            isinstance(message, PeerMessage) for message in self.messages
+        ):
+            raise TypeError("Peer exchange messages must be a tuple of PeerMessage values.")
+        if self.next_cursor is not None and (
+            not isinstance(self.next_cursor, str) or not self.next_cursor
+        ):
+            raise ValueError("Peer exchange cursor must be non-empty text when supplied.")
+        if not isinstance(self.has_more, bool):
+            raise TypeError("Peer exchange has_more must be a boolean.")
+        if self.has_more and (not self.messages or self.next_cursor is None):
+            raise ValueError("A continued peer exchange page must include messages and a cursor.")
+
+
 class PeerIdentityProvider(Provider, ABC):
     @abstractmethod
     async def initialize(self, config: dict[str, object]) -> None:
@@ -109,8 +130,13 @@ class PeerTransportProvider(Provider, ABC):
         self,
         peer_id: str,
         messages: Sequence[PeerMessage],
-    ) -> tuple[PeerMessage, ...]:
-        """Exchange append-only messages with a peer and return its log."""
+        cursor: str | None = None,
+    ) -> PeerExchangePage:
+        """Push local messages and return one bounded remote page."""
+
+    @abstractmethod
+    async def acknowledge(self, peer_id: str, cursor: str | None) -> None:
+        """Persist the page cursor after returned messages have been merged."""
 
 
 class PeerSyncError(RuntimeError):

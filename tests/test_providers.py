@@ -1,16 +1,24 @@
 import asyncio
 import importlib.util
 import os
+import sqlite3
 import tempfile
 import unittest
 from uuid import uuid4
 
+from apps.example_crud_app.migrate import run_migrations
 from xyberos.kernel import DependencyContainer
 from xyberos.providers.blob import LocalFilesystemBlobProvider
 from xyberos.providers.database import PostgreSQLProvider, SQLiteProvider
 from xyberos.providers.database.postgresql import adapt_placeholders
 from xyberos.subsystems.blob import BlobProvider, BlobSubsystem
-from xyberos.subsystems.database import Database, DatabaseProvider, DatabaseSubsystem
+from xyberos.subsystems.database import (
+    Database,
+    DatabaseProvider,
+    DatabaseSubsystem,
+    SchemaMigration,
+    SchemaMigrator,
+)
 
 
 class AlternateSQLiteProvider(SQLiteProvider):
@@ -20,6 +28,79 @@ class AlternateSQLiteProvider(SQLiteProvider):
 
 
 class TestProviderContracts(unittest.TestCase):
+    def test_example_migration_command_is_repeatable(self):
+        async def scenario():
+            with tempfile.TemporaryDirectory() as directory:
+                database_path = os.path.join(directory, "example.sqlite")
+                self.assertEqual(await run_migrations(database_path), (1,))
+                self.assertEqual(await run_migrations(database_path), ())
+
+        asyncio.run(scenario())
+
+    def test_sqlite_schema_migrations_are_ordered_atomic_and_idempotent(self):
+        async def scenario():
+            provider = SQLiteProvider()
+            await provider.initialize({"path": ":memory:"})
+            migrator = SchemaMigrator(provider)
+            migrations = (
+                SchemaMigration(
+                    1,
+                    ("CREATE TABLE migration_one (value TEXT NOT NULL)",),
+                ),
+                SchemaMigration(
+                    2,
+                    (
+                        "CREATE TABLE migration_two (value TEXT NOT NULL)",
+                        "INSERT INTO migration_two (value) VALUES (?)",
+                    ),
+                ),
+            )
+            self.assertEqual(await migrator.apply(migrations[:1]), (1,))
+            self.assertEqual(await migrator.apply(migrations[:1]), ())
+            with self.assertRaisesRegex(
+                sqlite3.ProgrammingError,
+                "Incorrect number of bindings",
+            ):
+                await migrator.apply(migrations)
+            self.assertEqual(
+                await provider.fetch_all(
+                    "SELECT version FROM xyberos_schema_migrations ORDER BY version"
+                ),
+                [{"version": 1}],
+            )
+            self.assertIsNone(
+                await provider.fetch_one(
+                    "SELECT name FROM sqlite_master WHERE name = ?",
+                    ("migration_two",),
+                )
+            )
+            await provider.close()
+
+        asyncio.run(scenario())
+
+    def test_migrations_reject_non_increasing_or_unknown_versions(self):
+        with self.assertRaisesRegex(ValueError, "strictly increasing"):
+            asyncio.run(
+                SchemaMigrator(SQLiteProvider()).apply(
+                    (
+                        SchemaMigration(2, ("SELECT 1",)),
+                        SchemaMigration(1, ("SELECT 1",)),
+                    )
+                )
+            )
+
+        async def scenario():
+            provider = SQLiteProvider()
+            await provider.initialize({"path": ":memory:"})
+            await SchemaMigrator(provider).apply(
+                (SchemaMigration(1, ("SELECT 1",)),)
+            )
+            with self.assertRaisesRegex(RuntimeError, "unknown to this release"):
+                await SchemaMigrator(provider).apply(())
+            await provider.close()
+
+        asyncio.run(scenario())
+
     def test_sqlite_contract_operations_and_transaction(self):
         async def scenario():
             provider = SQLiteProvider()

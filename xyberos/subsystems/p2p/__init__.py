@@ -1,5 +1,6 @@
 from .contracts import (
     PeerIdentity,
+    PeerExchangePage,
     PeerIdentityProvider,
     PeerMessage,
     PeerMessageStore,
@@ -14,6 +15,7 @@ __all__ = [
     "OfflineMessagingService",
     "P2PSubsystem",
     "PeerIdentity",
+    "PeerExchangePage",
     "PeerIdentityProvider",
     "PeerMessage",
     "PeerMessageStore",

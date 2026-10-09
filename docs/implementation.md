@@ -31,6 +31,20 @@ Priority levels match the document:
 - P1: provider ecosystem and AI subsystem
 - P2: P2P and production hardening
 
+Phases 1–11 have implemented the platform foundation and the core relay reliability
+slice, but this does not mean the platform is production-ready. The remaining
+review-driven priorities are:
+
+1. Use the Phase 10 generic capability authorization boundary for exposed
+   operations and retain domain-level checks before adding public APIs.
+2. Establish reproducible deployment, schema migration, CI, and backend validation
+   before making production-readiness claims.
+3. Add further persistence, workflow, retrieval, or UI capabilities only to meet a
+   documented user need; interfaces and demos are not guarantees of durable
+   production services.
+4. Complete relay operational controls, retention policy, key lifecycle design, and
+   independent cryptographic review before presenting P2P as a user-facing service.
+
 ## 2. Implementation milestones
 
 ### Phase 1 — Kernel foundation (P0)
@@ -337,13 +351,13 @@ The initial engine is sequential and in-process, with a configurable bound on co
   identical ID/content pair; reusing an ID with different content is a hard conflict,
   never last-write-wins. Messages are displayed in deterministic
   `(created_at, message_id)` order.
-- Keep the first transport in-process and test-only to validate APIs and offline
-  semantics without choosing a network protocol. A future network transport must
-  authenticate peer identity, bound/validate wire payloads, encrypt traffic where
-  required, and defend against replay and unauthorized tenant/conversation sync.
-- `ConfiguredPeerIdentityProvider` is a development identity only, not a cryptographic
-  device identity. The transport-neutral foundation does not yet deliver messages
-  across processes or machines and must not be deployed as a secure P2P system.
+- The first implementation used an in-process test transport to validate APIs and
+  offline semantics before selecting a network protocol. Phase 9 adds a separately
+  configured HTTPS relay provider; `InMemoryPeerTransport` remains a test fixture.
+- `ConfiguredPeerIdentityProvider` remains a development identity only. Use the
+  Phase 9 sodium identity and HTTPS relay for authenticated encrypted network
+  exchanges. The relay is not built into the kernel and must be hosted/configured by
+  the application.
 - The SQLite message store uses the application's already-initialized `Database`
   provider, so configure/start the database subsystem before the P2P subsystem.
   Supply a stable, application-assigned peer ID:
@@ -367,16 +381,359 @@ The initial engine is sequential and in-process, with a configurable bound on co
 - offline peers leave local messages intact; reconnect synchronization converges and
   can be safely repeated
 - duplicate messages are idempotent and same-ID conflicting content is rejected
-- peer identity/storage/transport are replaceable contracts, and no network transport
-  or peer service is required by the kernel
-- deployment-grade peer authentication, discovery, encryption, and cross-process
-  networking remain explicitly out of scope for this foundation slice
+- peer identity/storage/transport are replaceable contracts, and no peer service is
+  required by the kernel
+- deployment-grade peer discovery, dynamic enrollment, group messaging, key
+  rotation, and managed key recovery remain out of scope for this foundation slice
 
-## 3. Enhancement suggestions to the plan
+### Phase 7 — Production hardening (P2)
+
+#### Deliverables
+
+- distinct kernel liveness and readiness status, with Starlette-compatible health routes
+- HTTP admission middleware and in-flight work tracking for graceful drain
+- bounded shutdown drain timeout with retryable shutdown after a timeout
+- metadata-only kernel lifecycle observer events
+- explicit validation for kernel-owned runtime configuration
+
+#### Scope and operational behavior
+
+- `kernel.health.live` indicates that the runtime has not failed or stopped;
+  `kernel.health.ready` is true only after all enabled subsystems have initialized
+  and while the kernel is accepting work. It does not perform active health probes
+  against external databases, model services, or peers.
+- `create_health_routes(kernel)` adds `GET /health/live` and `GET /health/ready`.
+  `KernelAdmissionMiddleware` rejects new HTTP requests with `503` while the kernel
+  is not ready, tracks admitted requests, and exempts those default health paths.
+  If health routes use a custom prefix, configure the middleware's `excluded_paths`
+  to match them.
+- `kernel.work()` can also track non-HTTP work. Shutdown first switches the kernel
+  to `STOPPING`, preventing new admissions, then waits up to the configured
+  `xyberos.runtime.shutdown_drain_timeout_seconds` (30 seconds by default).
+  If the timeout expires, `ShutdownDrainTimeoutError` is raised and subsystems are
+  left open; after outstanding work has completed or been cancelled by the
+  application, shutdown can be retried. The kernel does not forcibly cancel
+  arbitrary tasks or thread/process work.
+- An optional synchronous `KernelObserver` receives subsystem initialize/shutdown
+  outcomes, elapsed time, and exception type only. It receives no prompts,
+  credentials, tenant IDs, or request payloads. Observer failures are logged and
+  counted in `observer_failure_count`; they do not interrupt runtime lifecycle.
+- The `xyberos` configuration namespace accepts only `runtime` and `subsystems`.
+  `runtime` currently accepts only `shutdown_drain_timeout_seconds`, which must be
+  positive and finite. Subsystem-specific settings remain owned by their subsystem
+  and provider validators. Legacy unwrapped configuration remains supported.
+
+#### Exit criteria
+
+- health readiness transitions through startup, running, and drain states, separately
+  from liveness
+- requests admitted before shutdown drain before subsystem teardown; later requests
+  receive `503`
+- drain timeout is explicit and leaves resources available for a later shutdown retry
+- lifecycle instrumentation contains no application payload or secret values
+- malformed kernel runtime configuration fails before subsystem startup
+
+### Phase 8 — Runnable reference application and end-to-end validation
+
+#### Deliverables
+
+- runnable local CRUD reference app with SQLite and explicitly demo-only identity
+- integrated public liveness/readiness endpoints and kernel request admission
+- opt-in `/ai/generate` endpoint wired through the existing guarded model facade
+- end-to-end coverage of startup, tenant-authenticated CRUD, health, and shutdown
+- documentation that can be followed from setup through a successful local request
+
+#### Scope
+
+- Use the example CRUD app as the integration point for kernel lifecycle, database
+  subsystem/provider, trusted identity middleware, health endpoints, and graceful
+  request drain.
+- Keep demo authentication isolated in a clearly named local entry point. It must
+  not be represented as production authentication and must not be enabled by the
+  library's default app factory.
+- Offer model generation only when both a provider and application-owned policy are
+  injected. Resolve identity through the same trusted middleware as other routes;
+  return policy denials as forbidden responses.
+- Keep the default end-to-end path usable without Ollama or external services.
+  Model generation remains optional and subject to the existing AI policy and
+  trusted-context guard.
+- Verify public health probes work without application credentials, while tenant
+  CRUD routes require resolved identity and remain tenant-scoped.
+
+#### Exit criteria
+
+- the documented local startup command serves health and authenticated CRUD routes
+- startup and shutdown health/admission transitions are covered by tests
+- missing identity is rejected and forged tenant headers do not change the resolved
+  tenant for database operations
+- the default end-to-end tests require no Ollama, PostgreSQL, or network service
+
+### Phase 9 — Encrypted one-to-one HTTPS relay
+
+#### Deliverables
+
+- PyNaCl/libsodium-backed per-device Ed25519 signing and sealed-box key pairs
+- manually pinned public-key bundles with SHA-256 fingerprints
+- opaque encrypted message envelopes with sender signatures
+- SQLite-backed exact-envelope cache for idempotent retransmission across restarts
+- HTTPS request-response relay transport and a Starlette relay endpoint
+- signed request proofs with timestamp validation and persistent replay nonces
+- bilateral peer-pair allowlists and bounded request/response payload sizes
+
+#### Scope and security boundaries
+
+- The relay synchronizes one-to-one peer mailboxes over signed HTTPS POST requests.
+  It verifies the request signer against its configured peer keys, enforces a
+  configured bilateral pair allowlist, stores signed sealed-box envelopes, and
+  returns envelopes from the selected peer. The relay cannot decrypt message body,
+  conversation ID, or other encrypted message content; message ID, sender ID,
+  recipient ID, timestamp, ciphertext size, and traffic timing remain visible.
+- `SodiumPeerIdentityProvider` uses Ed25519 signatures and libsodium sealed boxes
+  (Curve25519/XSalsa20-Poly1305). Public bundles must be compared out of band and
+  pinned at both clients and the relay. The fingerprint is for comparison, not a
+  key-discovery or recovery system.
+- Persist both private keys in application-managed protected storage. If keys are
+  omitted, the provider generates ephemeral keys that are suitable only for tests;
+  restarting with new keys invalidates the old manual pairing. Key rotation,
+  revocation, recovery, group key distribution, and account/device discovery are
+  not implemented.
+- `SQLitePeerEnvelopeCache` persists the exact random sealed-box envelope by
+  recipient and message ID. Retries reuse those exact bytes, so relay ID conflict
+  detection remains meaningful after process restart. The local message store still
+  holds decrypted plaintext; this phase does not encrypt client data at rest.
+- The relay endpoint is an application-hosted Starlette route. Remote deployment
+  must terminate TLS and apply normal operational protections (network policy,
+  backups, monitoring, and rate limiting). Plain HTTP is accepted only for loopback
+  development. The current relay has static pairing, append-only retention, a 4 MiB
+  request/response cap, and no delivery acknowledgements or mailbox pruning.
+  Synchronization is capped at 100 envelopes with no pagination; a larger backlog
+  blocks sync until addressed operationally. It is a protocol foundation, not a
+  complete managed messaging service.
+- Each HTTP request is Ed25519-signed over the method, exact path, timestamp, nonce,
+  and body hash. The relay enforces a five-minute timestamp window and stores used
+  nonces. Message signatures bind outer routing metadata to the ciphertext. The
+  receiver verifies the pinned sender key before decrypting and validating message
+  metadata.
+- The relay's current nonce lock is process-local. Do not claim multi-worker replay
+  safety until nonce creation is made atomic using database-enforced uniqueness
+  and verified under concurrent requests and multiple workers.
+
+#### Exit criteria
+
+- independent client identities exchange messages through the real HTTP relay
+  endpoint and decrypt only on the intended recipient
+- message body and conversation ID are absent from relay-stored envelope content
+- retries remain identical after client restart when the same private keys and local
+  envelope cache are retained
+- unpinned peers, unauthorized pairs, replayed request proofs, invalid signatures,
+  and conflicting reused message IDs are rejected
+- remote relay URLs require HTTPS; insecure HTTP works only on loopback
+
+## 3. Review-driven gaps, risks, and next phases
+
+The following work is prioritized from the engineering review. Phase 10 is now
+implemented; Phases 11–14 remain planned. Phase 11 is the reliability gate before
+promoting the relay to a user-facing feature.
+
+### Phase 10 — Mandatory capability authorization boundary
+
+**Status: implemented in the kernel API.**
+
+#### Gap and risk
+
+The kernel supports capability registration and defines `PolicyEngine`, but it has
+no generic executor that binds a registered capability to a handler and guarantees
+authorization before execution. AI generation has its own guard and the reference
+app has route-level checks, but capability registration alone does not protect
+application operations.
+
+#### Scope
+
+- Implement a generic capability executor that accepts only registered
+  capabilities, obtains the trusted `ExecutionContext`, asks the configured
+  `PolicyEngine`, and invokes the associated handler only after authorization.
+- Deny by default when context is missing, policy is missing or fails, the
+  capability is unregistered, or resource input is invalid. Surface explicit,
+  non-sensitive failures; never turn policy exceptions into success.
+- Keep domain-level resource authorization and tenant-scoped database access in
+  the application/subsystem layer. The generic check does not replace them.
+- Test that denied and exceptional policy decisions do not call handlers, forged
+  identity headers do not affect policy inputs, and request context is reset on
+  normal and exceptional paths.
+- Document which operations must use the executor and which internal operations
+  are intentionally not capabilities.
+
+Applications register capability descriptors and handlers before kernel startup,
+register a `PolicyEngine` utility, and invoke them through
+`await kernel.execute_capability(name, *args, resource=..., **kwargs)`. The kernel
+tracks each invocation as admitted work so shutdown stops new capability calls and
+drains active ones. `requires_authentication=True` requires non-empty actor and
+tenant IDs in the current trusted execution context. All invocations, including
+capabilities that do not require an authenticated actor, still require a context
+and a policy decision. Handler registration alone is not a policy decision, and
+direct calls to application services remain the application's authorization
+responsibility.
+
+#### Exit criteria
+
+- Every operation exposed through the generic capability API is authorized before
+  its handler runs.
+- Missing context or policy cannot result in an allow decision.
+- Unit and HTTP integration tests cover allow, deny, missing policy, handler
+  non-invocation, and context cleanup.
+
+### Phase 11 — Relay reliability and lifecycle (core delivered)
+
+#### Gap and risk
+
+The Phase 9 relay had append-only mailboxes, no pagination, and a 100-envelope
+per-sync limit. A larger inbox failed rather than progressing. Nonce replay checking
+was process-local and did not serialize requests across multiple workers or relay
+instances.
+
+#### Scope
+
+- Add bounded cursor-based pagination so clients can drain large mailboxes without
+  losing messages or exceeding response limits. **Delivered:** pages are limited
+  to 100 envelopes; clients merge each page before persisting its cursor, and
+  retrying before cursor persistence safely replays idempotent messages.
+- Make nonce consumption atomic across concurrent workers by relying on database
+  uniqueness/transactions and handle uniqueness conflicts as replay rejections.
+  **Delivered:** nonce uniqueness and envelope deduplication are enforced by
+  database constraints, not process-local locks.
+- Preserve mailbox order using relay-assigned sequences, including deterministic
+  backfill for envelopes already present during initialization.
+- Test concurrent duplicate proofs, large backlogs, repeated synchronization, and
+  exact ciphertext persistence across client restarts.
+- **Deferred:** define delivery acknowledgements, retention and deletion semantics
+  before implementing mailbox pruning. The local cursor is a client-side progress
+  checkpoint; it does not cause relay deletion or prove human/device delivery.
+- **Deferred:** add peer quotas/rate limits and operational metrics; specify key
+  rotation, revocation, re-pairing, and recovery. Do not change envelope/proof
+  formats without versioning and compatibility tests.
+- Obtain independent cryptographic review before using the relay for sensitive
+  communications or claiming forward secrecy. The sealed-box design has no
+  ratcheting sessions, exposes routing metadata, and leaves endpoint message
+  storage unencrypted.
+
+#### Exit criteria
+
+- Arbitrarily large mailboxes can be synchronized in bounded, repeatable pages.
+- Page retry and local cursor persistence behavior are specified and tested.
+- Replay rejection relies on transactional database uniqueness; validate it on each
+  supported production database backend as part of Phase 12.
+- Per-peer resource controls and operational signals remain a prerequisite for
+  public or production relay deployment, not a delivered Phase 11 feature.
+- Security claims match reviewed protocol properties; no unsupported
+  confidentiality or forward-secrecy claim is made.
+
+### Phase 12 — Production deployment and persistence baseline (baseline delivered)
+
+#### Gap and risk
+
+The repository is currently strongest as a local, testable foundation. Lifecycle
+health is not an active dependency probe; schema creation relies on provider-time
+`CREATE TABLE IF NOT EXISTS`; and the plan does not yet establish a reproducible
+deployment/CI and tested compatibility policy.
+
+#### Scope
+
+- Add a minimal deployment runbook covering TLS termination, secret injection,
+  network exposure, backup/restore, logs, and graceful shutdown. **Delivered:**
+  [docs/deployment.md](deployment.md) documents operator responsibilities and
+  provider maturity.
+- Add schema migration/versioning and document upgrade/rollback expectations.
+  **Delivered:** `SchemaMigration` and `SchemaMigrator` provide ordered,
+  transactional, forward-only SQL migrations and reject unknown applied versions;
+  the example CRUD app includes a versioned migration and a single-run migration
+  command. Production deployments must run migrations as a single pre-deploy job.
+- Define active readiness checks for configured critical dependencies separately
+  from process liveness. Use bounded probes and do not expose credentials or
+  sensitive connection details in errors. **Delivered:** `create_health_routes`
+  accepts application-supplied async probes, runs them with a bounded timeout, and
+  reports only ready/unavailable status per probe.
+- Add database contract tests for SQLite and PostgreSQL, and run PostgreSQL tests
+  using a reproducible CI service when the optional extra is enabled.
+  **Delivered:** SQLite tests run locally; CI provisions PostgreSQL 16 and enables
+  the existing PostgreSQL contract integration test.
+- Add CI for the declared Python versions, lint/type checks, default tests, and
+  dependency security checks. **Delivered:** `.github/workflows/ci.yml` configures
+  Python 3.10–3.13, Ruff, scoped Pyright, the complete unittest suite, PostgreSQL,
+  and `pip-audit`. Hosted CI results are the evidence for each matrix runtime.
+- Document which providers are demonstration/local implementations and which are
+  supported for durable production use. In particular, in-memory memory/knowledge
+  and local filesystem blob providers do not imply distributed/durable semantics.
+  **Delivered:** see the provider maturity section in the runbook.
+
+#### Exit criteria
+
+- A clean checkout has a reproducible CI workflow; matrix/runtime results remain
+  contingent on successful hosted runs.
+- A documented deployment can report configured dependency readiness, perform
+  supported backup/restore procedures, and drain/shut down with stated limits.
+- The migration utility supplies a transactional versioned upgrade path; it is
+  forward-only and requires one deployment runner.
+- Compatibility and provider maturity claims are bounded to the configured matrix
+  and backend tests rather than presumed for untested environments.
+
+### Phase 13 — Secure reference application extension (conditional)
+
+Implement this only if a real application use case requires P2P messaging exposed
+over HTTP. Complete Phase 10 first.
+
+#### Scope
+
+- Expose read, send, and synchronize operations only through the capability
+  boundary and tenant-/conversation-scoped application services.
+- Keep peer identities and pairing policy in trusted application configuration;
+  do not accept an arbitrary target peer as sufficient authorization from a
+  request body.
+- Demonstrate offline queueing and retry behavior without presenting the relay as
+  a complete consumer messaging service.
+- Test cross-tenant access, unauthorized peers, retry/idempotency, mailbox errors,
+  and lifecycle shutdown.
+- Explain endpoint plaintext, relay-visible metadata, key storage responsibilities,
+  and relay retention in the example documentation.
+
+#### Exit criteria
+
+- The sample enforces authorization for every send, read, and synchronization
+  operation and passes negative cross-tenant/unauthorized-peer tests.
+- The sample accurately communicates the relay's supported behavior and
+  operational limitations.
+
+### Phase 14 — API stability and product focus
+
+#### Gap and risk
+
+The platform spans web applications, workflows, AI, retrieval, blob storage, and
+P2P. Without a defined target developer and user problem, this breadth risks
+duplicating mature ecosystems while multiplying maintenance and security costs.
+
+#### Scope
+
+- Identify the target developer and the concrete workflows Xyberos should make
+  safer or simpler than composing existing libraries.
+- Mark supported public APIs, deprecation/versioning rules, and extension points;
+  keep internal contracts free to evolve until there is a reason to stabilize them.
+- Prioritize durable flows, production memory/knowledge, richer web scaffolding, or
+  other expansions only when validated by a user need and acceptance criteria.
+- Keep dynamic plugin discovery and autonomous tool execution deferred until trust,
+  compatibility, policy, and maintenance requirements are specified.
+
+#### Exit criteria
+
+- The project's scope and compatibility promise are explicit.
+- Every new subsystem has a demonstrated user case, an owner, and measurable
+  behavior/operational acceptance criteria.
+- Xyberos is positioned as a composable platform rather than as feature-equivalent
+  to mature web, workflow, AI, or messaging systems.
+
+## 4. Enhancement suggestions to the plan
 
 These are the key enhancements I recommend adding to the architecture before implementation begins.
 
-### 3.1 Add explicit execution policies to the flow runtime
+### 4.1 Add explicit execution policies to the flow runtime
 
 The existing plan correctly notes that async I/O alone is not enough for CPU-heavy AI or ML work. This should be formalized.
 
@@ -403,7 +760,7 @@ Recommended behavior:
 
 This avoids forcing all developers to understand Starlette internals or ad hoc worker configuration.
 
-### 3.2 Separate identity, authorization, and execution context
+### 4.2 Separate identity, authorization, and execution context
 
 The current design is strong, but the security boundary should be made explicit.
 
@@ -416,7 +773,7 @@ Suggested model:
 
 This is important because a context variable is not itself a trust boundary.
 
-### 3.3 Add provider-specific concurrency defaults to SQLite
+### 4.3 Add provider-specific concurrency defaults to SQLite
 
 The document’s concern about SQLite concurrency is valid and should be turned into concrete defaults in the SQLite provider.
 
@@ -441,7 +798,7 @@ And runtime safeguards:
 - use `aiosqlite` or equivalent async integration at the provider layer
 - document when PostgreSQL is the correct choice for multi-writer workloads
 
-### 3.4 Introduce observability contracts from day one
+### 4.4 Introduce observability contracts from day one
 
 The architecture discusses observability but should define it as a deliberate runtime concern.
 
@@ -458,7 +815,7 @@ Recommended metrics and traces:
 
 Sensitive data should never be logged by default.
 
-### 3.5 Keep provider registrations explicit and safe
+### 4.5 Keep provider registrations explicit and safe
 
 The provider registry should remain a registry, not a dynamic plugin loader.
 
@@ -470,7 +827,7 @@ Recommended rules:
 - compatibility checks should verify declared contract support
 - dynamic third-party loading should be deferred until the security model is proven
 
-### 3.6 Treat transport identity as untrusted
+### 4.6 Treat transport identity as untrusted
 
 HTTP headers and other client-controlled request fields may provide hints or requested values, but they must not establish an authenticated actor or trusted tenant on their own.
 
@@ -484,13 +841,13 @@ Recommended boundary:
 
 Context variables carry execution data; they are not proof of identity and are not an authorization mechanism.
 
-### 3.7 Make subsystem startup transactional
+### 4.7 Make subsystem startup transactional
 
 Startup can fail after some subsystems have already acquired resources. Track successfully initialized subsystems and, if a later initialization fails, shut down the successful ones in reverse initialization order before surfacing the original startup failure. Preserve cleanup failures as diagnostics without hiding the startup error.
 
 Lifecycle behavior should also define whether repeated shutdown is safe and what happens when a subsystem's shutdown fails. Only successfully initialized subsystems should be shut down.
 
-### 3.8 Validate configuration with explicit schemas
+### 4.8 Validate configuration with explicit schemas
 
 Give runtime, subsystem, and provider configuration defined schemas and validation rules. Reject unknown keys where appropriate, invalid values, missing required settings, and unsupported provider/contract combinations with actionable errors at startup.
 
@@ -498,7 +855,7 @@ Document configuration precedence and secret handling. Secrets should come from 
 
 Avoid binding the public configuration API to an implementation-specific schema library unless that dependency is justified; the important requirements are stable validation behavior and useful errors.
 
-### 3.9 Make retries safe by design
+### 4.9 Make retries safe by design
 
 Retries can repeat external side effects when a timeout or connection failure leaves the operation outcome uncertain. Before adding automatic retry behavior:
 
@@ -510,23 +867,23 @@ Retries can repeat external side effects when a timeout or connection failure le
 
 Start with in-process flows. Defer durable or resumable execution until a demonstrated use case requires it.
 
-### 3.10 Define readiness and graceful shutdown
+### 4.10 Define readiness and graceful shutdown
 
 Expose separate liveness and readiness semantics. Liveness indicates that the process is running; readiness indicates that required startup work and configured critical subsystems are healthy enough to serve traffic.
 
 During shutdown, stop accepting new work, allow in-flight requests or flows a bounded drain period, then cancel or time out remaining work and release subsystem resources. Report failures rather than silently treating partial cleanup as success.
 
-### 3.11 Make tenant isolation an end-to-end invariant
+### 4.11 Make tenant isolation an end-to-end invariant
 
 Test tenant isolation across the full path from authenticated request through capability authorization to database access. Include concurrent requests for different tenants, missing identity, forged tenant headers, direct service/data-access calls, and attempts to use context values to change access. Every data-access path must apply tenant scoping or prove why it is not applicable.
 
-### 3.12 Defer plugin discovery
+### 4.12 Defer plugin discovery
 
 Keep `plugins/` as a future packaging and extension boundary, not an early runtime feature. Initially, applications should import and register trusted providers and subsystems explicitly. Do not scan directories or load arbitrary code automatically.
 
 Before adding third-party plugin discovery, specify trust and installation rules, compatibility/versioning, configuration validation, startup-failure isolation, and the security impact of executing plugin code in-process.
 
-## 4. Proposed future project structure
+## 5. Proposed future project structure
 
 The tree below is a target layout to make package responsibilities and dependencies visible. It is intentionally illustrative: create directories and packages when a working feature needs them, not just to fill out the tree. Phase 1 remains focused on the kernel under `xyberos/kernel/`.
 
@@ -622,7 +979,7 @@ xyberos/
     └── end_to_end/
 ```
 
-### 4.1 Directory responsibilities and boundaries
+### 5.1 Directory responsibilities and boundaries
 
 | Location | Belongs here | Must not become |
 | --- | --- | --- |
@@ -636,17 +993,17 @@ xyberos/
 | `apps/` | Runnable applications that prove the public APIs work together | Shared platform implementation |
 | `tests/` | Unit, contract, integration, security, and end-to-end tests grouped by scope | Product runtime code |
 
-### 4.2 Provider versus plugin
+### 5.2 Provider versus plugin
 
 A provider is one implementation of a subsystem contract—for example, the SQLite implementation of the database subsystem. A plugin is an optional packaging/registration boundary that may contribute one or more providers, subsystems, or modules. A provider does not have to be a plugin, and first-party providers should initially be imported and registered explicitly by the application.
 
 Do not implement automatic plugin discovery or arbitrary code loading in the first release. If plugin support is introduced later, define a trust, version-compatibility, configuration-validation, and failure-isolation model before enabling it.
 
-### 4.3 Middleware versus HTTP adapter
+### 5.3 Middleware versus HTTP adapter
 
 Use `xyberos/middleware/` only for middleware that can remain independent of a particular web framework. Put Starlette-specific ASGI middleware—including the adapter that establishes and resets `ExecutionContext` around a request—in `xyberos/http/middleware.py`. This keeps the kernel and reusable middleware free of Starlette imports while retaining a clear place for the current HTTP integration.
 
-### 4.4 Dependency direction
+### 5.4 Dependency direction
 
 The intended dependency direction is:
 
@@ -660,7 +1017,7 @@ kernel contracts and runtime
 
 Providers implement subsystem contracts; the kernel should not import concrete providers. The kernel must not import `xyberos/http`, Starlette, SQLite libraries, AI SDKs, or P2P libraries. Optional subsystems and providers should be importable only when an application enables or registers them.
 
-### 4.5 Security placement
+### 5.5 Security placement
 
 Security is a cross-cutting platform responsibility, not an optional subsystem that applications can accidentally omit from protected operations.
 
@@ -674,7 +1031,7 @@ Phase 2 establishes and tests the trusted HTTP-to-context identity boundary and 
 
 The Phase 2 HTTP adapter intentionally does not prescribe or implement a token/session scheme. The application must inject an identity resolver backed by its chosen authentication mechanism; if none is configured or no verified identity is returned, protected routes reject the request.
 
-## 5. Recommended starter configuration
+## 6. Recommended starter configuration
 
 ```yaml
 xyberos:
@@ -716,7 +1073,7 @@ xyberos:
       enabled: false
 ```
 
-## 6. Testing plan
+## 7. Testing plan
 
 ### Required test categories
 
@@ -758,7 +1115,7 @@ xyberos:
   - worker cleanup
   - connection cleanup
 
-## 7. Suggested first implementation task list
+## 8. Suggested first implementation task list
 
 ### Sprint 1
 
@@ -786,7 +1143,7 @@ xyberos:
 4. Document deployment and provider configuration guidance
 5. Keep plugin loading out of scope until trust and compatibility requirements are specified
 
-## 8. Final assessment
+## 9. Final assessment
 
 The architecture in [docs/xyberos2.0.md](./docs/xyberos2.0.md) is sound and correctly prioritizes a simple server-based kernel plus optional subsystems. The strongest implementation improvements are:
 
@@ -798,4 +1155,4 @@ The architecture in [docs/xyberos2.0.md](./docs/xyberos2.0.md) is sound and corr
 - explicit configuration validation, readiness, and graceful shutdown
 - deferred plugin discovery and retry safety based on idempotency
 
-If these are added early, Xyberos 2.0 stays lightweight, testable, and production-minded while still leaving room for AI, flow orchestration, and optional P2P features later.
+If these are added early, Xyberos 2.0 stays lightweight, testable, and production-minded while leaving higher-level AI, flow orchestration, and managed peer services optional.

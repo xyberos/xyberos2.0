@@ -8,9 +8,11 @@ from xyberos.kernel import (
     ExecutionContext,
     ExecutionContextAccessor,
     InProcessEventBus,
+    KernelNotReadyError,
     LifecycleState,
     DependencyContainer,
     Provider,
+    ShutdownDrainTimeoutError,
     Subsystem,
     SubsystemShutdownError,
     XyberosKernel,
@@ -46,11 +48,119 @@ class RecordingProvider(Provider):
 
 
 class TestKernel(unittest.TestCase):
+    def test_health_and_shutdown_drain_track_admitted_work(self):
+        async def scenario():
+            calls = []
+            kernel = XyberosKernel(shutdown_drain_timeout=1)
+            kernel.register_subsystem("first", RecordingSubsystem("first", calls))
+            self.assertTrue(kernel.health.live)
+            self.assertFalse(kernel.health.ready)
+            await kernel.bootstrap(
+                {"subsystems": {"first": {"enabled": True}}}
+            )
+            self.assertTrue(kernel.health.ready)
+
+            entered = asyncio.Event()
+            release = asyncio.Event()
+
+            async def active_request():
+                async with kernel.work():
+                    entered.set()
+                    await release.wait()
+
+            request = asyncio.create_task(active_request())
+            await entered.wait()
+            shutdown = asyncio.create_task(kernel.shutdown())
+            for _ in range(20):
+                if kernel.state is LifecycleState.STOPPING:
+                    break
+                await asyncio.sleep(0)
+
+            self.assertEqual(kernel.health.active_work, 1)
+            self.assertFalse(kernel.health.ready)
+            with self.assertRaises(KernelNotReadyError):
+                async with kernel.work():
+                    pass
+
+            release.set()
+            await request
+            await shutdown
+            self.assertEqual(kernel.state, LifecycleState.STOPPED)
+            self.assertEqual(calls, ["start:first", "stop:first"])
+
+        asyncio.run(scenario())
+
+    def test_observer_failures_are_logged_and_counted_without_failing_lifecycle(self):
+        async def scenario():
+            calls = []
+
+            def failing_observer(_event):
+                raise RuntimeError("telemetry unavailable")
+
+            kernel = XyberosKernel(observer=failing_observer)
+            kernel.register_subsystem("first", RecordingSubsystem("first", calls))
+            await kernel.bootstrap(
+                {"subsystems": {"first": {"enabled": True}}}
+            )
+            await kernel.shutdown()
+
+            self.assertEqual(kernel.observer_failure_count, 2)
+            self.assertEqual(kernel.state, LifecycleState.STOPPED)
+            self.assertEqual(calls, ["start:first", "stop:first"])
+
+        asyncio.run(scenario())
+
+    def test_shutdown_drain_timeout_leaves_subsystems_open_for_retry(self):
+        async def scenario():
+            calls = []
+            kernel = XyberosKernel(shutdown_drain_timeout=0.01)
+            kernel.register_subsystem("first", RecordingSubsystem("first", calls))
+            await kernel.bootstrap(
+                {"subsystems": {"first": {"enabled": True}}}
+            )
+
+            async with kernel.work():
+                with self.assertRaises(ShutdownDrainTimeoutError) as caught:
+                    await kernel.shutdown()
+                self.assertEqual(caught.exception.active_work, 1)
+                self.assertEqual(kernel.state, LifecycleState.STOPPING)
+                self.assertEqual(calls, ["start:first"])
+
+            await kernel.shutdown()
+            self.assertEqual(calls, ["start:first", "stop:first"])
+            self.assertEqual(kernel.state, LifecycleState.STOPPED)
+
+        asyncio.run(scenario())
+
+    def test_lifecycle_observer_receives_safe_timing_events(self):
+        async def scenario():
+            calls = []
+            events = []
+            kernel = XyberosKernel(observer=events.append)
+            kernel.register_subsystem("first", RecordingSubsystem("first", calls))
+            await kernel.bootstrap(
+                {"subsystems": {"first": {"enabled": True}}}
+            )
+            await kernel.shutdown()
+
+            self.assertEqual(
+                [(event.name, event.component, event.outcome) for event in events],
+                [
+                    ("subsystem.initialize", "first", "succeeded"),
+                    ("subsystem.shutdown", "first", "succeeded"),
+                ],
+            )
+            self.assertTrue(all(event.duration_seconds >= 0 for event in events))
+            self.assertEqual(kernel.observer_failure_count, 0)
+
+        asyncio.run(scenario())
+
     def test_bootstrap_failure_rolls_back_started_subsystems_in_reverse(self):
         async def scenario():
             calls = []
             kernel = XyberosKernel()
-            kernel.register_subsystem("first", RecordingSubsystem("first", calls))
+            subsystem = RecordingSubsystem("first", calls)
+            kernel.register_subsystem("first", subsystem)
             kernel.register_subsystem(
                 "second",
                 RecordingSubsystem("second", calls, fail_initialize=True),
@@ -69,6 +179,7 @@ class TestKernel(unittest.TestCase):
                 )
 
             self.assertEqual(calls, ["start:first", "start:second", "stop:first"])
+            self.assertEqual(subsystem.asserted_config, {})
             self.assertEqual(kernel.state, LifecycleState.FAILED)
             self.assertFalse(kernel.is_initialized)
 
@@ -143,6 +254,23 @@ class TestKernel(unittest.TestCase):
     def test_invalid_subsystem_config_fails_before_startup(self):
         with self.assertRaises(ConfigurationError):
             KernelConfig.from_dict({"subsystems": {"database": {"enabled": "yes"}}})
+
+    def test_kernel_config_rejects_unknown_keys_and_invalid_drain_timeouts(self):
+        for config in (
+            {"xyberos": {"subsytems": {}}},
+            {"xyberos": {"runtime": {"shutdown_timeout": 5}}},
+            {"xyberos": {"runtime": {"shutdown_drain_timeout_seconds": True}}},
+            {"xyberos": {"runtime": {"shutdown_drain_timeout_seconds": 0}}},
+            {"xyberos": {"runtime": {"shutdown_drain_timeout_seconds": 10**10000}}},
+        ):
+            with self.subTest(config=config):
+                with self.assertRaises(ConfigurationError):
+                    KernelConfig.from_dict(config)
+
+        config = KernelConfig.from_dict(
+            {"xyberos": {"runtime": {"shutdown_drain_timeout_seconds": 2.5}}}
+        )
+        self.assertEqual(config.shutdown_drain_timeout_seconds, 2.5)
 
     def test_execution_context_resets_to_previous_scope(self):
         context = ExecutionContext("request-1", "tenant-1", "actor-1")

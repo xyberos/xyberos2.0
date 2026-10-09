@@ -81,6 +81,14 @@ class Capability:
     description: str = ""
     requires_authentication: bool = True
 
+    def __post_init__(self) -> None:
+        if not isinstance(self.name, str) or not self.name.strip():
+            raise ValueError("Capability name must be non-empty text.")
+        if not isinstance(self.description, str):
+            raise ValueError("Capability description must be text.")
+        if not isinstance(self.requires_authentication, bool):
+            raise ValueError("'requires_authentication' must be a boolean.")
+
 
 class PolicyEngine(ABC):
     """Contract for authorization and execution policy decisions."""

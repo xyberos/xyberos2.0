@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: xyberos_test
+          POSTGRES_USER: xyberos
+          POSTGRES_PASSWORD: ci-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U xyberos -d xyberos_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      XYBEROS_TEST_POSTGRES_DSN: postgresql://xyberos:ci-only-password@localhost:5432/xyberos_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Update installer security fixes
+        run: python -m pip install --upgrade "pip>=26.2"
+      - name: Install package and CI tools
+        run: python -m pip install -e ".[postgres,p2p-crypto,dev]"
+      - name: Lint
+        run: >-
+          ruff check
+          xyberos/http/health.py
+          xyberos/subsystems/database/migrations.py
+          apps/example_crud_app/app.py
+          apps/example_crud_app/migrate.py
+          tests/test_phase2_app.py
+          tests/test_providers.py
+      - name: Type-check new deployment primitives
+        run: >-
+          pyright --pythonversion 3.10
+          xyberos/http/health.py
+          xyberos/subsystems/database/migrations.py
+          apps/example_crud_app/app.py
+          apps/example_crud_app/migrate.py
+      - name: Run tests
+        run: python -m unittest discover -s tests -p "test_*.py"
+      - name: Audit Python dependencies
+        run: pip-audit

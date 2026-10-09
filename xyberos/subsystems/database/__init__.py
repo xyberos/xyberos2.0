@@ -1,4 +1,5 @@
 from .contracts import Database, DatabaseProvider, DatabaseTransaction, ExecutionResult
+from .migrations import SchemaMigration, SchemaMigrator
 from .subsystem import DatabaseSubsystem
 
 __all__ = [
@@ -7,4 +8,6 @@ __all__ = [
     "DatabaseSubsystem",
     "DatabaseTransaction",
     "ExecutionResult",
+    "SchemaMigration",
+    "SchemaMigrator",
 ]
