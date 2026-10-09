@@ -1,63 +1,64 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
 from typing import Any
 
 from xyberos.kernel.container import DependencyContainer
 from xyberos.kernel.contracts import Subsystem
 
-from .contracts import Database, DatabaseProvider
+from .contracts import MemoryProvider
 
 
-class DatabaseSubsystem(Subsystem):
-    """Lifecycle adapter that exposes a configured database provider."""
-
+class MemorySubsystem(Subsystem):
     def __init__(
         self,
-        providers: DatabaseProvider | Mapping[str, DatabaseProvider],
+        providers: MemoryProvider | Mapping[str, MemoryProvider],
     ) -> None:
-        if isinstance(providers, DatabaseProvider):
+        if isinstance(providers, MemoryProvider):
             self.providers = {providers.provider_name: providers}
         else:
             self.providers = dict(providers)
         if not self.providers:
-            raise ValueError("DatabaseSubsystem requires at least one provider.")
+            raise ValueError("MemorySubsystem requires at least one provider.")
         for name, provider in self.providers.items():
-            if not isinstance(provider, DatabaseProvider):
+            if not isinstance(provider, MemoryProvider):
                 raise TypeError(
-                    f"Database provider '{name}' does not implement DatabaseProvider."
+                    f"Memory provider '{name}' does not implement MemoryProvider."
                 )
             if name != provider.provider_name:
                 raise ValueError(
-                    f"Database provider registry key '{name}' does not match "
+                    f"Memory provider registry key '{name}' does not match "
                     f"provider name '{provider.provider_name}'."
                 )
         self._container: DependencyContainer | None = None
-        self._active_provider: DatabaseProvider | None = None
+        self._active_provider: MemoryProvider | None = None
 
     async def initialize(
         self,
         config: dict[str, Any],
         container: DependencyContainer,
     ) -> None:
+        unknown_keys = set(config) - {"provider", "config"}
+        if unknown_keys:
+            raise ValueError(
+                f"Unknown memory subsystem config keys: {', '.join(sorted(unknown_keys))}."
+            )
         provider_name = config.get(
             "provider",
             next(iter(self.providers)) if len(self.providers) == 1 else None,
         )
-        if not isinstance(provider_name, str) or not provider_name:
-            raise ValueError(
-                "Database subsystem config must select a registered provider."
-            )
-        if provider_name not in self.providers:
+        if not isinstance(provider_name, str) or provider_name not in self.providers:
             available = ", ".join(sorted(self.providers))
             raise ValueError(
-                f"Database provider '{provider_name}' is not registered. "
+                f"Memory provider '{provider_name}' is not registered. "
                 f"Available providers: {available}."
             )
         provider_config = config.get("config", {})
         if not isinstance(provider_config, Mapping):
-            raise ValueError("Database provider config must be a mapping.")
+            raise ValueError("Memory provider config must be a mapping.")
         provider = self.providers[provider_name]
         await provider.initialize(provider_config)
-        container.register_utility(Database, provider)
+        container.register_utility(MemoryProvider, provider)
         self._container = container
         self._active_provider = provider
 
@@ -67,6 +68,6 @@ class DatabaseSubsystem(Subsystem):
                 await self._active_provider.close()
         finally:
             if self._container is not None:
-                self._container.unregister(Database)
+                self._container.unregister(MemoryProvider)
                 self._container = None
             self._active_provider = None

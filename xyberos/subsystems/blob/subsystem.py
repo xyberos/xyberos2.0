@@ -1,37 +1,34 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
 from typing import Any
 
 from xyberos.kernel.container import DependencyContainer
 from xyberos.kernel.contracts import Subsystem
 
-from .contracts import Database, DatabaseProvider
+from .contracts import BlobProvider
 
 
-class DatabaseSubsystem(Subsystem):
-    """Lifecycle adapter that exposes a configured database provider."""
+class BlobSubsystem(Subsystem):
+    """Lifecycle adapter that exposes a selected blob provider."""
 
-    def __init__(
-        self,
-        providers: DatabaseProvider | Mapping[str, DatabaseProvider],
-    ) -> None:
-        if isinstance(providers, DatabaseProvider):
+    def __init__(self, providers: BlobProvider | Mapping[str, BlobProvider]) -> None:
+        if isinstance(providers, BlobProvider):
             self.providers = {providers.provider_name: providers}
         else:
             self.providers = dict(providers)
         if not self.providers:
-            raise ValueError("DatabaseSubsystem requires at least one provider.")
+            raise ValueError("BlobSubsystem requires at least one provider.")
         for name, provider in self.providers.items():
-            if not isinstance(provider, DatabaseProvider):
-                raise TypeError(
-                    f"Database provider '{name}' does not implement DatabaseProvider."
-                )
+            if not isinstance(provider, BlobProvider):
+                raise TypeError(f"Blob provider '{name}' does not implement BlobProvider.")
             if name != provider.provider_name:
                 raise ValueError(
-                    f"Database provider registry key '{name}' does not match "
+                    f"Blob provider registry key '{name}' does not match "
                     f"provider name '{provider.provider_name}'."
                 )
+        self._active_provider: BlobProvider | None = None
         self._container: DependencyContainer | None = None
-        self._active_provider: DatabaseProvider | None = None
 
     async def initialize(
         self,
@@ -42,24 +39,21 @@ class DatabaseSubsystem(Subsystem):
             "provider",
             next(iter(self.providers)) if len(self.providers) == 1 else None,
         )
-        if not isinstance(provider_name, str) or not provider_name:
-            raise ValueError(
-                "Database subsystem config must select a registered provider."
-            )
-        if provider_name not in self.providers:
+        if not isinstance(provider_name, str) or provider_name not in self.providers:
             available = ", ".join(sorted(self.providers))
             raise ValueError(
-                f"Database provider '{provider_name}' is not registered. "
+                f"Blob provider '{provider_name}' is not registered. "
                 f"Available providers: {available}."
             )
         provider_config = config.get("config", {})
         if not isinstance(provider_config, Mapping):
-            raise ValueError("Database provider config must be a mapping.")
+            raise ValueError("Blob provider config must be a mapping.")
+
         provider = self.providers[provider_name]
         await provider.initialize(provider_config)
-        container.register_utility(Database, provider)
-        self._container = container
+        container.register_utility(BlobProvider, provider)
         self._active_provider = provider
+        self._container = container
 
     async def shutdown(self) -> None:
         try:
@@ -67,6 +61,6 @@ class DatabaseSubsystem(Subsystem):
                 await self._active_provider.close()
         finally:
             if self._container is not None:
-                self._container.unregister(Database)
+                self._container.unregister(BlobProvider)
                 self._container = None
             self._active_provider = None

@@ -138,60 +138,239 @@ The initial engine is sequential and in-process, with a configurable bound on co
 
 #### Deliverables
 
-- PostgreSQL provider
-- blob provider abstraction
+- PostgreSQL provider using the optional `psycopg` extra
+- blob provider contract and local filesystem implementation
+- lifecycle subsystems that expose configured database and blob providers
 - config compatibility checks
 - provider tests
 
 #### Scope
 
-- Add PostgreSQL-backed data provider for production deployments
-- Add blob storage abstraction with local filesystem provider first
-- Validate provider compatibility through contract tests, not method-name matching
+- Register trusted provider instances explicitly in application code; select among
+  those instances through subsystem configuration. Provider names must match their
+  registry keys, and provider instances must implement the subsystem contract.
+- Configure the database subsystem with a selected provider and its provider-owned
+  settings:
+
+  ```python
+  DatabaseSubsystem(
+      {
+          "sqlite": SQLiteProvider(),
+          "postgresql": PostgreSQLProvider(),
+      }
+  )
+  ```
+
+  ```yaml
+  database:
+    provider: postgresql
+    config:
+      conninfo: "<injected securely from XYBEROS_DATABASE_URL>"
+      connect_timeout: 10
+  ```
+
+- Keep PostgreSQL support optional so the core and SQLite-only installations do not
+  require a PostgreSQL driver. Install the `postgres` extra to use it. PostgreSQL
+  configuration requires non-empty `conninfo`; credentials should come from
+  environment or a secrets provider, never committed configuration.
+- Use the common database contract for portable SQL. The PostgreSQL adapter accepts
+  qmark placeholders (`?`) for positional parameters and `:name` placeholders for
+  mappings, while preserving placeholder-like text in quoted strings and comments.
+  PostgreSQL-specific operators that use `?` can be ambiguous with this portable
+  placeholder convention; use an equivalent function such as `jsonb_exists` in
+  portable application queries.
+- Define blob content and metadata operations independently of the storage backend.
+  The initial local provider stores generated, traversal-safe identifiers in
+  per-blob directories, writes content and metadata through a staging directory,
+  and supports an optional maximum blob size:
+
+  ```python
+  BlobSubsystem(LocalFilesystemBlobProvider())
+  ```
+
+  ```yaml
+  blob:
+    provider: local_filesystem
+    config:
+      root: ./data/blobs
+      max_size_bytes: 10485760
+  ```
+
+- Treat local filesystem storage as a single-host development or deployment option,
+  not shared or highly available object storage. Applications needing those
+  properties should add a compatible remote blob provider.
+- Verify behavior with provider contract tests, configuration rejection tests, and
+  optional integration tests against real PostgreSQL. The PostgreSQL integration
+  test runs only when `psycopg` is installed and `XYBEROS_TEST_POSTGRES_DSN` points
+  to a dedicated test database.
 
 #### Exit criteria
 
-- providers can swap via configuration without rewriting app logic
-- compatibility tests verify expected behavior
-- invalid provider configuration fails fast with actionable errors
+- registered providers can be selected by configuration without rewriting app
+  logic; unregistered or incompatible providers fail with actionable errors
+- SQLite and local blob contract tests verify data, lifecycle, and validation
+  behavior
+- PostgreSQL placeholder/configuration behavior is tested, and live database
+  integration is explicitly opt-in
+- no PostgreSQL driver is required for the SQLite-only installation
 
 ### Phase 5 — AI subsystem (P1)
 
 #### Deliverables
 
-- model provider abstractions
-- intent and memory subsystems
-- optional knowledge subsystem
+- provider-neutral model contract and OpenAI-compatible HTTP adapter
+- validated intent proposal service
+- tenant/actor/conversation-scoped memory contract and bounded in-memory provider
+- optional tenant- and actor-filtered knowledge contract and keyword provider
 
 #### Scope
 
-- Add provider abstraction for model APIs and local inference
-- Keep AI behind capability boundaries and policy checks
-- Validate model outputs before they affect business operations
-- Keep knowledge and memory optional and tenant-aware
+- Keep AI optional: install and initialize `AISubsystem` only in applications that
+  require model requests. The initial `OpenAICompatibleProvider` uses Python's
+  standard library and supports hosted and local OpenAI Chat Completions-compatible
+  endpoints. Supply API credentials through secure configuration; non-loopback
+  endpoints must use HTTPS, while plain HTTP is allowed only for loopback. Register
+  the application's `PolicyEngine`
+  in the kernel dependency container before startup. `AISubsystem` exposes a guarded
+  model-provider facade that requires trusted execution context and approval for
+  the `ai.generate` capability; inject this facade, not the raw provider, into flows.
+  By default it targets Ollama's local OpenAI-compatible endpoint at
+  `http://localhost:11434/v1` and selects `llama3.2`. Ollama must be running and the
+  model must be available locally; model requests fail explicitly if either is
+  unavailable. Set `base_url` and `model` to use another Ollama model or compatible
+  service. For the default, install/start Ollama and pull it with `ollama pull
+  llama3.2`.
+
+  ```python
+  AISubsystem(OpenAICompatibleProvider())
+  ```
+
+  ```yaml
+  ai:
+    provider: openai_compatible
+    config:
+      base_url: http://localhost:11434/v1
+      model: llama3.2
+      timeout_seconds: 30
+      max_input_chars: 100000
+      max_output_tokens: 2048
+  ```
+
+- Ollama commonly uses `num_predict` in native API options rather than supporting
+  every OpenAI-specific option identically; verify JSON response format support for
+  the chosen Ollama version/model. The adapter sends OpenAI-compatible
+  `max_tokens`/`response_format` fields and does not silently retry via a different
+  API. Non-Ollama endpoints may require an API key.
+- Provide text generation and JSON-mode response requests. The HTTP adapter bounds
+  response size, applies socket timeouts, and reports status/transport failures
+  without logging prompts, API keys, or response bodies. Cancellation of a coroutine
+  cannot forcibly terminate a request already running in a worker thread.
+- Provide a structured intent resolver that accepts an application allowlist and
+  validates the model response shape, allowed intent name, parameter object, and
+  confidence range. An intent is only a proposal: it does not authorize or execute
+  an action. Applications must validate parameters against their own business
+  schemas and perform authorization through the normal capability/resource boundary.
+  Initialize `AISubsystem` before `IntentSubsystem`; the latter resolves the already
+  initialized model provider from the dependency container.
+- Provide a process-local memory provider with a configurable message-count bound.
+  Conversation count and message length are bounded as well. Every read and write
+  requires a trusted execution context matching the tenant and actor, and is scoped
+  by conversation. This baseline is not durable; a persistent memory provider can
+  implement the same contract.
+
+  ```yaml
+  memory:
+    provider: in_memory
+    config:
+      max_messages: 50
+      max_conversations: 100
+      max_message_chars: 10000
+  ```
+
+- Provide an optional keyword-based knowledge provider with tenant filtering,
+  optional actor ACLs, explicit source allowlists, and source citations. Retrieved
+  retrieval requires trusted context matching the supplied tenant and actor.
+  Retrieved content is untrusted input, not instructions. The in-memory provider is
+  for tests and small demos; document count and content length are bounded. It does
+  not provide embeddings, chunking, durable/vector storage, or document ingestion
+  pipelines. Document indexing/deletion are administrative operations and must be
+  exposed only through application code that authorizes the source and tenant.
+
+  ```yaml
+  knowledge:
+    provider: in_memory_keyword
+    config:
+      max_documents: 1000
+      max_document_chars: 100000
+  ```
+- Keep tool execution, model-driven side effects, autonomous agents, and automatic
+  authorization out of this phase. Model tool calling can be added only with
+  application-owned schemas, capability checks, and any required user confirmation.
 
 #### Exit criteria
 
-- AI can assist a flow without bypassing authorization
-- retrieval and model-side effects remain auditable and scoped to tenant permissions
+- an application can inject a model provider into a flow without making the flow
+  runtime depend on a model SDK or bypassing authorization
+- malformed or out-of-allowlist model intents are rejected and no intent can execute
+  a capability directly
+- memory reads cannot cross tenant, actor, or conversation boundaries
+- knowledge retrieval applies tenant, actor, and allowed-source filters before
+  returning source-linked citations
+- model-provider timeout and HTTP failures are surfaced, with no default prompt or
+  credential logging
+- no hosted model, embedding, vector database, or additional SDK is required to run
+  the core test suite
 
 ### Phase 6 — P2P subsystem (P2)
 
 #### Deliverables
 
-- peer identity and transport abstraction
-- one real proof-of-concept app
+- peer identity, append-only message-store, and exchange transport contracts
+- local-first messaging service with SQLite-backed durable message log
+- in-memory transport for deterministic offline/reconnect and conflict tests
 
 #### Scope
 
-- Build one focused app such as a messaging or sync demo
-- Keep P2P optional and not mandatory for the server kernel
+- Keep P2P optional and outside the server kernel. The message service can persist
+  locally while a peer is unavailable, and synchronization can be retried later.
+- Use stable message IDs and immutable message contents. Merge is idempotent for an
+  identical ID/content pair; reusing an ID with different content is a hard conflict,
+  never last-write-wins. Messages are displayed in deterministic
+  `(created_at, message_id)` order.
+- Keep the first transport in-process and test-only to validate APIs and offline
+  semantics without choosing a network protocol. A future network transport must
+  authenticate peer identity, bound/validate wire payloads, encrypt traffic where
+  required, and defend against replay and unauthorized tenant/conversation sync.
+- `ConfiguredPeerIdentityProvider` is a development identity only, not a cryptographic
+  device identity. The transport-neutral foundation does not yet deliver messages
+  across processes or machines and must not be deployed as a secure P2P system.
+- The SQLite message store uses the application's already-initialized `Database`
+  provider, so configure/start the database subsystem before the P2P subsystem.
+  Supply a stable, application-assigned peer ID:
+
+  ```yaml
+  p2p:
+    identity:
+      peer_id: device-a
+    message_store: {}
+    transport: {}
+  ```
+
+  `InMemoryPeerTransport` is intentionally a test fixture and is not the runtime
+  transport. Application routes/services must enforce user authorization before
+  sending or exposing local messages; the local-first service is not an identity or
+  authorization system.
 
 #### Exit criteria
 
-- offline behavior is tested
-- peer identity and sync conflict rules are defined
-- server and peer responsibilities remain clearly separated
+- sending persists to the local SQLite log before synchronization is attempted
+- offline peers leave local messages intact; reconnect synchronization converges and
+  can be safely repeated
+- duplicate messages are idempotent and same-ID conflicting content is rejected
+- peer identity/storage/transport are replaceable contracts, and no network transport
+  or peer service is required by the kernel
+- deployment-grade peer authentication, discovery, encryption, and cross-process
+  networking remain explicitly out of scope for this foundation slice
 
 ## 3. Enhancement suggestions to the plan
 
@@ -384,11 +563,21 @@ xyberos/
 │   │   │   ├── contracts.py            # Typed flow and step interfaces
 │   │   │   ├── engine.py               # Deterministic execution, branches, retries, timeout
 │   │   │   └── execution.py            # Async/thread/process execution policies
-│   │   ├── ai/                         # Optional model and structured-output interfaces
-│   │   ├── knowledge/                  # Optional ingestion, retrieval, and citation APIs
-│   │   ├── memory/                     # Optional session and persistent-memory APIs
-│   │   ├── blob/                       # Optional file/blob storage API
-│   │   └── p2p/                        # Optional peer identity, transport, and sync APIs
+│   │   ├── ai/
+│   │   │   ├── contracts.py            # Model message, response, and provider contract
+│   │   │   ├── intent.py               # Validated model intent proposals
+│   │   │   └── subsystem.py            # Model provider selection and lifecycle
+│   │   ├── knowledge/
+│   │   │   ├── contracts.py            # Tenant-scoped retrieval and citation contract
+│   │   │   └── subsystem.py            # Knowledge provider lifecycle
+│   │   ├── memory/
+│   │   │   ├── contracts.py            # Tenant/actor/conversation-scoped memory
+│   │   │   └── subsystem.py            # Memory provider lifecycle
+│   │   ├── p2p/
+│   │   │   ├── contracts.py            # Peer identity, append-only messages, transport
+│   │   │   ├── messaging.py            # Local-first send and explicit peer sync
+│   │   │   └── subsystem.py            # Peer messaging provider lifecycle
+│   │   └── blob/                       # Optional file/blob storage API
 │   ├── providers/                      # First-party implementations of subsystem contracts
 │   │   ├── database/
 │   │   │   ├── sqlite.py
@@ -396,8 +585,16 @@ xyberos/
 │   │   ├── blob/
 │   │   │   ├── local_filesystem.py
 │   │   │   └── s3_compatible.py
-│   │   └── ai/
-│   │       └── ...                     # Concrete model-provider adapters, when selected
+│   │   ├── ai/
+│   │   │   └── openai_compatible.py    # Hosted or local Chat Completions adapter
+│   │   ├── knowledge/
+│   │   │   └── in_memory.py            # Demo/test keyword retrieval provider
+│   │   ├── memory/
+│   │   │   └── in_memory.py            # Bounded process-local conversation history
+│   │   └── p2p/
+│   │       ├── local_identity.py       # Configured demo identity
+│   │       ├── sqlite_message_store.py # Durable append-only local message log
+│   │       └── in_memory_transport.py  # Test-only multi-peer transport
 │   ├── plugins/                        # Optional, explicitly registered extension packages
 │   │   ├── __init__.py
 │   │   └── ...                         # Add only when a real extension needs this boundary
