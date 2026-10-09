@@ -1054,6 +1054,216 @@ Keep `plugins/` as a future packaging and extension boundary, not an early runti
 
 Before adding third-party plugin discovery, specify trust and installation rules, compatibility/versioning, configuration validation, startup-failure isolation, and the security impact of executing plugin code in-process.
 
+### 4.13 Developer-friendly public API plan (from ENHANCEMENTS.md)
+
+The enhancement notes describe a developer experience goal rather than a new framework. The implementation should preserve the current runtime architecture while adding a thin application-facing facade that makes common work feel small and conventional.
+
+#### 4.13.1 Add a simple `App()` facade
+
+To make Xyberos accessible to conventional app developers, add a first-class `App()` object that hides low-level kernel plumbing behind familiar route, startup, and lifecycle APIs.
+
+Recommended contract:
+
+```python
+from xyberos import App
+
+app = App()
+
+@app.get("/")
+async def home(request):
+    return {"message": "Hello from Xyberos"}
+```
+
+Design rules:
+
+- `App()` is a thin facade over the existing Starlette integration and kernel runtime.
+- It owns application startup/shutdown and route registration.
+- It still relies on the kernel for lifecycle, subsystems, and capability execution.
+- Developers must not need to know the registry or provider model for the common case.
+
+#### 4.13.2 Make SQLite the default local development path
+
+SQLite should be the default backend for local builds. The implementation should keep the underlying provider abstraction intact while making SQLite the easiest path for developers.
+
+Recommended behavior:
+
+- local development starts with SQLite by default
+- a single database path is configured automatically unless overridden
+- migrations and schema setup are handled through clear, explicit startup rules
+- PostgreSQL remains optional and should require explicit provider selection
+- application code should avoid coupling to the backend provider where practical
+
+This preserves the provider abstraction while reducing onboarding friction.
+
+#### 4.13.3 Keep business logic out of route handlers
+
+The public API should encourage a layered app structure:
+
+```text
+myapp/
+  app.py
+  services/
+  routes/
+  models/
+  tests/
+```
+
+Recommended pattern:
+
+- routes parse and validate HTTP input
+- services own business logic and validation
+- repositories/providers own persistence logic
+- the kernel remains responsible for runtime lifecycle and trust boundaries
+
+This keeps the application logic easier to test and easier to evolve without code sprawl in the route layer.
+
+#### 4.13.4 Add plugin ergonomics without exposing internals
+
+Developer-friendly plugin support should be provided through a small, safe interface:
+
+```python
+app.use("database")
+app.use("auth")
+app.use("email", provider="smtp", host="localhost", port=1025)
+```
+
+The implementation should standardize:
+
+- initialization and shutdown lifecycle
+- configuration validation
+- dependency declarations
+- service registration
+- health checks
+- startup rollback on failure
+
+This should be a stable extension API, not a dynamic code loader or arbitrary dependency discovery mechanism.
+
+#### 4.13.5 Add a small AI facade
+
+AI should be easy to add without forcing developers to understand the full model-provider stack.
+
+Recommended API:
+
+```python
+ai = app.ai()
+
+answer = await ai.ask("What should I build next?")
+```
+
+Supported methods should remain intentionally small:
+
+- `ai.ask()`
+- `ai.generate()`
+- `ai.embed()`
+- `ai.stream()`
+- `ai.tool()`
+
+The AI facade must still respect the existing policy and execution-context model. Model output remains untrusted input; application logic must validate it and use policy checks before acting on it.
+
+#### 4.13.6 Keep flows explicit, not mandatory
+
+Flow execution should remain optional. Simple operations should remain simple.
+
+The implementation plan should preserve the current direct-service style for ordinary app behavior while adding an explicit flow abstraction for multi-step orchestration:
+
+```python
+result = await app.run_flow(
+    "support",
+    input={"question": question},
+)
+```
+
+Recommended rules:
+
+- direct CRUD and service calls should not require a flow wrapper
+- multi-step workflows use `Flow` only when they need explicit retries, tracing, or orchestration
+- step contracts should include timeout, retry policy, idempotency, and structured output
+- the flow engine stays a subsystem built on top of the same runtime, not a competing app framework
+
+#### 4.13.7 Keep configuration obvious and predictable
+
+The implementation should support a compact configuration model such as `xyberos.toml`, environment-variable overrides, and explicit validation.
+
+Recommended behavior:
+
+- sensible defaults whenever possible
+- environment variables override file settings
+- secrets are not committed to project files
+- invalid settings fail early with actionable errors
+- optional subsystems are initialized only when enabled
+
+The goal is to reduce configuration overhead without making the runtime opaque.
+
+#### 4.13.8 Make testing first-class
+
+The project should provide an easy testing story that matches the app production patterns.
+
+Suggested capabilities:
+
+- temporary SQLite databases per test
+- dependency overrides for services and providers
+- mock AI providers and external services
+- auth/authorization tests with trusted identity fixtures
+- flow execution inspection and trace assertions
+
+This is essential for maintaining the safety model as the project grows.
+
+#### 4.13.9 Add a minimal CLI and project template
+
+A friendly CLI helps developers start building before they understand the internal architecture.
+
+Recommended commands:
+
+```bash
+xyberos new myapp
+xyberos dev app:app
+xyberos test
+xyberos db migrate
+xyberos doctor
+```
+
+The generated project should stay small and minimal. The template should not create an oversized scaffolding tree before a project has a clear need.
+
+#### 4.13.10 Keep the internal architecture hidden until needed
+
+This is the most important product rule:
+
+- Level 1: application API for common development
+- Level 2: capability API for optional features like AI or flows
+- Level 3: kernel API for advanced platform work
+
+The kernel, subsystem, provider, and flow concepts remain valid internal building blocks. They should not dominate everyday application development, and they should not be required for beginners to achieve a useful app.
+
+#### 4.13.11 Implementation priority for the developer-facing work
+
+The work should be prioritized in this order:
+
+1. `App()` facade and lifecycle management
+2. routing and error handling
+3. SQLite provider and migration defaults
+4. dependency injection and service layer
+5. testing utilities
+6. configuration and CLI
+7. plugin/provider contracts
+8. AI facade
+9. explicit flow API
+10. specialized P2P and workflow additions
+
+This keeps the developer experience improvement grounded in real project needs rather than broad speculative subsystem expansion.
+
+#### 4.13.12 Success benchmark
+
+Before calling the developer experience good enough for release, the project should be able to demonstrate:
+
+- a small app with CRUD endpoints
+- SQLite persistence
+- validation and auth checks
+- unit/integration tests
+- a documented local dev command
+- a second example with AI and a multi-step flow
+
+If those examples can be built without requiring the developer to manipulate low-level kernel details, then the developer-facing goals in the enhancement notes are being met.
+
 ## 5. Proposed future project structure
 
 The tree below is a target layout to make package responsibilities and dependencies visible. It is intentionally illustrative: create directories and packages when a working feature needs them, not just to fill out the tree. Phase 1 remains focused on the kernel under `xyberos/kernel/`.

@@ -119,6 +119,235 @@ In plain language: do not install the whole world to build a basic app.
 
 ---
 
+## How to achieve the developer-friendly features described in ENHANCEMENTS.md
+
+The enhancement notes are not asking for a rewrite of Xyberos into a new framework. They are asking for a disciplined product decision: keep the runtime secure and explicit, but make the public API feel simple and conventional for everyday app development.
+
+The correct implementation strategy is to add a thin developer-facing facade on top of the existing runtime, not to replace the underlying kernel/subsystem/provider model.
+
+### 1. Provide a simple `App()` facade
+
+The biggest improvement would be a first-class application object that hides the kernel plumbing from ordinary developers.
+
+Recommended design:
+
+- `App()` is a thin facade over the existing Starlette integration and Xyberos runtime.
+- It provides a familiar API for routes, startup/shutdown, configuration, and dependency wiring.
+- It still uses the kernel under the hood for lifecycle, subsystem registration, and capability execution.
+- It does not require every developer to understand registries, providers, or execution context unless they are doing advanced work.
+
+Example target behavior:
+
+```python
+from xyberos import App
+
+app = App()
+
+@app.get("/")
+async def home(request):
+    return {"message": "Hello from Xyberos"}
+```
+
+This is the easiest way to make Xyberos feel like a normal Python app framework without removing the security model.
+
+### 2. Make SQLite the default, not an advanced mode
+
+The enhancement notes rightly say that SQLite should be the default starting point for developers.
+
+Implementation guidance:
+
+- initialize SQLite automatically for local development
+- keep the default data path simple and obvious
+- provide a small repository or service abstraction over raw SQL
+- preserve provider abstraction so PostgreSQL can replace SQLite later without rewriting the app layer
+- validate migrations and schema setup with clear errors before start-up
+
+The code should support this progression:
+
+- local dev: SQLite file database
+- test env: isolated temporary SQLite
+- production: configured PostgreSQL or other provider
+
+This reduces setup burden while keeping the architecture extensible.
+
+### 3. Keep business logic out of route handlers
+
+The strongest beginner-friendly pattern is:
+
+- route handlers validate and parse request input
+- services own validation and business rules
+- repositories or providers own data access
+- the kernel and runtime stay separate from domain logic
+
+Recommended structure:
+
+```text
+myapp/
+  app.py
+  services/
+  routes/
+  models/
+  tests/
+```
+
+This pattern should be documented and enforced in examples. It reduces route sprawl and makes tests easier to write.
+
+### 4. Design a plugin system around developer ergonomics
+
+The enhancement notes call for plugins that can be enabled without framework-level knowledge.
+
+The right design is:
+
+- `app.use("database")`
+- `app.use("auth")`
+- `app.use("email", provider="smtp")`
+- standard plugin lifecycle: initialize, validate config, register services, handle shutdown
+
+Rules to implement:
+
+- missing dependencies produce actionable errors
+- invalid config fails early
+- plugin startup errors roll back partially initialized state
+- plugin health checks are easy to inspect
+- built-in subsystems and third-party plugins share the same lifecycle contract but not necessarily the same security defaults
+
+This keeps the plugin model accessible while retaining explicit, safe behavior.
+
+### 5. Add a simple AI facade rather than exposing raw model internals
+
+AI should not require developers to learn the kernel, tool registry, memory adapter, and flow engine all at once.
+
+The recommended pattern is a deliberately small facade:
+
+- `ai.ask()`
+- `ai.generate()`
+- `ai.embed()`
+- `ai.stream()`
+- `ai.tool()`
+
+This should be built on top of the existing provider and policy model, not as a separate parallel framework. It should still support:
+
+- provider selection
+- environment variable or secret-based config
+- request timeouts
+- structured errors
+- knowledge search if used
+- policy validation before tool execution
+
+The design principle is: AI should be easy to add, but never easy to use unsafely.
+
+### 6. Make flow explicit, not mandatory
+
+The enhancement notes are clear: flow orchestration should remain an optional tool, not a hidden requirement.
+
+Implementation guidance:
+
+- simple operations stay direct and simple
+- multi-step orchestration uses a `Flow` abstraction only when needed
+- each flow step should have a clear contract, timeout, retry policy, and trace
+- the flow engine should be a subsystem building on the same underlying runtime
+- the app layer should not require flow creation for ordinary CRUD or AI ask operations
+
+This keeps the system easy to learn while still supporting explicit orchestration for complex tasks.
+
+### 7. Keep configuration simple and obvious
+
+The project should support a small config file like `xyberos.toml` or environment-driven overrides, but avoid a giant low-level config tree.
+
+Recommended rules:
+
+- defaults work out of the box
+- environment variables override file settings
+- secrets stay out of generated config files
+- misconfigured optional subsystems fail early with actionable messages
+- configuration is validated before the app accepts traffic
+
+This reduces friction while preserving explicit control when needed.
+
+### 8. Make testing as easy as writing the app itself
+
+The enhancement notes emphasize testing as a first-class part of developer experience.
+
+Implement the following:
+
+- a small `TestClient`-style wrapper around the app runtime
+- isolated temporary SQLite for tests
+- dependency overrides for providers and services
+- mock AI providers and mock external services
+- easy auth and authorization tests
+- deterministic flow inspection and trace output
+
+This lowers the barrier to robust test coverage and helps the project keep quality high without forcing heavy infrastructure.
+
+### 9. Ship a minimal CLI and project template
+
+The CLI is important because it defines the onboarding experience.
+
+Minimum useful commands:
+
+- `xyberos new myapp`
+- `xyberos dev app:app`
+- `xyberos test`
+- `xyberos db migrate`
+- `xyberos doctor`
+
+The generated template should be minimal and clean, with only the essentials:
+
+```text
+myapp/
+  app.py
+  pyproject.toml
+  xyberos.toml
+  tests/
+```
+
+This is how a framework begins to feel friendly before the first line of application code is written.
+
+### 10. Keep the internal architecture hidden until it is needed
+
+This is the architectural rule that makes the rest possible.
+
+A good public API should be layered like this:
+
+- Level 1: application API for ordinary developers
+- Level 2: capability-level API for optional features
+- Level 3: kernel-level API for advanced platform developers
+
+The kernel, registry, provider, and subsystem concepts remain valid, but they should not dominate everyday developer work. This is how Xyberos can stay strong and explicit without being intimidating.
+
+### 11. The implementation priority order
+
+If the team wants to make the developer experience real, the sequencing matters:
+
+1. `App()` facade and lifecycle management
+2. routing and error handling
+3. SQLite provider and migration defaults
+4. dependency injection and service layer
+5. test utilities
+6. configuration and CLI
+7. plugin/provider contracts
+8. AI facade
+9. explicit flow API
+10. longer-term P2P and durable workflow features
+
+This order matches the enhancement notes and keeps the project moving from beginner-friendly fundamentals to advanced platform capabilities without breaking the design.
+
+### 12. The success benchmark
+
+Before release, Xyberos should be able to demonstrate a small app with:
+
+- 3 CRUD endpoints
+- SQLite persistence
+- validation
+- auth and tenant checks
+- tests
+- a local dev command
+- a second app with AI and a 3-step flow
+
+If the same app can be built in a straightforward way with clear controls and limited framework knowledge, then the developer-friendly goals are being met.
+
+---
+
 ## What is still early-stage or limited
 
 Xyberos is not pretending to be a finished product in every direction. It is a strong foundation, but some areas are still intentionally minimal.
