@@ -219,3 +219,94 @@ class WorkflowTimeoutError(WorkflowExecutionError):
 
 class WorkflowCancelledError(WorkflowExecutionError):
     """Raised when cancellation was requested before or during execution."""
+
+
+class AIError(XyberosError):
+    """Base class for AI facade and provider adapter failures."""
+
+
+class AIConfigurationError(AIError):
+    """Raised when AI configuration is missing, unknown, or unusable."""
+
+
+class AIRequestError(AIError):
+    """Raised when a request cannot be sent as built.
+
+    It is not retryable: the caller has to change the request.
+    """
+
+
+class AITransportError(AIError, TransientError):
+    """Raised when the provider could not be reached or its response was unreadable.
+
+    It derives from :class:`TransientError` so a default retry policy retries it.
+    """
+
+
+class AITimeoutError(AITransportError):
+    """Raised when a provider call or the request's budget ran out.
+
+    A provider timeout is retryable, unlike a workflow step timeout, because it reports a slow or
+    unreachable *service* rather than the engine's verdict on a stuck step.
+    """
+
+
+class AIRateLimitError(AITransportError):
+    """Raised when a provider reports that the client is sending requests too quickly.
+
+    It is retryable for the same reason a transport failure is: the request itself was valid, and a
+    later attempt may succeed.
+    """
+
+
+class AIInvalidPayloadError(AITransportError):
+    """Raised when the provider's response envelope is not the documented shape.
+
+    Missing fields and unreadable bodies are treated as service faults because the connection or an
+    intermediary is the likely cause.
+    """
+
+
+class AIModelNotFoundError(AIError):
+    """Raised when the configured model is not available on the provider."""
+
+    def __init__(self, message: str, *, model: str) -> None:
+        self.model = model
+        super().__init__(message)
+
+
+class AIUnsupportedCapabilityError(AIError):
+    """Raised when the model or adapter does not support what the request needs.
+
+    Capabilities are declared, not inferred: a provider that accepts a request field may still
+    ignore it, so an unsupported capability is refused before any call is made.
+    """
+
+    def __init__(self, message: str, *, capability: str, model: str = "") -> None:
+        self.capability = capability
+        self.model = model
+        super().__init__(message)
+
+
+class AIRefusalError(AIError):
+    """Raised when a provider reports that the model refused the request.
+
+    Refusals are only raised when a provider signals one explicitly; Xyberos never guesses a refusal
+    from response text.
+    """
+
+
+class AISchemaError(AIError):
+    """Raised when a payload does not validate against a declared schema.
+
+    It is deliberately not a :class:`TransientError`: a shape mismatch is a contract or prompt
+    problem, so retrying it has to be an explicit policy decision.
+    """
+
+
+class AIToolError(AIError):
+    """Raised when a tool call is unknown, not allowed, or carries invalid arguments."""
+
+    def __init__(self, message: str, *, tool: str) -> None:
+        self.tool = tool
+        super().__init__(message)

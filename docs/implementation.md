@@ -174,7 +174,7 @@ Deprecation policy: mark a stable API deprecated in documentation and runtime wa
 ## Phase status
 
 The detailed work packages live in the phase-by-phase plan below; this table is the at-a-glance
-state. Phases 0–4 are complete; Phase 5 is next.
+state. Phases 0–5 are complete; Phase 6 is next.
 
 | Phase | Scope | Status | Exit-gate evidence |
 | --- | --- | --- | --- |
@@ -183,30 +183,33 @@ state. Phases 0–4 are complete; Phase 5 is next.
 | 2 | Starlette adapter and SQLite CRUD slice | complete | `tests/http/`, `tests/database/`, `tests/integration/`, `tests/test_import_boundary.py`, `examples/sqlite_crud/`, [ADR 0006](adr/0006-http-and-database-adapters.md) |
 | 3 | Trusted plugin and capability model | complete | `src/xyberos/plugins/`, `src/xyberos/diagnostics.py`, `tests/plugins/`, `tests/integration/test_plugin_packages.py`, `tests/fixtures/metrics_plugin/`, `examples/custom_plugin/`, [ADR 0007](adr/0007-trusted-plugins.md) |
 | 4 | Stable, in-process Workflow engine | complete | `src/xyberos/execution/`, `tests/workflow/` (107 tests), `tests/integration/test_workflow_example.py`, `tests/contracts/examples/phase4_workflow.py`, `examples/workflow/`, `docs/workflow.md`, [ADR 0009](adr/0009-workflow-engine-contract.md) |
-| 5 | Optional AI facade | next | see the Phase 5 entry checklist below |
-| 6 | Experimental single-host durable executor | planned | — |
+| 5 | Optional AI facade | complete | `src/xyberos/ai/`, `tests/ai/` (125 tests), `tests/integration/test_ai_assistant.py` (11 tests), `examples/ai_assistant/`, `docs/ai.md`, [ADR 0010](adr/0010-ai-facade-contract.md) |
+| 6 | Experimental single-host durable executor | next | see the Phase 6 entry checklist below |
 | 7 | Developer experience, hardening, and release | planned | — |
 
-### Phase 5 entry checklist
+### Phase 6 entry checklist
 
-Confirm these before starting Phase 5:
+Confirm these before starting Phase 6:
 
-1. The runtime, HTTP/database, plugin, and Workflow contracts are frozen in
-   [ADR 0005](adr/0005-phase-1-runtime-contract.md),
-   [ADR 0006](adr/0006-http-and-database-adapters.md),
-   [ADR 0007](adr/0007-trusted-plugins.md), and
-   [ADR 0009](adr/0009-workflow-engine-contract.md), and each guide matches the shipped behavior.
-2. Workflow error, deadline, cancellation, and event semantics are stable and *importable* by an
-   adapter, while no AI-shaped concept leaks into `xyberos.execution` or the runtime.
-3. A deterministic fake-provider pattern exists to copy: `FakeExternalService`, `ManualClock`, and
-   `drive`/`wait_for_sleepers` already make retries, deadlines, and cancellation reproducible
-   without wall-clock sleeps. Phase 5 adds its own fake model provider rather than overloading the
-   external-service double.
-4. The AI facade stays optional: core imports and the full test suite pass with no AI SDK
-   installed, and importing `xyberos` loads neither an AI SDK nor `xyberos.ai`.
-5. The owner decisions in "Remaining owner decisions" are made: the Ollama model(s) used in
-   examples and smoke tests, the supported Ollama release range, the model-download policy, and the
-   data-retention/privacy policy for optional AI telemetry.
+1. The AI facade contract is frozen in [ADR 0010](adr/0010-ai-facade-contract.md): classification is
+   the retry interface, events are metadata-only, and no durable state depends on prompt content.
+2. Workflow definitions carry a required `version` and JSON-serializable metadata, so a stored
+   definition can be identified and migrated; the *journal* schema and its migration path are this
+   phase's work, not Phase 4's ([ADR 0009](adr/0009-workflow-engine-contract.md)).
+3. Durable execution is a separate package with a separate execution store: it must not extend the
+   application database provider's general-purpose API (see section 5 of
+   [the architecture plan](PLAN.md#5-native-durable-execution-detailed-design)), and it must not
+   require an AI SDK. Importing the dependency-free `xyberos.ai` contracts is allowed; importing
+   `xyberos.ai.ollama` is not. The runtime still imports neither.
+4. `Plugin`, configuration, and Workflow-definition versioning are versioned independently of the
+   package version ([ADR 0003](adr/0003-versions-and-experimental-scope.md)).
+5. The experimental boundary is named and warns where practical: this phase owns
+   `ExperimentalWarning` and the package that carries it.
+6. A process-kill and restart harness is planned for this phase (it is a prerequisite in the Phase 6
+   prerequisites list, and `tests/crash_recovery/` is reserved for it), and every timing assertion
+   runs on an injectable monotonic clock so leases and retry scheduling stay deterministic.
+7. The owner decisions in "Remaining owner decisions" that concern retention and redistribution are
+   settled for anything this phase persists.
 
 
 ## Detailed phase-by-phase execution plan
@@ -397,6 +400,28 @@ here: plugin registrations record `plugin:<name>` automatically.
 
 **Deliverables:** optional AI package, provider-neutral contracts, fake provider, selected adapters, structured-output/tool APIs, assistant example, and AI security/operations documentation.
 
+**Shipped.** The facade, contracts, tool contract, closed schema subset, and fake provider live in
+`src/xyberos/ai/` and import nothing outside the core package and the standard library, so the core
+wheel answers "no AI SDK installed" with a working, fully testable facade; `xyberos.ai.ollama` is
+the only module behind the `ollama` extra, and `xyberos.ai` never imports it. The frozen contract,
+including the classification-is-the-retry-interface rule and the closed schema subset, is
+[ADR 0010](adr/0010-ai-facade-contract.md), and `docs/ai.md` carries the guide plus the
+security/operations policy with real captured log output.
+
+Two scope notes, both deliberate:
+
+- **Knowledge/retrieval was not built**, as work package 6 requires; it stays in the deferred
+  backlog until it has its own storage, chunking, filtering, authorization, and evaluation
+  contracts. `PLAN.md` section 4.5 lists it as an initial interface, so it is named there as
+  deferred rather than quietly dropped.
+- **Model capability claims are declared, not inferred.** The Ollama adapter cross-checks a declared
+  `tools` claim against what the model reports through `/api/show`, because that is the only
+  capability the API exposes; every other claim is the operator's to make.
+
+Phase 5 also produced the next phase's inputs: AI usage metadata is the only thing Phase 6 may
+persist, the event shape is metadata-only by default, and the Ollama release range and smoke-test
+model names remain owner decisions.
+
 ### Phase 6 - experimental single-host durable executor
 
 **Objective:** provide opt-in persisted Workflow progress for a carefully bounded SQLite, single-host deployment model.
@@ -470,13 +495,17 @@ core runtime/config/registry
         +-- plugin protocol
         |
         +-- Workflow
-              |
-              +-- AI adapters (optional)
-              |
-              +-- durable executor (optional, separate journal)
+        |
+        +-- AI facade (core, no SDK) -- AI adapters (optional)
+        |
+        +-- durable executor (optional, separate journal)
 ```
 
-Dependencies point downward in this diagram. The runtime cannot import HTTP, AI, or durable modules; Workflow cannot import a particular AI SDK; the durable executor consumes stable Workflow definition contracts but does not replace the in-process executor for ordinary work.
+Dependencies point downward in this diagram, and optional pieces hang off the core rather than off
+each other. The runtime cannot import HTTP, AI, or durable modules; `xyberos.ai` imports neither a
+vendor adapter nor `xyberos.execution`, so an AI call is usable with or without a workflow around it;
+Workflow cannot import a particular AI SDK; the durable executor consumes stable Workflow definition
+contracts but does not replace the in-process executor for ordinary work.
 
 ### Definition of phase completion
 
@@ -562,7 +591,22 @@ Use a monotonic clock abstraction for Workflow and durability tests. Avoid sleep
 - Parallel step execution and any claim of DAG scheduling; Phase 4 is sequential and conditional by
   design.
 - Dynamic/imperative decorator Workflows until declarative Workflow semantics and introspection are stable.
-- Knowledge/RAG subsystem until it has a bounded, independently useful provider contract.
+- Knowledge/RAG subsystem until it has a bounded, independently useful provider contract; Phase 5
+  ships embeddings and a tool allowlist, which is what a retrieval layer would need, but no
+  storage/chunking/filtering/authorization contract is designed yet.
+- Deriving tool schemas from type annotations, instead of requiring an explicit schema per tool
+  ([ADR 0010](adr/0010-ai-facade-contract.md)).
+- Streaming tool calls: a streaming response carries content only, and partially validated
+  structured output is not actionable. Supporting this needs a new ADR, not a patch.
+- Additional JSON Schema keywords (`oneOf`, `$ref`, `pattern`, numeric exclusivity). The subset is
+  closed by decision, so widening it requires a new ADR rather than passing a schema that would
+  validate more loosely than it reads.
+- Pairing an embedding model with a chat model in a single provider contract; Phase 5 configures
+  them separately (`model`, `embedding_model`) because one Ollama model does not serve both.
+
+**Non-goals, not deferred work.** Xyberos does not infer a refusal, a provider capability, or
+structured-output support from response text. Only a provider-reported signal is trusted, because a
+guess presented as a classification is worse than an absent one.
 
 The disposition of the external review proposals — including the deferred decorator Workflow API and
 the rejected reordering of the AI facade — is recorded in `PLAN.md` Appendix A.
@@ -572,3 +616,12 @@ the rejected reordering of the AI facade — is recorded in `PLAN.md` Appendix A
 The license remains intentionally undecided and must be selected before any public distribution. The adopted Python, database, TOML, Ollama, and versioning decisions above remove the other Phase 0 blockers.
 
 Before the relevant delivery phase begins, the project owner should also approve the Ollama model(s) used in examples and integration smoke tests, the supported Ollama release range, any model-download/container distribution policy, and the data-retention/privacy policy for optional AI telemetry. These are operational choices, not reasons to delay the provider-neutral facade or fake-provider tests.
+
+**State after Phase 5.** None of these were decided, and Phase 5 deliberately did not decide them on
+the owner's behalf. What shipped instead is neutral to each answer: the adapter requires a model and
+has no default, so only `examples/ai_assistant` ships a convenient model name; nothing is ever pulled
+or upgraded for you; live smoke tests are opt-in behind `XYBEROS_OLLAMA_LIVE*` environment variables
+and are skipped by default; and logging records metadata only unless a caller opts into redacted
+content capture. [ADR 0010](adr/0010-ai-facade-contract.md) records the release range and
+smoke-test model names as still owner-owned, so approving them later changes operator configuration,
+not the contract.

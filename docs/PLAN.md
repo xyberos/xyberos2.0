@@ -329,6 +329,24 @@ Model providers should be optional adapters. Keep provider-specific request form
 
 AI calls should use direct execution by default. A developer should opt into Workflow for explicit multi-step orchestration and into durable execution only when the task needs persisted progress and recovery.
 
+**Shipped in Phase 5.** The facade, provider-neutral contracts, tool contract, closed schema subset,
+and fake provider are dependency-free and live in `src/xyberos/ai/`, so "no AI SDK installed" is a
+supported configuration rather than a degraded one; the Ollama adapter is the only module behind the
+`ollama` extra. Chat, structured output, streaming, embeddings, and tool invocation all shipped, and
+`examples/ai_assistant` runs them through the same DI, plugin, and Workflow contracts as any other
+service. The frozen contract is [ADR 0010](./adr/0010-ai-facade-contract.md) and the guide is
+[`docs/ai.md`](./ai.md).
+
+Two interfaces in the list above did **not** ship, and the phase plan is why:
+
+- **Knowledge retrieval integration** is deferred until it has its own storage, chunking, filtering,
+  authorization, and evaluation contracts. Embeddings and the tool allowlist are the interface a
+  retrieval layer would build on; the layer itself would be a guess today.
+- **Provider capability discovery** is *declared*, not probed, with one exception: the Ollama
+  adapter cross-checks a declared `tools` claim against what a model reports through `/api/show`,
+  because that is the only capability the API exposes. The rest stay the operator's claim, which
+  keeps a wrong claim a configuration bug instead of a silent false promise.
+
 ### 4.6 Experimental native SQLite durability
 
 Implement this after the runtime and Workflow APIs are stable.
@@ -423,15 +441,15 @@ Use a modular monolith, with optional subsystems separated by import and depende
 
 The tree below is the **target** layout. It is not a description of the current tree, and it is
 not a requirement to create empty modules: implement a module only when its responsibilities and
-contracts are understood. Phases 1–4 currently implement:
+contracts are understood. Phases 1–5 currently implement:
 
 ```text
 src/xyberos/
 ├── __init__.py          # public re-exports
 ├── app.py               # App, RequestContext, lifecycle, plugins
-├── config.py            # typed settings, including plugin sections
+├── config.py            # typed settings, including plugin and ai sections
 ├── diagnostics.py       # provider and plugin diagnostics
-├── errors.py            # error taxonomy, including the workflow families
+├── errors.py            # error taxonomy, including the workflow and AI families
 ├── routing.py           # dependency-free route records
 ├── runtime/
 │   ├── __init__.py
@@ -448,6 +466,13 @@ src/xyberos/
 │   ├── events.py        # structured execution events
 │   ├── direct.py        # the single-call execution boundary
 │   └── testing.py       # ManualClock, FakeExternalService, Reply
+├── ai/                  # provider-neutral facade (core, no dependency)
+│   ├── contracts.py     # requests, responses, usage, capabilities, protocols
+│   ├── schema.py        # closed JSON Schema subset
+│   ├── tools.py         # allowlisted tool contract and audit events
+│   ├── facade.py        # AIFacade and the logging policy
+│   ├── testing.py       # FakeModelProvider and scripted replies
+│   └── ollama.py        # the Ollama adapter; only module behind the "ollama" extra
 ├── http/                # optional "http" extra (Starlette)
 │   ├── adapter.py, middleware.py, routing.py, requests.py, testing.py
 └── database/            # optional "database" extra (SQLAlchemy Core, aiosqlite, Alembic)
@@ -456,7 +481,8 @@ src/xyberos/
 examples/
 ├── sqlite_crud/         # worked CRUD slice with Alembic migrations
 ├── custom_plugin/       # plugin authoring example
-└── workflow/            # workflow example with retries, branching, and events
+├── workflow/            # workflow example with retries, branching, and events
+└── ai_assistant/        # AI facade wired through a plugin, DI, routes, and a workflow
 
 tests/
 ├── runtime/             # Phase 1 exit-criteria tests
@@ -464,7 +490,8 @@ tests/
 ├── database/            # provider, PRAGMA, and contention tests
 ├── plugins/             # plugin contract, configuration, and lifecycle tests
 ├── workflow/            # Phase 4 exit-criteria tests
-├── integration/         # end-to-end example, migration, plugin-package, and workflow tests
+├── ai/                  # Phase 5 exit-criteria tests, including the Ollama adapter
+├── integration/         # end-to-end example, migration, plugin-package, workflow, and AI tests
 ├── fixtures/            # separately packaged plugin used as a test fixture
 ├── contracts/           # executable public-API examples
 ├── test_import_boundary.py
@@ -544,6 +571,7 @@ xyberos3/
     ├── database/         # implemented (Phase 2)
     ├── plugins/          # implemented (Phase 3)
     ├── workflow/         # implemented (Phase 4)
+    ├── ai/               # implemented (Phase 5)
     ├── fixtures/         # implemented (separately packaged plugin)
     ├── contracts/        # implemented (executable API examples)
     ├── integration/      # implemented
@@ -569,8 +597,8 @@ is the summary.
 | 2 | HTTP and traditional application support | A working CRUD application | 1–2 weeks | complete |
 | 3 | Plugins and capabilities | An independently developed plugin | 1–2 weeks | complete |
 | 4 | Stable in-process Workflow | A tested, inspectable workflow engine without durability promises | 2–3 weeks | complete |
-| 5 | AI facade and integration | An AI application built on the same runtime and Workflow APIs | 1–2 weeks | next |
-| 6 | Experimental durable execution | An experimental single-instance executor with documented limits | 3–6+ weeks | planned |
+| 5 | AI facade and integration | An AI application built on the same runtime and Workflow APIs | 1–2 weeks | complete |
+| 6 | Experimental durable execution | An experimental single-instance executor with documented limits | 3–6+ weeks | next |
 | 7 | DX, hardening, and release | A stable runtime and Workflow release; durability remains experimental | 1–2 weeks | planned |
 
 Estimated initial implementation: approximately 10–18+ working weeks for one experienced developer, including a limited experimental durable executor. The work can take longer if building and validating recovery semantics reveals additional requirements.

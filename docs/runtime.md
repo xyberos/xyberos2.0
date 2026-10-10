@@ -1,6 +1,6 @@
 # Runtime guide
 
-> Status: Phases 1–2. This guide documents the preview runtime surface reached through the
+> Status: Phases 1–5. This guide documents the preview runtime surface reached through the
 > stable `xyberos` import root. Preview APIs may change in a `0.x` minor release with upgrade
 > notes. The frozen contract is recorded in
 > [ADR 0005](./adr/0005-phase-1-runtime-contract.md); see
@@ -147,6 +147,11 @@ the configuration file, then defaults.
 - `XYBEROS_` variables map to nested settings with `__`: `XYBEROS_APP__DEBUG=true`.
 - Unknown settings, incompatible types, conflicting environment names, and an unsupported
   `schema_version` are rejected with a field-level `ConfigurationError`.
+- Optional capabilities own their own sections. `settings.plugin_options(name)` and
+  `settings.ai_options(name)` return a named section as a plain mapping (`[plugins.metrics]`,
+  `[ai.ollama]`) with the same precedence, lowercasing, and `XYBEROS_AI__OLLAMA__MODEL`-style
+  environment mapping. Core keeps the contents opaque: the capability interprets its own keys and
+  rejects the ones it does not know.
 - Keep secrets in environment variables; core settings hold no secrets, and error messages
   never echo configured values.
 
@@ -230,7 +235,8 @@ Phase 1 raises these types, all rooted at `XyberosError`:
 ## Later phases
 
 HTTP support is provided by the optional `http` extra ([guide](./http.md)) and the SQLite
-provider by the optional `database` extra ([operations guide](./database.md)); plugins and the
-in-process workflow engine are part of core ([plugin guide](./plugins.md),
-[workflow guide](./workflow.md)). AI adapters and durable execution arrive in later phases. See
+provider by the optional `database` extra ([operations guide](./database.md)); plugins, the
+in-process workflow engine, and the provider-neutral AI facade are part of core
+([plugin guide](./plugins.md), [workflow guide](./workflow.md), [AI guide](./ai.md)). Only vendor
+adapters sit behind extras — `ollama` today — and durable execution arrives in a later phase. See
 [the implementation plan](./implementation.md#detailed-phase-by-phase-execution-plan).

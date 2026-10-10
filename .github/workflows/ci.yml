@@ -49,6 +49,27 @@ jobs:
         run: |
           python - <<'PY'
           import asyncio
+          import sys
+
+          from xyberos.ai import AIFacade, ChatRequest, FakeModelProvider, Message, ModelReply
+
+          assert "httpx" not in sys.modules, "the AI facade imported an SDK"
+
+
+          async def main() -> None:
+              facade = AIFacade(FakeModelProvider([ModelReply.ok("hello")]))
+              request = ChatRequest(messages=(Message.user("hi"),), model="m")
+              response = await facade.chat(request)
+              assert response.message.content == "hello", response.message.content
+              print("AI facade usable with no extras installed")
+
+
+          asyncio.run(main())
+          PY
+      - if: matrix.extra == 'core'
+        run: |
+          python - <<'PY'
+          import asyncio
 
           from xyberos import Retry, Workflow
           from xyberos.execution import FakeExternalService, ManualClock, Reply, WorkflowExecutor
@@ -73,4 +94,40 @@ jobs:
 
 
           asyncio.run(main())
+          PY
+      - if: matrix.extra == 'ollama'
+        run: |
+          python - <<'PY'
+          import asyncio
+
+          import httpx
+
+          from xyberos.ai import ChatRequest, Message
+          from xyberos.ai.ollama import OllamaProvider, OllamaSettings
+
+
+          def handler(request: httpx.Request) -> httpx.Response:
+              return httpx.Response(
+                  200,
+                  json={
+                      "model": "smoke",
+                      "message": {"role": "assistant", "content": "ok"},
+                      "done": True,
+                  },
+              )
+
+
+          async def main() -> None:
+              async with httpx.AsyncClient(
+                  transport=httpx.MockTransport(handler), base_url="http://127.0.0.1:11434"
+              ) as client:
+                  provider = OllamaProvider(OllamaSettings(model="smoke"), client=client)
+                  response = await provider.chat(
+                      ChatRequest(messages=(Message.user("hi"),), model="smoke")
+                  )
+                  assert response.message.content == "ok", response.message.content
+
+
+          asyncio.run(main())
+          print("ollama adapter importable and drivable without a service")
           PY

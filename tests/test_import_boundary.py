@@ -61,6 +61,48 @@ def test_http_adapter_does_not_import_the_database_extra() -> None:
     assert result.returncode == 0, result.stderr
 
 
+def test_the_runtime_does_not_import_the_ai_package() -> None:
+    result = run_python(
+        "import sys, xyberos, xyberos.app, xyberos.execution; "
+        "leaked = [name for name in sys.modules if name.startswith('xyberos.ai')]; "
+        "assert not leaked, leaked"
+    )
+
+    assert result.returncode == 0, result.stderr
+
+
+def test_the_ai_package_loads_no_provider_sdk() -> None:
+    result = run_python(
+        "import sys, xyberos.ai; "
+        "optional = ('httpx', 'ollama', 'openai', 'anthropic'); "
+        "loaded = [name for name in optional if name in sys.modules]; "
+        "assert not loaded, loaded"
+    )
+
+    assert result.returncode == 0, result.stderr
+
+
+def test_the_ai_package_does_not_import_an_adapter() -> None:
+    result = run_python(
+        "import sys; import xyberos.ai; import xyberos.ai.contracts; import xyberos.ai.facade; "
+        "leaked = [name for name in sys.modules if name.startswith('xyberos.ai.ollama')]; "
+        "assert not leaked, leaked"
+    )
+
+    assert result.returncode == 0, result.stderr
+
+
+def test_the_ai_package_does_not_import_optional_subsystems() -> None:
+    result = run_python(
+        "import sys; import xyberos.ai; "
+        "leaked = [name for name in sys.modules if name.startswith("
+        "('xyberos.http', 'xyberos.database', 'xyberos.durable'))]; "
+        "assert not leaked, leaked"
+    )
+
+    assert result.returncode == 0, result.stderr
+
+
 def test_the_execution_layer_loads_no_optional_capability() -> None:
     result = run_python(
         "import sys, xyberos.execution; "

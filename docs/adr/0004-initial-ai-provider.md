@@ -15,10 +15,12 @@ feature.
 
 ## Consequences
 
-- Unit tests can use an HTTP mock or fake provider without a local Ollama daemon.
-- Examples may name a model but production applications must configure one explicitly.
-- Prompts, completions, and credentials are excluded from logs by default.
-
-*All three are owned by Phase 5 (optional AI facade), whose work packages and exit criteria cover
-the fake provider, explicit model configuration, and default redaction; Phase 7 re-audits
-redaction.*
+- Unit tests can use an HTTP mock or fake provider without a local Ollama daemon. *Satisfied in
+  Phase 5: `xyberos.ai.testing.FakeModelProvider` and `httpx.MockTransport` cover the adapter; the
+  suite runs with no service, and live checks are opt-in.*
+- Examples may name a model but production applications must configure one explicitly. *Satisfied in
+  Phase 5: `OllamaSettings.model` is required and unknown keys are rejected, so the adapter has no
+  default; only `examples/ai_assistant` ships a default model name for convenience.*
+- Prompts, completions, and credentials are excluded from logs by default. *Satisfied in Phase 5:
+  `LoggingPolicy.metadata_only()` is the default, content capture is opt-in with truncation and
+  redaction, and a credential-bearing base URL is rejected; Phase 7 re-audits redaction.*

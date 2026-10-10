@@ -14,6 +14,35 @@ def test_defaults_are_used_when_nothing_is_configured(tmp_path: Path) -> None:
     assert settings.app.name == "xyberos"
     assert settings.app.environment == "development"
     assert settings.app.debug is False
+    assert settings.ai_options("ollama") == {}
+
+
+def test_ai_sections_resolve_from_file_environment_and_lowercase_names(tmp_path: Path) -> None:
+    (tmp_path / "xyberos.toml").write_text(
+        '[ai.Ollama]\nmodel = "from-file"\nnum_ctx = 4096\n', encoding="utf-8"
+    )
+
+    from_file = Settings.load(environ={}, cwd=tmp_path)
+    merged = Settings.load(environ={"XYBEROS_AI__OLLAMA__MODEL": "from-env"}, cwd=tmp_path)
+
+    assert from_file.ai_options("ollama") == {"model": "from-file", "num_ctx": 4096}
+    assert from_file.ai_options("OLLAMA") == {"model": "from-file", "num_ctx": 4096}
+    assert merged.ai_options("ollama")["model"] == "from-env"
+    assert merged.ai_options("missing") == {}
+
+
+def test_ai_sections_must_be_tables_of_tables(tmp_path: Path) -> None:
+    with pytest.raises(ConfigurationError, match="ai must be a table/object"):
+        Settings.load(environ={}, overrides={"ai": ["ollama"]}, cwd=tmp_path)
+    with pytest.raises(ConfigurationError, match="the configuration for AI provider 'ollama'"):
+        Settings.load(environ={}, overrides={"ai": {"ollama": "model=llama3.2"}}, cwd=tmp_path)
+    with pytest.raises(ConfigurationError, match="AI provider names must be non-empty strings"):
+        Settings.load(environ={}, overrides={"ai": {"": {}}}, cwd=tmp_path)
+
+
+def test_an_unknown_ai_section_key_is_not_accepted_at_the_root(tmp_path: Path) -> None:
+    with pytest.raises(ConfigurationError, match="unknown setting"):
+        Settings.load(environ={}, overrides={"aiOptions": {}}, cwd=tmp_path)
 
 
 def test_explicit_arguments_beat_environment_which_beats_file(tmp_path: Path) -> None:

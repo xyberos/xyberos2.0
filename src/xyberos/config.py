@@ -39,6 +39,7 @@ class Settings:
     schema_version: int = _SUPPORTED_SCHEMA_VERSION
     app: AppSettings = field(default_factory=AppSettings)
     plugins: Mapping[str, Mapping[str, object]] = field(default_factory=dict)
+    ai: Mapping[str, Mapping[str, object]] = field(default_factory=dict)
 
     def plugin_options(self, name: str) -> Mapping[str, object]:
         """Return the configuration section for one plugin, or an empty mapping.
@@ -48,6 +49,16 @@ class Settings:
         same section.
         """
         return self.plugins.get(name.lower(), {})
+
+    def ai_options(self, provider: str) -> Mapping[str, object]:
+        """Return the configuration section for one AI provider, or an empty mapping.
+
+        AI sections follow the same precedence and normalization as plugin sections, so
+        ``[ai.ollama]`` and ``XYBEROS_AI__OLLAMA__MODEL=llama3.2`` resolve to the same section. The
+        runtime treats the contents as opaque data: it validates the section *shape* and leaves
+        every AI concept to the adapter that reads it.
+        """
+        return self.ai.get(provider.lower(), {})
 
     @classmethod
     def load(
@@ -154,7 +165,7 @@ def _deep_merge(base: Mapping[str, object], override: Mapping[str, object]) -> d
 
 
 def _settings_from_mapping(values: Mapping[str, object]) -> Settings:
-    _reject_unknown_keys(values, {"schema_version", "app", "plugins"}, "root")
+    _reject_unknown_keys(values, {"schema_version", "app", "plugins", "ai"}, "root")
     schema_version = _as_int(
         values.get("schema_version", _SUPPORTED_SCHEMA_VERSION), "schema_version"
     )
@@ -185,25 +196,29 @@ def _settings_from_mapping(values: Mapping[str, object]) -> Settings:
                 typed_app_values.get("shutdown_timeout"), "app.shutdown_timeout"
             ),
         ),
-        plugins=_plugins_from_mapping(values.get("plugins")),
+        plugins=_sections_from_mapping(values.get("plugins"), label="plugins", item="plugin"),
+        ai=_sections_from_mapping(values.get("ai"), label="ai", item="AI provider"),
     )
 
 
-def _plugins_from_mapping(values: object) -> dict[str, Mapping[str, object]]:
+def _sections_from_mapping(
+    values: object, *, label: str, item: str
+) -> dict[str, Mapping[str, object]]:
+    """Return validated ``name -> mapping`` sections for a configuration table."""
     if values is None:
         return {}
     if not isinstance(values, Mapping):
-        raise ConfigurationError("plugins must be a table/object")
-    plugins: dict[str, Mapping[str, object]] = {}
+        raise ConfigurationError(f"{label} must be a table/object")
+    sections: dict[str, Mapping[str, object]] = {}
     for name, section in cast(Mapping[object, object], values).items():
         if not isinstance(name, str) or not name.strip():
-            raise ConfigurationError("plugin names must be non-empty strings")
+            raise ConfigurationError(f"{item} names must be non-empty strings")
         if not isinstance(section, Mapping):
             raise ConfigurationError(
-                f"the configuration for plugin {name!r} must be a table/object"
+                f"the configuration for {item} {name!r} must be a table/object"
             )
-        plugins[name.lower()] = dict(cast(Mapping[str, object], section))
-    return plugins
+        sections[name.lower()] = dict(cast(Mapping[str, object], section))
+    return sections
 
 
 def _reject_unknown_keys(values: Mapping[str, object], allowed: set[str], location: str) -> None:

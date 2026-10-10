@@ -4,10 +4,11 @@ Xyberos is an experimental, composable Python application runtime. Its planned s
 surface is application composition, typed dependencies, Starlette-backed HTTP, SQLite,
 and explicit in-process Workflow execution. Durable execution and AI adapters are optional.
 
-The project is currently at version `0.0.0`. Phases 0–4 are complete: the architecture baseline,
+The project is currently at version `0.0.0`. Phases 0–5 are complete: the architecture baseline,
 the application runtime, the Starlette HTTP adapter with the SQLite database provider, the trusted
-plugin/capability model, and the in-process workflow engine. AI adapters and durable execution are
-still in progress. Breaking changes are expected before `1.0.0`.
+plugin/capability model, the in-process workflow engine, and the provider-neutral AI facade with
+Ollama as the first adapter. Experimental durable execution is still in progress. Breaking changes
+are expected before `1.0.0`.
 
 ## Runtime
 
@@ -128,6 +129,43 @@ In-process execution keeps no state after the process exits and promises no reco
 execution is a separate, experimental phase. See the [workflow guide](docs/workflow.md) and the
 [`workflow` example](examples/workflow/README.md).
 
+## AI
+
+The AI facade is provider-neutral and dependency-free, so it ships in core: contracts, structured
+output over a closed JSON Schema subset, allowlisted tool invocation, streaming, embeddings, and a
+deterministic fake provider are all usable and testable with no SDK and no model service. Only a
+vendor adapter needs an extra:
+
+```python
+from typing import Annotated
+
+from xyberos import App, Inject
+from xyberos.ai import AIFacade, ChatRequest, Message
+from xyberos.ai.ollama import OllamaSettings, ollama_provider
+
+provider_factory = ollama_provider(OllamaSettings(model="your-model"))
+
+
+async def assistant_factory() -> AIFacade:
+    return AIFacade(await provider_factory())
+
+
+app = App()
+app.provide(AIFacade, factory=assistant_factory, eager=True)
+
+
+@app.get("/ask")
+async def ask(assistant: Annotated[AIFacade, Inject()]) -> str:
+    response = await assistant.chat(ChatRequest(messages=(Message.user("Hello"),)))
+    return response.message.content
+```
+
+Prompt, completion, and credential content stays out of logs by default; content capture is an
+explicit, redacted opt-in, and `Message` content never reaches an event payload. Ollama is never
+started, stopped, or downloaded by the framework: a missing model is a configuration error, not
+something the framework fixes. See the [AI guide](docs/ai.md) and the
+[`ai_assistant` example](examples/ai_assistant/README.md).
+
 ## Development
 
 Use Python 3.10 or newer. Install the project with development tools and run the quality
@@ -151,7 +189,7 @@ python -m pip install -e ".[ollama]"
 python -m pip install -e ".[durable]"
 ```
 
-See [the architecture plan](docs/PLAN.md), [the phase-by-phase implementation plan](docs/implementation.md), [the runtime guide](docs/runtime.md), [the HTTP guide](docs/http.md), [the database operations guide](docs/database.md), [the plugin guide](docs/plugins.md), [the workflow guide](docs/workflow.md), and [the architecture decisions](docs/adr/).
+See [the architecture plan](docs/PLAN.md), [the phase-by-phase implementation plan](docs/implementation.md), [the runtime guide](docs/runtime.md), [the HTTP guide](docs/http.md), [the database operations guide](docs/database.md), [the plugin guide](docs/plugins.md), [the workflow guide](docs/workflow.md), [the AI guide](docs/ai.md), and [the architecture decisions](docs/adr/).
 
 ## Status and compatibility
 
