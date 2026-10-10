@@ -174,7 +174,7 @@ Deprecation policy: mark a stable API deprecated in documentation and runtime wa
 ## Phase status
 
 The detailed work packages live in the phase-by-phase plan below; this table is the at-a-glance
-state. Phases 0–5 are complete; Phase 6 is next.
+state. Phases 0–5 are complete and Phase 6 is under way.
 
 | Phase | Scope | Status | Exit-gate evidence |
 | --- | --- | --- | --- |
@@ -184,7 +184,7 @@ state. Phases 0–5 are complete; Phase 6 is next.
 | 3 | Trusted plugin and capability model | complete | `src/xyberos/plugins/`, `src/xyberos/diagnostics.py`, `tests/plugins/`, `tests/integration/test_plugin_packages.py`, `tests/fixtures/metrics_plugin/`, `examples/custom_plugin/`, [ADR 0007](adr/0007-trusted-plugins.md) |
 | 4 | Stable, in-process Workflow engine | complete | `src/xyberos/execution/`, `tests/workflow/` (107 tests), `tests/integration/test_workflow_example.py`, `tests/contracts/examples/phase4_workflow.py`, `examples/workflow/`, `docs/workflow.md`, [ADR 0009](adr/0009-workflow-engine-contract.md) |
 | 5 | Optional AI facade | complete | `src/xyberos/ai/`, `tests/ai/` (125 tests), `tests/integration/test_ai_assistant.py` (11 tests), `examples/ai_assistant/`, `docs/ai.md`, [ADR 0010](adr/0010-ai-facade-contract.md) |
-| 6 | Experimental single-host durable executor | next | see the Phase 6 entry checklist below |
+| 6 | Experimental single-host durable executor | in progress | journal, transition table, atomic claims, and inspection shipped in `src/xyberos/durable/` with `tests/durable/` (68 tests); [ADR 0011](adr/0011-durable-executor-contract.md); the worker loop, recovery pass, crash harness, example, and operator guide are next |
 | 7 | Developer experience, hardening, and release | planned | — |
 
 ### Phase 6 entry checklist
@@ -453,6 +453,23 @@ model names remain owner decisions.
 - Experimental labelling is verified: unstable entry points emit `ExperimentalWarning`, the experimental namespace is used, and package metadata and docs state the single-host and at-least-once limits.
 
 **Deliverables:** optional durable package, schema/migrations, store, scheduler/worker/recovery components, process-fault test harness, durable-workflow example, operator guide, and experimental API label with `ExperimentalWarning`.
+
+**Landed so far.** Work packages 1–4 are implemented and tested: the transition table is frozen in
+[ADR 0011](adr/0011-durable-executor-contract.md) and locked by a test that lists every row, the
+journal owns a versioned schema in a separate file and refuses a newer one, and
+`JournalStore` submits transactionally, claims atomically under a fencing token, guards every write
+with ownership and the token, schedules retries, persists cancellation requests, and exposes
+read-only inspection and queue statistics. `ExperimentalWarning` and the single-host/at-least-once
+limits ship with the package, and the import boundary tests prove core never imports
+`xyberos.durable` and that the durable package loads no HTTP or AI dependency.
+
+Two decisions taken while implementing are worth naming, because they shape the remaining work: a
+ready execution belongs to nobody (a live lease protects `RUNNING` work only, so a worker can
+advance one step per claim and yield), and a worker upgrades feedback into a reason — a refused write
+is re-read and reported as a lease, cancellation, or state problem rather than "no rows matched".
+
+Remaining: the worker loop and scheduler, the startup recovery pass, activity idempotency wiring, the
+process-kill harness, the example, and the operator guide. The exit gate is not met until those land.
 
 ### Phase 7 - developer experience, hardening, and release
 

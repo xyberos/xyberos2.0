@@ -474,6 +474,12 @@ src/xyberos/
 │   ├── facade.py        # AIFacade and the logging policy
 │   ├── testing.py       # FakeModelProvider and scripted replies
 │   └── ollama.py        # the Ollama adapter; only module behind the "ollama" extra
+├── durable/             # experimental durable executor (optional "durable" extra)
+│   ├── contracts.py     # wall clock protocol and system clock
+│   ├── models.py        # statuses, the transition table, and inspection records
+│   ├── journal.py       # versioned journal schema and settings
+│   ├── store.py         # submission, atomic claims, guarded writes, inspection
+│   └── testing.py       # ManualWallClock for lease and retry tests
 ├── http/                # optional "http" extra (Starlette)
 │   ├── adapter.py, middleware.py, routing.py, requests.py, testing.py
 └── database/            # optional "database" extra (SQLAlchemy Core, aiosqlite, Alembic)
@@ -492,6 +498,7 @@ tests/
 ├── plugins/             # plugin contract, configuration, and lifecycle tests
 ├── workflow/            # Phase 4 exit-criteria tests
 ├── ai/                  # Phase 5 exit-criteria tests, including the Ollama adapter
+├── durable/             # Phase 6 exit-criteria tests for the journal and store
 ├── integration/         # end-to-end example, migration, plugin-package, workflow, and AI tests
 ├── fixtures/            # separately packaged plugin used as a test fixture
 ├── contracts/           # executable public-API examples

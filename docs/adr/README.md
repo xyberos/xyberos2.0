@@ -38,3 +38,4 @@ backlog. Annotate anything newly satisfied, and give an owner to anything that h
 | [0008](0008-workflow-terminology.md) | Name the in-process execution unit *Workflow* | accepted |
 | [0009](0009-workflow-engine-contract.md) | Freeze the workflow engine contract | accepted |
 | [0010](0010-ai-facade-contract.md) | Freeze the AI facade contract | accepted |
+| [0011](0011-durable-executor-contract.md) | Freeze the durable executor contract | accepted |

@@ -310,3 +310,65 @@ class AIToolError(AIError):
     def __init__(self, message: str, *, tool: str) -> None:
         self.tool = tool
         super().__init__(message)
+
+
+class ExperimentalWarning(UserWarning):
+    """Emitted by an unstable entry point before it does anything.
+
+    Experimental API is preview API with an explicit non-guarantee list: it may change in a `0.x`
+    minor release, and its limits (single-host, at-least-once) are part of the contract.
+    """
+
+
+class DurableError(XyberosError):
+    """Base class for durable-execution failures."""
+
+
+class DurableConfigurationError(DurableError):
+    """Raised when journal or executor settings are missing, unknown, or unusable."""
+
+
+class DurableSchemaError(DurableError):
+    """Raised when the journal schema is missing, older than the package, or newer than it."""
+
+
+class DurableStateError(DurableError):
+    """Raised when a requested transition is not legal from the current persisted state."""
+
+
+class DurableLeaseError(DurableError):
+    """Raised when a worker no longer owns the lease, or its fencing token is stale.
+
+    A stale worker keeps running but can no longer commit state; every write is guarded by
+    ownership and the fencing token, so recovery never has to trust a worker that stopped
+    heartbeating.
+    """
+
+    def __init__(self, message: str, *, execution_id: str, fence: int | None = None) -> None:
+        self.execution_id = execution_id
+        self.fence = fence
+        super().__init__(message)
+
+
+class DurableConflictError(DurableError):
+    """Raised when a submission or claim collides with existing, different work."""
+
+
+class DurableVersionError(DurableError):
+    """Raised when a resumable execution does not match the supplied workflow definition."""
+
+
+class DurablePayloadError(DurableError):
+    """Raised when an input, output, or result cannot be persisted safely.
+
+    Payloads must be JSON-serializable and within the configured size limit, because the journal
+    stores them verbatim and a durable execution has to be resumable from its records alone.
+    """
+
+
+class DurableOutcomeUnknownError(DurableError):
+    """Raised when an interrupted attempt may or may not have produced its external effect.
+
+    It is deliberately not a :class:`TransientError`: retrying an operation whose effect is
+    uncertain is a decision the caller has to make explicit, through idempotency or a reconciler.
+    """
