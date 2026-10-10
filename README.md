@@ -4,16 +4,17 @@ Xyberos is an experimental, composable Python application runtime. Its planned s
 surface is application composition, typed dependencies, Starlette-backed HTTP, SQLite,
 and explicit in-process Flow execution. Durable execution and AI adapters are optional.
 
-The project is currently at version `0.0.0`. Phase 0 (packaging, architecture, and
-API-contract baseline) and Phase 1 (application runtime, registry, lifecycle, and dependency
-injection) are complete; later phases are in progress. Breaking changes are expected before
+The project is currently at version `0.0.0`. Phases 0–2 are complete: packaging and the
+architecture baseline, the application runtime (composition, lifecycle, and dependency
+injection), and the Starlette HTTP adapter with the SQLite database provider. Plugins, Flow, AI
+adapters, and durable execution are still in progress. Breaking changes are expected before
 `1.0.0`.
 
 ## Runtime
 
-The stable `xyberos` import root exposes the Phase 1 runtime: application composition, typed
-configuration, dependency injection, lifecycle, and context/logging helpers. It never imports
-optional capabilities.
+The stable `xyberos` import root exposes the core runtime: application composition, typed
+configuration, dependency injection, lifecycle, context/logging helpers, and route records. It
+never imports optional capabilities.
 
 ```python
 from typing import Annotated
@@ -44,16 +45,44 @@ async def main() -> None:
 See [the runtime guide](docs/runtime.md) for scopes, lifecycle, configuration, and the error
 taxonomy.
 
+## HTTP and database
+
+HTTP support is an optional extra over Starlette, and the SQLite provider is an optional extra
+over SQLAlchemy Core and `aiosqlite`:
+
+```python
+from typing import Annotated
+
+from xyberos import App, Inject
+from xyberos.database import DatabaseProvider, SqliteSettings, sqlite_provider
+from xyberos.http import HttpAdapter
+
+app = App()
+app.provide(DatabaseProvider, factory=sqlite_provider(SqliteSettings()), eager=True)
+
+
+@app.get("/health")
+async def health(database: Annotated[DatabaseProvider, Inject()]) -> dict[str, str]:
+    await database.health()
+    return {"status": "ready"}
+
+
+asgi_app = HttpAdapter(app).asgi_app
+```
+
+See the [HTTP guide](docs/http.md), the [database operations guide](docs/database.md), and the
+[`sqlite_crud` example](examples/sqlite_crud/README.md).
+
 ## Development
 
 Use Python 3.10 or newer. Install the project with development tools and run the quality
 suite:
 
 ```powershell
-python -m pip install -e ".[dev]"
+python -m pip install -e ".[dev,http,database]"
 python -m pytest
-ruff check src tests
-ruff format --check src tests
+ruff check src tests examples
+ruff format --check src tests examples
 mypy
 python -m build
 ```
@@ -61,12 +90,13 @@ python -m build
 Optional capability dependencies are intentionally separate:
 
 ```powershell
+python -m pip install -e ".[http]"
 python -m pip install -e ".[database]"
 python -m pip install -e ".[ollama]"
 python -m pip install -e ".[durable]"
 ```
 
-See [the architecture plan](docs/PLAN.md), [the phase-by-phase implementation plan](docs/implementation.md), [the runtime guide](docs/runtime.md), and [the architecture decisions](docs/adr/).
+See [the architecture plan](docs/PLAN.md), [the phase-by-phase implementation plan](docs/implementation.md), [the runtime guide](docs/runtime.md), [the HTTP guide](docs/http.md), [the database operations guide](docs/database.md), and [the architecture decisions](docs/adr/).
 
 ## Status and compatibility
 

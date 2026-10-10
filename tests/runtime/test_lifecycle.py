@@ -265,6 +265,26 @@ def test_startup_failure_that_also_fails_cleanup_reports_both() -> None:
     asyncio.run(scenario())
 
 
+def test_shutdown_drain_is_bounded_by_the_configured_timeout() -> None:
+    async def scenario() -> None:
+        log = EventLog()
+        app = App(settings=Settings.load(environ={}, overrides={"app": {"shutdown_timeout": 0.05}}))
+        app.provide(EventLog, instance=log)
+        app.provide(FirstResource)
+        await app.start()
+        await app.resolve(FirstResource)
+
+        async with app.request_context():
+            with pytest.raises(ShutdownError) as info:
+                await app.stop()
+
+        assert app.state is LifecycleState.STOPPED
+        assert log.events == ["build:first", "close:first"]
+        assert info.value.resources == ("1 in-flight request context(s)",)
+
+    asyncio.run(scenario())
+
+
 def test_start_validates_the_graph_before_readiness() -> None:
     async def scenario() -> None:
         app = App(settings=Settings.load(environ={}))

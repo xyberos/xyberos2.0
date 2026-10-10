@@ -15,3 +15,4 @@ Status values are **proposed**, **accepted**, **superseded**, and **rejected**.
 | [0003](0003-versions-and-experimental-scope.md) | Begin at 0.0.0 and isolate experimental scope | accepted |
 | [0004](0004-initial-ai-provider.md) | Use Ollama as the first AI provider | accepted |
 | [0005](0005-phase-1-runtime-contract.md) | Freeze the Phase 1 runtime contract | accepted |
+| [0006](0006-http-and-database-adapters.md) | Keep the HTTP and database layers behind adapters | accepted |

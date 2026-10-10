@@ -29,6 +29,7 @@ class AppSettings:
     name: str = "xyberos"
     environment: str = "development"
     debug: bool = False
+    shutdown_timeout: float | None = None
 
 
 @dataclass(frozen=True)
@@ -157,7 +158,11 @@ def _settings_from_mapping(values: Mapping[str, object]) -> Settings:
     if not isinstance(app_values, Mapping):
         raise ConfigurationError("app must be a table/object")
     typed_app_values = cast(Mapping[str, object], app_values)
-    _reject_unknown_keys(typed_app_values, {"name", "environment", "debug"}, "app")
+    _reject_unknown_keys(
+        typed_app_values,
+        {"name", "environment", "debug", "shutdown_timeout"},
+        "app",
+    )
     return Settings(
         schema_version=schema_version,
         app=AppSettings(
@@ -166,6 +171,9 @@ def _settings_from_mapping(values: Mapping[str, object]) -> Settings:
                 typed_app_values.get("environment", "development"), "app.environment"
             ),
             debug=_as_bool(typed_app_values.get("debug", False), "app.debug"),
+            shutdown_timeout=_as_optional_timeout(
+                typed_app_values.get("shutdown_timeout"), "app.shutdown_timeout"
+            ),
         ),
     )
 
@@ -181,6 +189,25 @@ def _as_non_empty_string(value: object, location: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ConfigurationError(f"{location} must be a non-empty string")
     return value
+
+
+def _as_optional_timeout(value: object, location: str) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        raise ConfigurationError(f"{location} must be a positive number of seconds")
+    if isinstance(value, int | float):
+        timeout = float(value)
+    elif isinstance(value, str):
+        try:
+            timeout = float(value.strip())
+        except ValueError as error:
+            raise ConfigurationError(f"{location} must be a positive number of seconds") from error
+    else:
+        raise ConfigurationError(f"{location} must be a positive number of seconds")
+    if timeout <= 0:
+        raise ConfigurationError(f"{location} must be greater than zero")
+    return timeout
 
 
 def _as_bool(value: object, location: str) -> bool:

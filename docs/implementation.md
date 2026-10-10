@@ -1,10 +1,11 @@
 # Xyberos implementation plan
 
-> Implementation status: Phase 0 and Phase 1 are complete. The repository has an installable
-> `0.0.0` core package, isolated optional dependency groups, architecture decisions,
-> API-contract examples, CI quality gates, and the Phase 1 application runtime (composition,
-> typed configuration, registry, lifecycle, and dependency injection) with its exit-criteria
-> tests and [runtime guide](runtime.md). Phase 2 has not started.
+> Implementation status: Phases 0–2 are complete. The repository has an installable `0.0.0` core
+> package, isolated optional dependency groups, architecture decisions, API-contract examples, CI
+> quality gates, the Phase 1 application runtime (composition, typed configuration, registry,
+> lifecycle, and dependency injection), and the Phase 2 Starlette HTTP adapter plus SQLite
+> provider with the `sqlite_crud` example. Guides: [runtime](runtime.md), [HTTP](http.md),
+> [database](database.md). Phase 3 has not started.
 
 ## Purpose and release boundary
 
@@ -179,27 +180,26 @@ state. Phase 0 and Phase 1 are complete; Phase 2 has not started.
 | --- | --- | --- | --- |
 | 0 | Architecture, repository, and API contracts | complete | installable core package, ADR set, CI quality gates, contract examples |
 | 1 | Application runtime, registry, lifecycle, and dependency injection | complete | `tests/runtime/`, `tests/test_public_api.py`, `tests/contracts/test_phase1_example.py`, `docs/runtime.md`, [ADR 0005](adr/0005-phase-1-runtime-contract.md) |
-| 2 | Starlette adapter and SQLite CRUD slice | next | see the Phase 2 entry checklist below |
-| 3 | Trusted plugin and capability model | planned | — |
+| 2 | Starlette adapter and SQLite CRUD slice | complete | `tests/http/`, `tests/database/`, `tests/integration/`, `tests/test_import_boundary.py`, `examples/sqlite_crud/`, [ADR 0006](adr/0006-http-and-database-adapters.md) |
+| 3 | Trusted plugin and capability model | next | see the Phase 3 entry checklist below |
 | 4 | Stable, in-process Flow engine | planned | — |
 | 5 | Optional AI facade | planned | — |
 | 6 | Experimental single-host durable executor | planned | — |
 | 7 | Developer experience, hardening, and release | planned | — |
 
-### Phase 2 entry checklist
+### Phase 3 entry checklist
 
-Confirm these before starting Phase 2:
+Confirm these before starting Phase 3:
 
-1. The Phase 1 runtime contract is frozen in [ADR 0005](adr/0005-phase-1-runtime-contract.md)
-   and `docs/runtime.md` matches the shipped behavior.
-2. The `database` extra installs independently, and importing core still pulls in no optional
-   capability.
-3. `App` supplies what the ASGI adapter needs — readiness gating, `request_context()`, and
-   aggregated shutdown — with no adapter-side workarounds. Fix gaps in the runtime, not the
-   adapter.
-4. Phase 2 picks up these Phase 1 follow-ups: a configurable drain bound for shutdown while
-   request contexts are in flight, and provider `source` attribution in diagnostics (shared
-   with Phase 3).
+1. The Phase 2 contracts are frozen in [ADR 0006](adr/0006-http-and-database-adapters.md) and the
+   HTTP and database guides match the shipped behavior.
+2. The `http` and `database` extras install independently, and importing core still pulls in no
+   optional capability — enforced by the subprocess import-boundary test.
+3. Plugins register through `App.provide` and the existing app-local registry. A global registry
+   stays out of scope.
+4. Phase 3 owns the remaining Phase 2 follow-up: provider `source` attribution in diagnostics. The
+   registry already records a source per provider; `App.provide` needs to expose it, and plugin
+   failures must name the plugin, the phase, and the dependency.
 
 ## Detailed phase-by-phase execution plan
 
@@ -267,6 +267,12 @@ exit-criteria tests live in [`tests/runtime/`](../tests/runtime/) and
 **Deliverables:** `App`, registry and DI APIs, lifecycle engine, configuration module, context/logging primitives, runtime documentation, and isolated-app tests.
 
 ### Phase 2 - Starlette adapter and SQLite CRUD vertical slice
+
+**Status:** complete. `src/xyberos/http/` and `src/xyberos/database/` implement the adapter and
+provider; tests live in `tests/http/`, `tests/database/`, and `tests/integration/`, with the
+import-boundary check in `tests/test_import_boundary.py`; the example is `examples/sqlite_crud/`;
+guides are [HTTP](http.md) and [database](database.md). The Phase 1 follow-up on a configurable
+shutdown drain landed as `app.shutdown_timeout`.
 
 **Objective:** prove that the runtime supports a conventional production-style web application before adding Flow or AI complexity.
 

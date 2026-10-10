@@ -12,10 +12,12 @@ from typing import TypeVar, cast, overload
 from xyberos.config import Settings
 from xyberos.errors import (
     DependencyResolutionError,
+    LifecycleError,
     LifecycleStateError,
     MissingProviderError,
     ShutdownError,
 )
+from xyberos.routing import Handler, Route, RouteRegistry
 from xyberos.runtime.dependencies import (
     _UNSET,
     CloseHook,
@@ -76,6 +78,7 @@ class App:
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = Settings.load() if settings is None else settings
         self._registry = ProviderRegistry()
+        self._routes = RouteRegistry()
         self._state = LifecycleState.NEW
         self._validated_plan: tuple[Provider, ...] | None = None
         self._app_instances: dict[Contract, object] = {}
@@ -90,6 +93,16 @@ class App:
     def state(self) -> LifecycleState:
         """Return the current application lifecycle state."""
         return self._state
+
+    @property
+    def routes(self) -> tuple[Route, ...]:
+        """Return the registered route records in registration order."""
+        return self._routes.routes
+
+    @property
+    def route_version(self) -> int:
+        """Return a monotonic count of route registrations for adapter cache invalidation."""
+        return self._routes.version
 
     def provide(
         self,
@@ -117,6 +130,56 @@ class App:
         if self._state is LifecycleState.VALIDATED:
             self._state = LifecycleState.NEW
         return self
+
+    @overload
+    def route(
+        self, method: str, path: str, handler: Handler, *, name: str | None = None
+    ) -> Handler: ...
+
+    @overload
+    def route(
+        self, method: str, path: str, *, name: str | None = None
+    ) -> Callable[[Handler], Handler]: ...
+
+    def route(
+        self,
+        method: str,
+        path: str,
+        handler: Handler | None = None,
+        *,
+        name: str | None = None,
+    ) -> Handler | Callable[[Handler], Handler]:
+        """Register a route record, either directly or as a decorator."""
+        self._ensure_registration_allowed()
+        if handler is not None:
+            self._routes.add(method, path, handler, name=name)
+            return handler
+
+        def decorator(inner: Handler) -> Handler:
+            self._routes.add(method, path, inner, name=name)
+            return inner
+
+        return decorator
+
+    def get(self, path: str, *, name: str | None = None) -> Callable[[Handler], Handler]:
+        """Register a GET route."""
+        return self.route("GET", path, name=name)
+
+    def post(self, path: str, *, name: str | None = None) -> Callable[[Handler], Handler]:
+        """Register a POST route."""
+        return self.route("POST", path, name=name)
+
+    def put(self, path: str, *, name: str | None = None) -> Callable[[Handler], Handler]:
+        """Register a PUT route."""
+        return self.route("PUT", path, name=name)
+
+    def patch(self, path: str, *, name: str | None = None) -> Callable[[Handler], Handler]:
+        """Register a PATCH route."""
+        return self.route("PATCH", path, name=name)
+
+    def delete(self, path: str, *, name: str | None = None) -> Callable[[Handler], Handler]:
+        """Register a DELETE route."""
+        return self.route("DELETE", path, name=name)
 
     def validate(self) -> tuple[Provider, ...]:
         """Validate the complete provider graph without constructing services."""
@@ -169,8 +232,22 @@ class App:
                     f"cannot stop an application in {self._state.value!r} state"
                 )
             self._state = LifecycleState.STOPPING
-            await self._no_active_requests.wait()
-            failures = await self._close_owned(self._owned)
+            failures: list[tuple[str, BaseException]] = []
+            timeout = self.settings.app.shutdown_timeout
+            try:
+                if timeout is None:
+                    await self._no_active_requests.wait()
+                else:
+                    await asyncio.wait_for(self._no_active_requests.wait(), timeout)
+            except asyncio.TimeoutError:
+                active = len(self._active_requests)
+                failures.append(
+                    (
+                        f"{active} in-flight request context(s)",
+                        LifecycleError(f"shutdown timed out after {timeout}s"),
+                    )
+                )
+            failures.extend(await self._close_owned(self._owned))
             self._app_instances.clear()
             self._state = LifecycleState.STOPPED
             if failures:
@@ -221,6 +298,7 @@ class App:
         """Clone registrations into an independent app with test-value overrides."""
         clone = App(settings=self.settings)
         clone._registry = self._registry.clone()
+        clone._routes = self._routes.clone()
         for contract, value in overrides.items():
             original = clone._registry.get(contract)
             if original is None:

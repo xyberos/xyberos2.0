@@ -28,11 +28,13 @@ dependencies = [
 dev = [
   "build>=1.2,<2",
   "hatchling>=1.25,<2",
+  "httpx>=0.27,<1",
   "mypy>=1.11,<2",
   "pytest>=8,<10",
   "ruff>=0.6,<1",
   "tomli>=2,<3",
 ]
+http = ["starlette>=0.40,<1"]
 database = [
   "aiosqlite>=0.20,<1",
   "alembic>=1.13,<2",
@@ -50,7 +52,7 @@ packages = ["src/xyberos"]
 
 [tool.pytest.ini_options]
 addopts = "-ra"
-pythonpath = ["src"]
+pythonpath = ["src", "examples"]
 testpaths = ["tests"]
 
 [tool.ruff]

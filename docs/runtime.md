@@ -1,11 +1,13 @@
 # Runtime guide
 
-> Status: Phase 1 is complete. This guide documents the preview runtime surface reached
-> through the stable `xyberos` import root. Preview APIs may change in a `0.x` minor release
-> with upgrade notes. The frozen contract is recorded in
+> Status: Phases 1–2. This guide documents the preview runtime surface reached through the
+> stable `xyberos` import root. Preview APIs may change in a `0.x` minor release with upgrade
+> notes. The frozen contract is recorded in
 > [ADR 0005](./adr/0005-phase-1-runtime-contract.md); see
 > [the implementation plan](./implementation.md) for phase scope and
-> [ADR 0001](./adr/0001-runtime-boundaries.md) for the runtime boundary.
+> [ADR 0001](./adr/0001-runtime-boundaries.md) for the runtime boundary. HTTP and database
+> support are documented separately in [the HTTP guide](./http.md) and the
+> [database operations guide](./database.md).
 
 Xyberos core composes an application from explicit, typed provider registrations. It owns
 application configuration, dependency injection, lifecycle, and context/logging helpers. It
@@ -102,7 +104,8 @@ register -> validate -> start -> ready -> stop
 - `App.stop()` waits for in-flight request contexts, then closes app-owned resources in
   reverse dependency order. Every hook is given a chance to run; failures are collected and
   raised together as `ShutdownError` after cleanup completes, and `ShutdownError.resources`
-  names the resources that failed.
+  names the resources that failed. Set `app.shutdown_timeout` to bound how long the drain waits;
+  a timeout is reported as a shutdown problem instead of hanging the process.
 - `App.lifespan()` is an async context manager that starts and stops the application.
 - `App.request_context()` is an async context manager that owns a `RequestContext`. Resolve
   request-scoped dependencies through it, and it closes them when the block exits. If the
@@ -138,12 +141,31 @@ precedence, from highest to lowest, is explicit arguments, then environment vari
 the configuration file, then defaults.
 
 - `Settings.load(config_path=..., environ=..., overrides=..., cwd=...)`.
+- `app.name`, `app.environment`, and `app.debug` identify the application; `app.shutdown_timeout`
+  optionally bounds the shutdown drain in seconds.
 - `XYBEROS_CONFIG` selects an explicit file path; a file passed as `config_path` must exist.
 - `XYBEROS_` variables map to nested settings with `__`: `XYBEROS_APP__DEBUG=true`.
 - Unknown settings, incompatible types, conflicting environment names, and an unsupported
   `schema_version` are rejected with a field-level `ConfigurationError`.
 - Keep secrets in environment variables; core settings hold no secrets, and error messages
   never echo configured values.
+
+## Routes
+
+The runtime records routes without importing an HTTP library:
+
+```python
+@app.get("/items")
+async def list_items(items: Annotated[ItemService, Inject()]) -> list[str]:
+    return await items.list_items()
+```
+
+`get`, `post`, `put`, `patch`, and `delete` are decorators, and
+`app.route(method, path, handler, name=...)` registers a handler directly. Records are
+immutable `xyberos.Route` values whose handlers are compiled by an adapter. Registration is
+rejected after `app.start()`, and duplicate method+path or duplicate route names are refused.
+Handler signatures, request/response types, and middleware belong to the adapter; see
+[the HTTP guide](./http.md).
 
 ## Context and logging
 
@@ -182,13 +204,16 @@ Phase 1 raises these types, all rooted at `XyberosError`:
 
 ## Import and typing guarantees
 
-- `xyberos` re-exports the Phase 1 runtime and never imports optional capabilities.
+- `xyberos` re-exports the core runtime and never imports optional capabilities; the `http` and
+  `database` extras are imported only by their own subpackages.
 - Only names re-exported from `xyberos` are stable import paths; every other module is internal
   and may change without notice.
 - The package ships `py.typed` and is checked with `mypy --strict`; injected annotations are
   preserved with `include_extras=True`.
 
-## Not in Phase 1
+## Later phases
 
-HTTP routing, the SQLite provider, plugins, Flow, AI adapters, and durable execution arrive in
-later phases. See [the implementation plan](./implementation.md#detailed-phase-by-phase-execution-plan).
+HTTP support is provided by the optional `http` extra ([guide](./http.md)) and the SQLite
+provider by the optional `database` extra ([operations guide](./database.md)). Plugins, Flow,
+AI adapters, and durable execution arrive in later phases. See
+[the implementation plan](./implementation.md#detailed-phase-by-phase-execution-plan).

@@ -104,3 +104,19 @@ def test_numeric_strings_are_accepted_but_booleans_are_not(tmp_path: Path) -> No
     assert settings.schema_version == 1
     with pytest.raises(ConfigurationError):
         Settings.load(environ={}, overrides={"schema_version": True}, cwd=tmp_path)
+
+
+def test_shutdown_timeout_is_optional_and_validated(tmp_path: Path) -> None:
+    assert Settings.load(environ={}, cwd=tmp_path).app.shutdown_timeout is None
+    assert (
+        Settings.load(
+            environ={"XYBEROS_APP__SHUTDOWN_TIMEOUT": "2.5"}, cwd=tmp_path
+        ).app.shutdown_timeout
+        == 2.5
+    )
+
+    for invalid in (0, -1, "soon", True):
+        with pytest.raises(ConfigurationError):
+            Settings.load(
+                environ={}, overrides={"app": {"shutdown_timeout": invalid}}, cwd=tmp_path
+            )
