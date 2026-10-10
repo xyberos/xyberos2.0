@@ -1,4 +1,4 @@
-"""Execute the Phase 1 contract example so the public API is proven, not just parsed."""
+"""Execute the public-API contract examples so the surface is proven, not just parsed."""
 
 import asyncio
 import importlib.util
@@ -20,5 +20,11 @@ def load_example(name: str) -> ModuleType:
 
 def test_phase1_example_builds_and_runs() -> None:
     module = load_example("phase1_minimal_app")
+
+    asyncio.run(module.main())
+
+
+def test_phase4_example_builds_inspects_and_runs() -> None:
+    module = load_example("phase4_workflow")
 
     asyncio.run(module.main())

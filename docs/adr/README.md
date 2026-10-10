@@ -6,6 +6,24 @@ new ADR that links to the earlier one.
 
 Status values are **proposed**, **accepted**, **superseded**, and **rejected**.
 
+## Terminology
+
+Documents written before [ADR 0008](0008-workflow-terminology.md) called the in-process execution
+unit a *Flow*. It is now a *Workflow*, and the earlier text was updated to the new term; those
+decisions are unchanged. `flow` survives in these documents only as ordinary English, as in
+"control flow".
+
+## Keeping consequences current
+
+A *decision* is immutable, but a *consequence* is a claim about the future and can go stale.
+Consequences may therefore carry a short status note — satisfied in a phase, owned by a named
+phase, or deferred to the backlog — without that counting as an amendment. Changing a decision
+still requires a new ADR that links back to the original.
+
+Before a phase is declared complete, walk the consequence lists below and confirm each item is
+one of: satisfied, owned by a named phase in `implementation.md`, or recorded in its deferred
+backlog. Annotate anything newly satisfied, and give an owner to anything that has none.
+
 ## Index
 
 | ADR | Decision | Status |
@@ -17,3 +35,5 @@ Status values are **proposed**, **accepted**, **superseded**, and **rejected**.
 | [0005](0005-phase-1-runtime-contract.md) | Freeze the Phase 1 runtime contract | accepted |
 | [0006](0006-http-and-database-adapters.md) | Keep the HTTP and database layers behind adapters | accepted |
 | [0007](0007-trusted-plugins.md) | Trusted plugins as an explicit, ordered capability model | accepted |
+| [0008](0008-workflow-terminology.md) | Name the in-process execution unit *Workflow* | accepted |
+| [0009](0009-workflow-engine-contract.md) | Freeze the workflow engine contract | accepted |

@@ -2,12 +2,12 @@
 
 Xyberos is an experimental, composable Python application runtime. Its planned stable
 surface is application composition, typed dependencies, Starlette-backed HTTP, SQLite,
-and explicit in-process Flow execution. Durable execution and AI adapters are optional.
+and explicit in-process Workflow execution. Durable execution and AI adapters are optional.
 
-The project is currently at version `0.0.0`. Phases 0–3 are complete: the architecture baseline,
-the application runtime, the Starlette HTTP adapter with the SQLite database provider, and the
-trusted plugin/capability model. Flow, AI adapters, and durable execution are still in progress.
-Breaking changes are expected before `1.0.0`.
+The project is currently at version `0.0.0`. Phases 0–4 are complete: the architecture baseline,
+the application runtime, the Starlette HTTP adapter with the SQLite database provider, the trusted
+plugin/capability model, and the in-process workflow engine. AI adapters and durable execution are
+still in progress. Breaking changes are expected before `1.0.0`.
 
 ## Runtime
 
@@ -96,6 +96,38 @@ Plugins are ordinary Python code — there is no sandbox — and `app.diagnostic
 where every provider came from and in which order plugins start. See the
 [plugin guide](docs/plugins.md) and the [`custom_plugin` example](examples/custom_plugin/README.md).
 
+## Workflows
+
+Multi-step work can be expressed as an immutable, inspectable definition with bounded retries,
+conditional branches, per-step timeouts, a whole-run budget, cooperative cancellation, and
+structured events. The engine is part of core and imports no optional capability:
+
+```python
+from xyberos import Retry, StepContext, Workflow, seconds
+
+
+async def retrieve(value: str, context: StepContext) -> list[str]:
+    return [f"document-for-{value}"]
+
+
+async def answer(value: list[str], context: StepContext) -> str:
+    return f"answer from {len(value)} document(s)"
+
+
+workflow = (
+    Workflow("support", version="1")
+    .step("retrieve", retrieve, retry=Retry(max_attempts=3))
+    .step("answer", answer, timeout=seconds(30))
+    .edge("retrieve", "answer")
+)
+
+result = await workflow.run(input="T-1", timeout=seconds(45))
+```
+
+In-process execution keeps no state after the process exits and promises no recovery; durable
+execution is a separate, experimental phase. See the [workflow guide](docs/workflow.md) and the
+[`workflow` example](examples/workflow/README.md).
+
 ## Development
 
 Use Python 3.10 or newer. Install the project with development tools and run the quality
@@ -119,11 +151,11 @@ python -m pip install -e ".[ollama]"
 python -m pip install -e ".[durable]"
 ```
 
-See [the architecture plan](docs/PLAN.md), [the phase-by-phase implementation plan](docs/implementation.md), [the runtime guide](docs/runtime.md), [the HTTP guide](docs/http.md), [the database operations guide](docs/database.md), [the plugin guide](docs/plugins.md), and [the architecture decisions](docs/adr/).
+See [the architecture plan](docs/PLAN.md), [the phase-by-phase implementation plan](docs/implementation.md), [the runtime guide](docs/runtime.md), [the HTTP guide](docs/http.md), [the database operations guide](docs/database.md), [the plugin guide](docs/plugins.md), [the workflow guide](docs/workflow.md), and [the architecture decisions](docs/adr/).
 
 ## Status and compatibility
 
 `0.x` releases are preview releases. The first release intended to provide the stable
-runtime and Flow guarantees described in the implementation plan will be `1.0.0`.
+runtime and Workflow guarantees described in the implementation plan will be `1.0.0`.
 The project license is intentionally undecided; do not redistribute it until a license is
 selected.

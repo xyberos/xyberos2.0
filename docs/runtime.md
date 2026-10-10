@@ -11,7 +11,7 @@
 
 Xyberos core composes an application from explicit, typed provider registrations. It owns
 application configuration, dependency injection, lifecycle, and context/logging helpers. It
-does not import HTTP, database, AI, Flow, or durable-execution code.
+does not import HTTP, database, AI, Workflow, or durable-execution code.
 
 ## Composing an application
 
@@ -192,7 +192,7 @@ identity, tenancy, authorization, or transaction handles.
   copy of the current context.
 - `bind_correlation_id(value)` / `get_correlation_id()` carry the correlation ID.
 - `bind_deadline(seconds)` / `get_deadline()` carry cooperative deadline metadata for callers
-  such as the Flow executor.
+  such as the Workflow executor.
 - `create_task_in_context(coroutine)` creates an `asyncio` task that inherits the caller's
   context on every supported Python version.
 - `capture_context_runner(func, *args)` returns a zero-argument callable bound to a copy of
@@ -230,6 +230,7 @@ Phase 1 raises these types, all rooted at `XyberosError`:
 ## Later phases
 
 HTTP support is provided by the optional `http` extra ([guide](./http.md)) and the SQLite
-provider by the optional `database` extra ([operations guide](./database.md)); plugins are part of
-core ([guide](./plugins.md)). Flow, AI adapters, and durable execution arrive in later phases. See
+provider by the optional `database` extra ([operations guide](./database.md)); plugins and the
+in-process workflow engine are part of core ([plugin guide](./plugins.md),
+[workflow guide](./workflow.md)). AI adapters and durable execution arrive in later phases. See
 [the implementation plan](./implementation.md#detailed-phase-by-phase-execution-plan).

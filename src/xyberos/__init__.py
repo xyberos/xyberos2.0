@@ -1,9 +1,9 @@
 """Public package boundary for Xyberos.
 
-Phase 1 exposes the application runtime: composition, typed configuration, dependency
-injection, lifecycle, context/logging helpers, and the framework error taxonomy. Optional
-capabilities such as HTTP, databases, AI, Flow, and durable execution stay internal until
-their contracts are validated in later phases.
+The stable surface is the application runtime (composition, typed configuration, dependency
+injection, lifecycle, context helpers, and the error taxonomy), the trusted plugin contract, and
+the in-process workflow engine. Optional capabilities — HTTP, databases, AI providers, and
+durable execution — live behind their own extras and are imported explicitly from their modules.
 """
 
 from xyberos.app import App, RequestContext
@@ -29,12 +29,47 @@ from xyberos.errors import (
     PluginValidationError,
     RegistrationError,
     RequestValidationError,
+    RetryExhaustedError,
     RouteRegistrationError,
     ScopeViolationError,
     ShutdownError,
+    StepTimeoutError,
     TransactionError,
     TransientDatabaseError,
+    TransientError,
+    WorkflowCancelledError,
+    WorkflowError,
+    WorkflowExecutionError,
+    WorkflowTimeoutError,
+    WorkflowValidationError,
     XyberosError,
+)
+from xyberos.execution.direct import direct
+from xyberos.execution.events import EventSink, EventType, WorkflowEvent
+from xyberos.execution.executor import WorkflowExecutor
+from xyberos.execution.models import (
+    DIRECT_WORKFLOW,
+    Attempt,
+    BranchPredicate,
+    Edge,
+    InputType,
+    Step,
+    StepFunction,
+    StepOutcome,
+    StepStatus,
+    Workflow,
+    WorkflowResult,
+)
+from xyberos.execution.policies import (
+    Backoff,
+    CancellationToken,
+    Clock,
+    Retry,
+    StepContext,
+    SystemClock,
+    milliseconds,
+    minutes,
+    seconds,
 )
 from xyberos.plugins.protocol import (
     PLUGIN_API_VERSION,
@@ -61,8 +96,15 @@ from xyberos.runtime.lifecycle import LifecycleState
 __version__ = "0.0.0"
 
 __all__ = [
+    "DIRECT_WORKFLOW",
+    "PLUGIN_API_VERSION",
     "App",
     "AppSettings",
+    "Attempt",
+    "Backoff",
+    "BranchPredicate",
+    "CancellationToken",
+    "Clock",
     "ConfigurationError",
     "ContextLogFilter",
     "DatabaseConfigurationError",
@@ -73,13 +115,16 @@ __all__ = [
     "DependencyError",
     "DependencyResolutionError",
     "Diagnostics",
+    "Edge",
+    "EventSink",
+    "EventType",
     "HttpError",
     "Inject",
+    "InputType",
     "LifecycleError",
     "LifecycleState",
     "LifecycleStateError",
     "MissingProviderError",
-    "PLUGIN_API_VERSION",
     "Plugin",
     "PluginCompatibilityError",
     "PluginConfigurationError",
@@ -96,6 +141,8 @@ __all__ = [
     "RegistrationError",
     "RequestContext",
     "RequestValidationError",
+    "Retry",
+    "RetryExhaustedError",
     "Route",
     "RouteRegistrationError",
     "RouteRegistry",
@@ -103,8 +150,25 @@ __all__ = [
     "ScopeViolationError",
     "Settings",
     "ShutdownError",
+    "Step",
+    "StepContext",
+    "StepFunction",
+    "StepOutcome",
+    "StepStatus",
+    "StepTimeoutError",
+    "SystemClock",
     "TransactionError",
     "TransientDatabaseError",
+    "TransientError",
+    "Workflow",
+    "WorkflowCancelledError",
+    "WorkflowError",
+    "WorkflowEvent",
+    "WorkflowExecutionError",
+    "WorkflowExecutor",
+    "WorkflowResult",
+    "WorkflowTimeoutError",
+    "WorkflowValidationError",
     "XyberosError",
     "__version__",
     "bind_context",
@@ -112,8 +176,12 @@ __all__ = [
     "bind_deadline",
     "capture_context_runner",
     "create_task_in_context",
+    "direct",
     "get_context",
     "get_correlation_id",
     "get_deadline",
     "load_settings",
+    "milliseconds",
+    "minutes",
+    "seconds",
 ]

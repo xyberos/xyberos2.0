@@ -56,7 +56,10 @@ does not claim a permission model, and does not attempt to make untrusted packag
 
 ## Consequences
 
-- Phase 4 (Flow) and later phases can ship capabilities as plugins without widening the runtime.
+- Phase 4 (Workflow) and later phases can ship capabilities as plugins without widening the
+  runtime. *Phase 4 instead kept the workflow engine in core, because it is an execution layer
+  rather than a capability, so it needs no extra and no plugin lifecycle; the plugin path stays open
+  for capabilities built on top of it ([ADR 0008](./0008-workflow-terminology.md)).*
 - Test clones copy providers and routes but not plugin registrations, so plugin lifecycle hooks
   cannot run twice; this is documented in the plugin guide.
 - Provider `source` attribution from Phase 2 is now populated automatically for plugin

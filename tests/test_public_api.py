@@ -1,4 +1,4 @@
-"""The Phase 1 public surface is importable, typed, and usable end to end."""
+"""The public surface is importable, typed, and usable end to end."""
 
 import asyncio
 from typing import Annotated, get_type_hints
@@ -6,7 +6,7 @@ from typing import Annotated, get_type_hints
 import pytest
 
 import xyberos
-from xyberos import App, Inject, RegistrationError, Scope, Settings
+from xyberos import App, Inject, RegistrationError, Scope, Settings, Workflow
 
 
 class Counter:
@@ -21,8 +21,14 @@ class CounterHolder:
 
 def test_expected_public_names_are_exported() -> None:
     expected = {
+        "DIRECT_WORKFLOW",
         "App",
         "AppSettings",
+        "Attempt",
+        "Backoff",
+        "BranchPredicate",
+        "CancellationToken",
+        "Clock",
         "ConfigurationError",
         "ContextLogFilter",
         "Dependency",
@@ -30,7 +36,11 @@ def test_expected_public_names_are_exported() -> None:
         "DependencyError",
         "DependencyResolutionError",
         "Diagnostics",
+        "Edge",
+        "EventSink",
+        "EventType",
         "Inject",
+        "InputType",
         "LifecycleError",
         "LifecycleState",
         "LifecycleStateError",
@@ -51,20 +61,43 @@ def test_expected_public_names_are_exported() -> None:
         "ProviderRegistry",
         "RegistrationError",
         "RequestContext",
+        "Retry",
+        "RetryExhaustedError",
         "Scope",
         "ScopeViolationError",
         "Settings",
         "ShutdownError",
+        "Step",
+        "StepContext",
+        "StepFunction",
+        "StepOutcome",
+        "StepStatus",
+        "StepTimeoutError",
+        "SystemClock",
+        "TransientError",
+        "Workflow",
+        "WorkflowCancelledError",
+        "WorkflowError",
+        "WorkflowEvent",
+        "WorkflowExecutionError",
+        "WorkflowExecutor",
+        "WorkflowResult",
+        "WorkflowTimeoutError",
+        "WorkflowValidationError",
         "XyberosError",
         "bind_context",
         "bind_correlation_id",
         "bind_deadline",
         "capture_context_runner",
         "create_task_in_context",
+        "direct",
         "get_context",
         "get_correlation_id",
         "get_deadline",
         "load_settings",
+        "milliseconds",
+        "minutes",
+        "seconds",
     }
 
     assert expected <= set(xyberos.__all__)
@@ -106,5 +139,19 @@ def test_composition_and_resolution_work_end_to_end() -> None:
             holder.counter.value += 1
 
             assert (await running.resolve(CounterHolder)).counter.value == 1
+
+    asyncio.run(scenario())
+
+
+def test_a_workflow_is_part_of_the_core_surface() -> None:
+    async def scenario() -> None:
+        async def double(value: object, context: object) -> object:
+            return value * 2  # type: ignore[operator]
+
+        workflow = Workflow("demo", version="1").step("double", double)
+
+        result = await workflow.run(input=2)
+
+        assert result.value == 4
 
     asyncio.run(scenario())

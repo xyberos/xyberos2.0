@@ -1,6 +1,6 @@
 # Xyberos — architecture baseline and roadmap
 
-Python · Starlette · SQLite · Composable runtime · Explicit typed dependencies · Explicit Flow · Experimental durability
+Python · Starlette · SQLite · Composable runtime · Explicit typed dependencies · Explicit Workflow · Experimental durability
 
 This document is the stable architecture baseline: decisions, subsystem contracts, target
 structure, roadmap, and risk analysis. It is not the task tracker.
@@ -32,9 +32,9 @@ Database: SQLite by default
 
 Provide a zero-configuration SQLite setup and a database-provider contract. Reuse existing database libraries rather than building a custom ORM.
 
-Execution: Direct execution + Flow
+Execution: Direct execution + Workflow
 
-Support ordinary function calls first, then explicit multi-step Flow for branching, retries, timeouts, and cancellation.
+Support ordinary function calls first, then explicit multi-step Workflow for branching, retries, timeouts, and cancellation.
 
 Durability: Native SQLite MVP, experimental
 
@@ -42,7 +42,7 @@ Design the execution-store interface and prototype a single-instance durable exe
 
 ### Initial release scope
 
-Stable target: Runtime + capability registry + Starlette integration + SQLite provider + plugins + explicit Flow.
+Stable target: Runtime + capability registry + Starlette integration + SQLite provider + plugins + explicit Workflow.
 
 Experimental target: Native SQLite durable execution.
 
@@ -64,7 +64,7 @@ Database · Auth · Storage · Cache · AI providers · Plugins
 
 Execution Layer
 
-Direct calls · Flow · Experimental durable execution
+Direct calls · Workflow · Experimental durable execution
 
 HTTP adapter
 
@@ -249,7 +249,7 @@ Acceptance criteria
 - Middleware behaves according to a documented ordering model.
 - Runtime startup completes before requests are accepted.
 - Shutdown waits for managed resources to close within configured limits.
-- HTTP concerns do not leak into database, Flow, or durable execution abstractions.
+- HTTP concerns do not leak into database, Workflow, or durable execution abstractions.
 
 ### 4.3 SQLite and database providers
 
@@ -272,9 +272,9 @@ Acceptance criteria
 - Tests cover concurrent requests and SQLite write contention.
 - A future provider can be introduced without rewriting business services.
 
-### 4.4 Flow engine
+### 4.4 Workflow engine
 
-Flow is the explicit execution layer for multi-step work. It should not be required for ordinary functions or HTTP handlers.
+Workflow is the explicit execution layer for multi-step work. It should not be required for ordinary functions or HTTP handlers.
 
 Initial features
 
@@ -302,7 +302,14 @@ Acceptance criteria
 - Step failures produce structured execution errors.
 - Retry counts and timeouts are deterministic and testable.
 - Cancellation propagates to supported operations.
-- No documentation implies persistence or recovery for ordinary in-process Flow.
+- No documentation implies persistence or recovery for ordinary in-process Workflow.
+
+**Shipped in Phase 4.** All five criteria are now verified against the implementation: `Workflow`
+lives in `src/xyberos/execution/` with no optional dependency, the exit-gate suite in
+`tests/workflow/` covers every criterion deterministically with a virtual clock, and
+`docs/workflow.md` states the absence of persistence where a reader would look for it. The frozen
+contract is [ADR 0009](./adr/0009-workflow-engine-contract.md), and the naming decision is
+[ADR 0008](./adr/0008-workflow-terminology.md).
 
 ### 4.5 AI facade
 
@@ -320,11 +327,11 @@ Initial interfaces:
 
 Model providers should be optional adapters. Keep provider-specific request formats outside the runtime core.
 
-AI calls should use direct execution by default. A developer should opt into Flow for explicit multi-step orchestration and into durable execution only when the task needs persisted progress and recovery.
+AI calls should use direct execution by default. A developer should opt into Workflow for explicit multi-step orchestration and into durable execution only when the task needs persisted progress and recovery.
 
 ### 4.6 Experimental native SQLite durability
 
-Implement this after the runtime and Flow APIs are stable.
+Implement this after the runtime and Workflow APIs are stable.
 
 The initial durable executor should support:
 
@@ -416,7 +423,7 @@ Use a modular monolith, with optional subsystems separated by import and depende
 
 The tree below is the **target** layout. It is not a description of the current tree, and it is
 not a requirement to create empty modules: implement a module only when its responsibilities and
-contracts are understood. Phases 1–2 currently implement:
+contracts are understood. Phases 1–4 currently implement:
 
 ```text
 src/xyberos/
@@ -424,7 +431,7 @@ src/xyberos/
 ├── app.py               # App, RequestContext, lifecycle, plugins
 ├── config.py            # typed settings, including plugin sections
 ├── diagnostics.py       # provider and plugin diagnostics
-├── errors.py            # error taxonomy
+├── errors.py            # error taxonomy, including the workflow families
 ├── routing.py           # dependency-free route records
 ├── runtime/
 │   ├── __init__.py
@@ -433,6 +440,14 @@ src/xyberos/
 │   └── lifecycle.py     # LifecycleState
 ├── plugins/             # trusted plugin contract, configuration, and registry
 │   ├── protocol.py, config.py, registry.py
+├── execution/           # in-process workflow engine (core, no extra)
+│   ├── models.py        # immutable Workflow, Step, Edge, results
+│   ├── policies.py      # retry, backoff, clock, cancellation, step context
+│   ├── validation.py    # build-time graph validation
+│   ├── executor.py      # structured-concurrency execution
+│   ├── events.py        # structured execution events
+│   ├── direct.py        # the single-call execution boundary
+│   └── testing.py       # ManualClock, FakeExternalService, Reply
 ├── http/                # optional "http" extra (Starlette)
 │   ├── adapter.py, middleware.py, routing.py, requests.py, testing.py
 └── database/            # optional "database" extra (SQLAlchemy Core, aiosqlite, Alembic)
@@ -440,14 +455,16 @@ src/xyberos/
 
 examples/
 ├── sqlite_crud/         # worked CRUD slice with Alembic migrations
-└── custom_plugin/       # plugin authoring example
+├── custom_plugin/       # plugin authoring example
+└── workflow/            # workflow example with retries, branching, and events
 
 tests/
 ├── runtime/             # Phase 1 exit-criteria tests
 ├── http/                # adapter and handler-compilation tests
 ├── database/            # provider, PRAGMA, and contention tests
 ├── plugins/             # plugin contract, configuration, and lifecycle tests
-├── integration/         # end-to-end example, migration, and plugin-package tests
+├── workflow/            # Phase 4 exit-criteria tests
+├── integration/         # end-to-end example, migration, plugin-package, and workflow tests
 ├── fixtures/            # separately packaged plugin used as a test fixture
 ├── contracts/           # executable public-API examples
 ├── test_import_boundary.py
@@ -465,11 +482,16 @@ xyberos3/
 │   ├── PLAN.md              # architecture baseline (this file)
 │   ├── implementation.md    # phase plan and status
 │   ├── runtime.md           # implemented runtime surface
+│   ├── http.md              # HTTP adapter guide
+│   ├── database.md          # database provider guide
+│   ├── plugins.md           # plugin guide
+│   ├── workflow.md          # workflow engine guide
 │   └── adr/                 # decision records
 ├── examples/
 │   ├── hello_app/
 │   ├── sqlite_crud/
 │   ├── custom_plugin/
+│   ├── workflow/
 │   ├── ai_assistant/
 │   └── durable_workflow/
 ├── src/
@@ -494,9 +516,12 @@ xyberos3/
 │       │   └── sqlite.py
 │       ├── execution/
 │       │   ├── direct.py
-│       │   ├── flow.py
+│       │   ├── events.py
+│       │   ├── executor.py
 │       │   ├── models.py
-│       │   └── policies.py
+│       │   ├── policies.py
+│       │   ├── testing.py
+│       │   └── validation.py
 │       ├── ai/
 │       │   ├── facade.py
 │       │   ├── providers.py
@@ -511,17 +536,23 @@ xyberos3/
 │       │   └── recovery.py
 │       └── cli/
 └── tests/
+    ├── test_import_boundary.py   # implemented
+    ├── test_public_api.py        # implemented
+    ├── test_package.py           # implemented
     ├── runtime/          # implemented (Phase 1)
+    ├── http/             # implemented (Phase 2)
+    ├── database/         # implemented (Phase 2)
+    ├── plugins/          # implemented (Phase 3)
+    ├── workflow/         # implemented (Phase 4)
+    ├── fixtures/         # implemented (separately packaged plugin)
     ├── contracts/        # implemented (executable API examples)
-    ├── integration/      # planned
-    ├── plugins/          # planned
-    ├── flow/             # planned
+    ├── integration/      # implemented
     ├── durable/          # planned
     └── crash_recovery/   # planned
 
 ```
 
-The directory layout is a target, not a requirement to create empty modules upfront. Implement a module only when its responsibilities and contracts are understood.
+The directory layout is a target, not a requirement to create empty modules upfront. Implement a module only when its responsibilities and contracts are understood. A target module may be split once its real responsibilities are clear, as `execution/` was: `models`, `policies`, `validation`, `executor`, `events`, `direct`, and `testing` are separate because they are separately testable, not because the plan predicted those exact names.
 
 Keep `durable/` importable independently of the core. An installation that does not use experimental durability should not need its dependencies or initialize its database tables.
 
@@ -537,14 +568,14 @@ is the summary.
 | 1 | Runtime foundation | A working minimal application | 1–2 weeks | complete |
 | 2 | HTTP and traditional application support | A working CRUD application | 1–2 weeks | complete |
 | 3 | Plugins and capabilities | An independently developed plugin | 1–2 weeks | complete |
-| 4 | Stable in-process Flow | A tested, inspectable workflow engine without durability promises | 2–3 weeks | next |
-| 5 | AI facade and integration | An AI application built on the same runtime and Flow APIs | 1–2 weeks | planned |
+| 4 | Stable in-process Workflow | A tested, inspectable workflow engine without durability promises | 2–3 weeks | complete |
+| 5 | AI facade and integration | An AI application built on the same runtime and Workflow APIs | 1–2 weeks | next |
 | 6 | Experimental durable execution | An experimental single-instance executor with documented limits | 3–6+ weeks | planned |
-| 7 | DX, hardening, and release | A stable runtime and Flow release; durability remains experimental | 1–2 weeks | planned |
+| 7 | DX, hardening, and release | A stable runtime and Workflow release; durability remains experimental | 1–2 weeks | planned |
 
 Estimated initial implementation: approximately 10–18+ working weeks for one experienced developer, including a limited experimental durable executor. The work can take longer if building and validating recovery semantics reveals additional requirements.
 
-The stable runtime and Flow can be released earlier; there is no reason to block the useful framework on durable execution.
+The stable runtime and Workflow can be released earlier; there is no reason to block the useful framework on durable execution.
 
 ## 8. Testing and quality gates
 
@@ -557,7 +588,7 @@ Testing should be built into each phase, not postponed until the end.
 | Plugins              | Dependency order, duplicate registration, startup failure, cleanup   |
 | HTTP                 | Routing, middleware order, exception handling, async behavior        |
 | SQLite               | Transactions, migrations, connection cleanup, concurrent writes      |
-| Flow                 | Branches, retry limits, timeouts, cancellation, error propagation    |
+| Workflow                 | Branches, retry limits, timeouts, cancellation, error propagation    |
 | AI                   | Provider failures, malformed outputs, tool permissions, usage limits |
 | Durability           | Crash recovery, duplicate work, lease expiry, interrupted steps      |
 | Packaging            | Clean installation, optional dependencies, supported Python versions |
@@ -568,7 +599,7 @@ Stable runtime gate
 
 A developer can build, test, and run a SQLite-backed HTTP application without importing AI or durability modules.
 
-Stable Flow gate
+Stable Workflow gate
 
 Execution order, branching, retries, cancellation, and errors have documented semantics and automated tests.
 
@@ -588,7 +619,7 @@ Prioritize these deliverables:
 - A SQLite CRUD example.
 - A plugin-development example.
 - An AI assistant example.
-- A Flow example with branching and retries.
+- A Workflow example with branching and retries.
 - A separate experimental durable-workflow example.
 - Clear errors when configuration or dependencies are invalid.
 - A test client and easy dependency overrides.
@@ -602,7 +633,7 @@ The command-line interface can initially be limited to project creation, develop
 | ---------------------------------------------- | --------------------------------------------------------------------------------------- |
 | Runtime becomes a new kernel                   | Keep core responsibilities limited to lifecycle, composition, and dependency resolution |
 | Registry becomes a global service locator      | Use explicit typed injection and scoped dependencies                                    |
-| Flow grows into a universal workflow framework | Limit stable Flow to a well-defined set of execution primitives                         |
+| Workflow grows into a universal workflow framework | Limit stable Workflow to a well-defined set of execution primitives                         |
 | SQLite executor makes unsafe recovery claims   | Keep it experimental and single-instance until failure semantics are validated          |
 | Plugin API becomes unstable                    | Finalize lifecycle and registration contracts before broad plugin development           |
 | Too many abstractions slow development         | Reuse existing Python libraries and introduce interfaces where substitution is valuable |
@@ -618,7 +649,7 @@ The first stable release is ready when a developer can:
 3. Use SQLite without configuring an external database server.
 4. Inject services using explicit typed dependencies.
 5. Add and replace capabilities through plugins.
-6. Build ordinary applications without loading AI or Flow.
+6. Build ordinary applications without loading AI or Workflow.
 7. Build explicit, testable multi-step workflows.
 8. Add an AI provider and tools without changing the runtime architecture.
 9. Test applications without requiring live infrastructure wherever practical.
@@ -638,15 +669,15 @@ Starlette + SQLite default + modular plugin contracts.
 
 Execution
 
-Direct execution by default, explicit in-process Flow for multi-step work, and optional experimental native SQLite durability.
+Direct execution by default, explicit in-process Workflow for multi-step work, and optional experimental native SQLite durability.
 
 Release priority
 
-Ship a useful, developer-friendly runtime and Flow first. Do not delay the stable platform to achieve production-grade durability in version 3.0.
+Ship a useful, developer-friendly runtime and Workflow first. Do not delay the stable platform to achieve production-grade durability in version 3.0.
 
 The central architectural rule for Xyberos is:
 
-Compose the application through the runtime, expose functionality through capabilities, define multi-step behavior through Flow, and add durable execution only when recovery is required.
+Compose the application through the runtime, expose functionality through capabilities, define multi-step behavior through Workflow, and add durable execution only when recovery is required.
 
 This provides a manageable implementation path while keeping the framework extensible enough for conventional applications, AI systems, and future reliable workflow execution.
 
@@ -662,17 +693,17 @@ and in [`implementation.md`](./implementation.md).
 | 1 | Force WAL mode and a bounded busy timeout; keep the durable journal in a separate SQLite file | Accepted | Phase 2 work packages 5–6 and the durable requirements in section 5 |
 | 2 | Bake `contextvars` into the runtime and copy context across step, task, and thread boundaries | Accepted | `src/xyberos/runtime/context.py` (Phase 1); Phase 4 propagates it across steps |
 | 3 | Validate the dependency graph at startup instead of per request | Accepted | Phase 1 validates before readiness; see [ADR 0005](./adr/0005-phase-1-runtime-contract.md) |
-| 4 | Add a decorator or imperative Flow API alongside the declarative builder | Deferred | Deferred until declarative Flow introspection and recovery semantics are proven; see the backlog in [`implementation.md`](./implementation.md) |
-| 5 | Move the AI facade ahead of the stable Flow engine | Rejected | Flow semantics stabilize first; Phase 4 uses a deterministic fake provider, so no reordering is needed |
+| 4 | Add a decorator or imperative Workflow API alongside the declarative builder | Deferred | Deferred until declarative Workflow introspection and recovery semantics are proven; see the backlog in [`implementation.md`](./implementation.md) |
+| 5 | Move the AI facade ahead of the stable Workflow engine | Rejected | Workflow semantics stabilize first; Phase 4 uses a deterministic fake provider, so no reordering is needed |
 
 Rationale for the two proposals that were not accepted:
 
-- **Decorator Flow (deferred).** An imperative `async def flow(ctx)` body is arbitrary Python
+- **Decorator Workflow (deferred).** An imperative `async def workflow(ctx)` body is arbitrary Python
   control flow. It cannot be reliably inspected, retried, or recovered, so it cannot carry the
-  stable Flow contract. A decorator surface can be added later as sugar over the declarative
+  stable Workflow contract. A decorator surface can be added later as sugar over the declarative
   graph, once the graph semantics are frozen.
-- **AI facade before Flow (rejected).** AI adapters are the largest source of optional
-  dependencies and provider churn. Gating core Flow work on an adapter would invert the
+- **AI facade before Workflow (rejected).** AI adapters are the largest source of optional
+  dependencies and provider churn. Gating core Workflow work on an adapter would invert the
   dependency direction and slow the stable release. Phase 4 instead exercises retries,
   deadlines, and cancellation against a deterministic in-process fake that needs no network or
   model provider.

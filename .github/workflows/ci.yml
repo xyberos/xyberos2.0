@@ -45,3 +45,32 @@ jobs:
       - run: python -c "import xyberos; print(xyberos.__version__)"
       - if: matrix.extra == 'core'
         run: python -c "import sys, xyberos; assert not [m for m in ('starlette', 'sqlalchemy', 'aiosqlite', 'alembic', 'httpx') if m in sys.modules], 'core imported an optional capability'"
+      - if: matrix.extra == 'core'
+        run: |
+          python - <<'PY'
+          import asyncio
+
+          from xyberos import Retry, Workflow
+          from xyberos.execution import FakeExternalService, ManualClock, Reply, WorkflowExecutor
+
+
+          async def main() -> None:
+              clock = ManualClock()
+              service = FakeExternalService([Reply.rate_limited(), Reply.ok("done")], clock=clock)
+
+              async def fetch(value, context):
+                  return await service.call()
+
+              workflow = Workflow("smoke").step("fetch", fetch, retry=Retry(max_attempts=2))
+              task = asyncio.ensure_future(
+                  workflow.run(executor=WorkflowExecutor(clock=clock))
+              )
+              result = await clock.drive(task)
+
+              assert result.value == "done", result.value
+              assert service.calls == 2, service.calls
+              print("workflow engine usable with no extras installed")
+
+
+          asyncio.run(main())
+          PY

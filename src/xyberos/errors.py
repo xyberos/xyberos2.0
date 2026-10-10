@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from xyberos.execution.models import Attempt, StepOutcome
 
 
 class XyberosError(Exception):
@@ -145,3 +149,73 @@ class PluginDependencyError(PluginValidationError):
 
 class PluginLifecycleError(PluginError):
     """Raised when a plugin fails during ``start`` or ``stop``."""
+
+
+class TransientError(XyberosError):
+    """Marker base class for a failure that a retry policy may retry.
+
+    Retry classification is policy driven: a workflow step opts a failure into retrying either by
+    raising this type (or a subclass) or by naming the exception type in its retry policy. Nothing
+    else is retried, so a programming error is never silently repeated.
+    """
+
+
+class WorkflowError(XyberosError):
+    """Base class for workflow definition and execution errors."""
+
+
+class WorkflowValidationError(WorkflowError):
+    """Raised when a workflow definition cannot be compiled into an executable graph.
+
+    Validation happens before any step runs, so an invalid definition never causes partial
+    execution.
+    """
+
+
+class WorkflowExecutionError(WorkflowError):
+    """Raised when a workflow stops without producing a result.
+
+    ``step`` names the step that stopped the run, ``attempts`` preserves every attempt outcome in
+    order so retry behavior is inspectable, and ``outcomes`` holds the steps that already
+    resolved. The message names exception types only: the original exception is preserved as the
+    cause, including its own message.
+
+    ``workflow`` is filled in by the executor when it raises this error itself. A step may raise a
+    subclass with only a message to stop the run, in which case the executor replaces the error
+    with its own, carrying the workflow and step context.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        workflow: str = "",
+        step: str | None = None,
+        attempts: Iterable[Attempt] = (),
+        outcomes: Mapping[str, StepOutcome] | None = None,
+    ) -> None:
+        self.workflow = workflow
+        self.step = step
+        self.attempts = tuple(attempts)
+        self.outcomes = dict(outcomes or {})
+        super().__init__(message)
+
+
+class RetryExhaustedError(WorkflowExecutionError):
+    """Raised when a step's retry policy runs out of attempts."""
+
+
+class StepTimeoutError(WorkflowExecutionError):
+    """Raised when one step attempt exceeds its timeout.
+
+    A step timeout is not retryable by default: it is not a :class:`TransientError`, so retrying a
+    hung operation must be an explicit policy decision.
+    """
+
+
+class WorkflowTimeoutError(WorkflowExecutionError):
+    """Raised when the whole workflow exceeds its deadline."""
+
+
+class WorkflowCancelledError(WorkflowExecutionError):
+    """Raised when cancellation was requested before or during execution."""

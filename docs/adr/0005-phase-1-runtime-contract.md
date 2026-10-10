@@ -6,12 +6,12 @@
 
 Phase 1 delivered the application runtime in `src/xyberos/`. Later phases consume its
 semantics directly: the HTTP adapter (Phase 2) injects request-scoped services into handlers,
-plugins (Phase 3) register providers publicly, Flow (Phase 4) propagates runtime context, and
+plugins (Phase 3) register providers publicly, Workflow (Phase 4) propagates runtime context, and
 the durable executor (Phase 6) reuses the lifecycle and error conventions. These decisions
 therefore need to be explicit before Phase 2 begins.
 
 The runtime must stay thin: composition, configuration, dependency resolution, lifecycle, and
-context/logging only. It must not import HTTP, database, AI, Flow, or durable-execution code.
+context/logging only. It must not import HTTP, database, AI, Workflow, or durable-execution code.
 
 ## Decision
 
@@ -48,8 +48,8 @@ registration. Registration infers dependencies from the factory signature.
 then environment variables, then `xyberos.toml`, then defaults. Core settings hold no secrets,
 and validation errors never echo configured values.
 
-**Declarative Flow first.** Flow definitions stay declarative so they remain inspectable,
-retryable, and traceable. An imperative or decorator Flow API is deferred until the declarative
+**Declarative Workflow first.** Workflow definitions stay declarative so they remain inspectable,
+retryable, and traceable. An imperative or decorator Workflow API is deferred until the declarative
 graph and its recovery semantics are proven.
 
 ## Consequences
@@ -57,7 +57,15 @@ graph and its recovery semantics are proven.
 - Phases 2–7 build on the frozen `App`, `Inject`, `Scope`, `Settings`, `LifecycleState`, and
   error contracts; changing them requires a new ADR.
 - The error taxonomy grows per phase: Phase 1 defines configuration, registration,
-  dependency-resolution, and lifecycle families. HTTP, database, Flow, provider, and
-  durable-state families are added by the phase that introduces them.
+  dependency-resolution, and lifecycle families. HTTP, database, Workflow, provider, and
+  durable-state families are added by the phase that introduces them. *Satisfied through Phase 4:
+  HTTP and database families shipped in Phase 2, the plugin family in Phase 3, and the
+  Workflow-validation, Workflow-execution, and transient-failure families in Phase 4
+  ([ADR 0009](./0009-workflow-engine-contract.md)).*
+- The declarative-first decision is honoured: Phase 4 shipped an immutable builder whose
+  definitions validate without executing and render without side effects, and the decorator surface
+  stays in the Phase 7 backlog ([ADR 0009](./0009-workflow-engine-contract.md)).
 - A configurable shutdown drain bound and provider source attribution are deliberately left to
   Phase 2 and Phase 3, where HTTP lifespan and plugin diagnostics make them actionable.
+  *Satisfied: `app.shutdown_timeout` shipped in Phase 2, and automatic `plugin:<name>` provider
+  sources shipped in Phase 3 ([ADR 0007](./0007-trusted-plugins.md)).*

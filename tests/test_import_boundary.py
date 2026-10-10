@@ -59,3 +59,25 @@ def test_http_adapter_does_not_import_the_database_extra() -> None:
     )
 
     assert result.returncode == 0, result.stderr
+
+
+def test_the_execution_layer_loads_no_optional_capability() -> None:
+    result = run_python(
+        "import sys, xyberos.execution; "
+        "optional = ('starlette', 'sqlalchemy', 'aiosqlite', 'alembic', 'httpx'); "
+        "loaded = [name for name in optional if name in sys.modules]; "
+        "assert not loaded, loaded"
+    )
+
+    assert result.returncode == 0, result.stderr
+
+
+def test_the_execution_layer_does_not_import_optional_subsystems() -> None:
+    result = run_python(
+        "import sys; import xyberos.execution; import xyberos.execution.executor; "
+        "leaked = [name for name in sys.modules if name.startswith("
+        "('xyberos.http', 'xyberos.database', 'xyberos.ai', 'xyberos.durable'))]; "
+        "assert not leaked, leaked"
+    )
+
+    assert result.returncode == 0, result.stderr

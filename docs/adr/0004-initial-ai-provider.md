@@ -18,3 +18,7 @@ feature.
 - Unit tests can use an HTTP mock or fake provider without a local Ollama daemon.
 - Examples may name a model but production applications must configure one explicitly.
 - Prompts, completions, and credentials are excluded from logs by default.
+
+*All three are owned by Phase 5 (optional AI facade), whose work packages and exit criteria cover
+the fake provider, explicit model configuration, and default redaction; Phase 7 re-audits
+redaction.*

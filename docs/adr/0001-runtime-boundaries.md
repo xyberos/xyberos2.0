@@ -11,7 +11,7 @@ way to compose optional capabilities without becoming a centralized framework ke
 
 The core runtime owns only application composition, configuration, provider registration,
 dependency validation/resolution, lifecycle, and context/logging hooks. It does not import
-HTTP, database, AI, Flow, or durable-execution implementations.
+HTTP, database, AI, Workflow, or durable-execution implementations.
 
 Capabilities are application-local registrations with explicit contracts, provider scope,
 ownership, and cleanup. Dependencies are declared with type annotations and an explicit

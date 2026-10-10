@@ -62,4 +62,5 @@ implicitly during startup. SQLite table rebuilds use batch mode.
 - The runtime gained one configurable default for this phase: `app.shutdown_timeout`, which bounds
   the shutdown drain so a leaked request context cannot hang the process indefinitely.
 - Provider `source` attribution in diagnostics remains a Phase 3 item, because plugin
-  registration is what makes it actionable.
+  registration is what makes it actionable. *Satisfied in Phase 3; provider sources are reported
+  by `App.diagnostics()` ([ADR 0007](./0007-trusted-plugins.md)).*

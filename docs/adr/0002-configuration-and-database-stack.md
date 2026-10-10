@@ -16,5 +16,9 @@ not require SQLAlchemy ORM models as public framework types.
 ## Consequences
 
 - `pyproject.toml` remains build metadata rather than deploy-time application settings.
-- The database, Ollama, and durable stacks remain optional extras during Phase 0.
-- Application and durable journal databases use separate Alembic migration environments.
+- The database, Ollama, and durable stacks remain optional extras during Phase 0. *Satisfied:
+  `http`, `database`, `ollama`, and `durable` are separate extras, and an import-boundary test
+  enforces that core loads none of them.*
+- Application and durable journal databases use separate Alembic migration environments. *The
+  application side shipped with the Phase 2 migration integration; the separate journal migration
+  environment is owned by Phase 6.*
