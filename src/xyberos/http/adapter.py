@@ -9,10 +9,15 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 
-from starlette.applications import Starlette
-from starlette.middleware import Middleware
-from starlette.routing import Route as StarletteRoute
-from starlette.types import ASGIApp
+try:
+    from starlette.applications import Starlette
+    from starlette.middleware import Middleware
+    from starlette.routing import Route as StarletteRoute
+    from starlette.types import ASGIApp
+except ModuleNotFoundError as error:
+    from xyberos._extras import extra_error
+
+    raise extra_error("http", error) from error
 
 from xyberos.app import App
 from xyberos.http.middleware import (

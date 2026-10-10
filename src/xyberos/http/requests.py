@@ -5,7 +5,12 @@ from __future__ import annotations
 import json
 from typing import cast
 
-from starlette.requests import Request
+try:
+    from starlette.requests import Request
+except ModuleNotFoundError as error:
+    from xyberos._extras import extra_error
+
+    raise extra_error("http", error) from error
 
 from xyberos.errors import RequestValidationError
 

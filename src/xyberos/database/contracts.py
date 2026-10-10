@@ -11,7 +11,12 @@ from collections.abc import Awaitable, Callable
 from contextlib import AbstractAsyncContextManager
 from typing import Protocol, TypeAlias, TypeVar
 
-from sqlalchemy.ext.asyncio import AsyncConnection
+try:
+    from sqlalchemy.ext.asyncio import AsyncConnection
+except ModuleNotFoundError as error:
+    from xyberos._extras import extra_error
+
+    raise extra_error("database", error) from error
 
 T = TypeVar("T")
 

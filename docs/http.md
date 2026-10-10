@@ -3,7 +3,8 @@
 > Status: Phase 2. The adapter is preview API and lives in the optional `http` extra.
 
 Install it with `pip install "xyberos[http]"`, which provides Starlette and `httpx` (the Starlette
-test client is built on `httpx`).
+test client is built on `httpx`). Importing an adapter module without the extra fails with that
+command, not a bare `ModuleNotFoundError`.
 
 Xyberos owns the runtime — configuration, dependency resolution, lifecycle, and route records.
 Starlette owns ASGI mechanics: routing internals, request/response types, middleware plumbing,

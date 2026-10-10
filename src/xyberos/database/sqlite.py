@@ -14,14 +14,19 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, TypeVar
 
-from sqlalchemy import event, text
-from sqlalchemy.exc import OperationalError, SQLAlchemyError
-from sqlalchemy.ext.asyncio import (
-    AsyncConnection,
-    AsyncEngine,
-    AsyncTransaction,
-    create_async_engine,
-)
+try:
+    from sqlalchemy import event, text
+    from sqlalchemy.exc import OperationalError, SQLAlchemyError
+    from sqlalchemy.ext.asyncio import (
+        AsyncConnection,
+        AsyncEngine,
+        AsyncTransaction,
+        create_async_engine,
+    )
+except ModuleNotFoundError as error:
+    from xyberos._extras import extra_error
+
+    raise extra_error("database", error) from error
 
 from xyberos.database.contracts import TransactionOperation
 from xyberos.errors import (

@@ -17,8 +17,13 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Annotated, TypeAlias, cast, get_args, get_origin, get_type_hints
 
-from starlette.requests import Request
-from starlette.responses import JSONResponse, Response
+try:
+    from starlette.requests import Request
+    from starlette.responses import JSONResponse, Response
+except ModuleNotFoundError as error:
+    from xyberos._extras import extra_error
+
+    raise extra_error("http", error) from error
 
 from xyberos.errors import HttpError, RequestValidationError, RouteRegistrationError
 from xyberos.routing import Route

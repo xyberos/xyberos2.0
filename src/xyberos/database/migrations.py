@@ -10,8 +10,13 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from alembic import command
-from alembic.config import Config
+try:
+    from alembic import command
+    from alembic.config import Config
+except ModuleNotFoundError as error:
+    from xyberos._extras import extra_error
+
+    raise extra_error("database", error) from error
 
 
 def alembic_config(script_location: str | Path, *, url: str) -> Config:

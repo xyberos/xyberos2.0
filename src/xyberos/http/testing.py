@@ -5,8 +5,13 @@ Starlette's test client is built on ``httpx``, which the optional ``http`` extra
 
 from __future__ import annotations
 
-from starlette.testclient import TestClient
-from starlette.types import ASGIApp
+try:
+    from starlette.testclient import TestClient
+    from starlette.types import ASGIApp
+except ModuleNotFoundError as error:
+    from xyberos._extras import extra_error
+
+    raise extra_error("http", error) from error
 
 from xyberos.http.adapter import HttpAdapter
 

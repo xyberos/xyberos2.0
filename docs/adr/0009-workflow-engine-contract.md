@@ -90,7 +90,10 @@ exits, events are not a journal, cycles are rejected, and there is no declared D
   recorded as Phase 6's responsibility in [ADR 0003](0003-versions-and-experimental-scope.md).
 - Phase 5 may import workflow error, deadline, cancellation, and event types, but must not introduce
   AI concepts into `xyberos.execution` or let a provider shape the engine. Phase 5 owns its own fake
-  model provider.
+  model provider. *Satisfied in Phase 5: `xyberos.ai` imports only `xyberos.errors`,
+  `xyberos.config`, and `xyberos.runtime.context` — never `xyberos.execution` — so nothing
+  AI-shaped reached the engine, and `xyberos.ai.testing.FakeModelProvider` is a separate double
+  from `FakeExternalService`.*
 - `input_type` is validated and checked with `isinstance`, so `dict[str, int]` is rejected and a
   richer input contract would need a new ADR.
 - `Step.timeout` is a scalar in seconds rather than a policy object, because it has exactly one

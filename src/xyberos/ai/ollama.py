@@ -16,7 +16,12 @@ from logging import Logger, getLogger
 from types import MappingProxyType
 from urllib.parse import urlsplit
 
-import httpx
+try:
+    import httpx
+except ModuleNotFoundError as error:
+    from xyberos._extras import extra_error
+
+    raise extra_error("ollama", error) from error
 
 from xyberos.ai.contracts import (
     ChatChunk,

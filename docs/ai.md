@@ -12,7 +12,12 @@
 | Ollama adapter | `xyberos.ai.ollama` | `xyberos[ollama]` (`httpx`) |
 
 The runtime never imports `xyberos.ai`, and `xyberos.ai` never imports an adapter, so `import
-xyberos` and `import xyberos.ai` both work with no AI SDK installed.
+xyberos` and `import xyberos.ai` both work with no AI SDK installed. Importing the adapter without
+its extra fails with the command that fixes it, not a bare `ModuleNotFoundError`:
+
+```text
+ModuleNotFoundError: the 'ollama' extra cannot be imported: install it with 'pip install "xyberos[ollama]"' (No module named 'httpx')
+```
 
 ## Using a model provider
 

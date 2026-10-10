@@ -11,9 +11,14 @@ from collections.abc import Callable
 from contextlib import AbstractAsyncContextManager
 from uuid import uuid4
 
-from starlette.datastructures import Headers, MutableHeaders
-from starlette.responses import JSONResponse
-from starlette.types import ASGIApp, Message, Receive, Scope, Send
+try:
+    from starlette.datastructures import Headers, MutableHeaders
+    from starlette.responses import JSONResponse
+    from starlette.types import ASGIApp, Message, Receive, Scope, Send
+except ModuleNotFoundError as error:
+    from xyberos._extras import extra_error
+
+    raise extra_error("http", error) from error
 
 from xyberos.errors import HttpError, RequestValidationError
 from xyberos.runtime.context import bind_correlation_id

@@ -1,0 +1,3 @@
+# Keep the repository LF-only regardless of a contributor's git configuration. Without this, a
+# checkout with core.autocrlf=true rewrites text files to CRLF, and committing them stores CRLF.
+* text=auto eol=lf

@@ -446,6 +446,7 @@ contracts are understood. Phases 1–5 currently implement:
 ```text
 src/xyberos/
 ├── __init__.py          # public re-exports
+├── _extras.py           # missing-extra guidance for optional imports
 ├── app.py               # App, RequestContext, lifecycle, plugins
 ├── config.py            # typed settings, including plugin and ai sections
 ├── diagnostics.py       # provider and plugin diagnostics

@@ -3,7 +3,8 @@
 > Status: Phase 2. The SQLite provider is preview API and lives in the optional `database` extra.
 
 Install it with `pip install "xyberos[database]"`, which provides SQLAlchemy 2.x Core,
-`aiosqlite`, and Alembic. Importing `xyberos` never imports any of them.
+`aiosqlite`, and Alembic. Importing `xyberos` never imports any of them, and importing a database
+module without the extra fails with that command, not a bare `ModuleNotFoundError`.
 
 Xyberos owns configuration, connection PRAGMAs, transaction boundaries, and shutdown. SQLAlchemy
 owns the driver integration. Applications use Core statements; ORM sessions are not a required
