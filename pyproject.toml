@@ -1,0 +1,67 @@
+[build-system]
+requires = ["hatchling>=1.25,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "xyberos"
+version = "0.0.0"
+description = "Composable Python application runtime"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Xyberos contributors" }]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Typing :: Typed",
+]
+dependencies = [
+  "tomli>=2,<3; python_version < '3.11'",
+]
+
+[project.optional-dependencies]
+dev = [
+  "build>=1.2,<2",
+  "hatchling>=1.25,<2",
+  "mypy>=1.11,<2",
+  "pytest>=8,<10",
+  "ruff>=0.6,<1",
+  "tomli>=2,<3",
+]
+database = [
+  "aiosqlite>=0.20,<1",
+  "alembic>=1.13,<2",
+  "sqlalchemy>=2.0,<2.1",
+]
+ollama = ["httpx>=0.27,<1"]
+durable = [
+  "aiosqlite>=0.20,<1",
+  "alembic>=1.13,<2",
+  "sqlalchemy>=2.0,<2.1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/xyberos"]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+files = ["src", "tests/contracts/examples/phase1_minimal_app.py"]
+python_version = "3.10"
+strict = true
+warn_unused_configs = true

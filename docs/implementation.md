@@ -1,0 +1,535 @@
+# Xyberos implementation plan
+
+> Implementation status: Phase 0 and Phase 1 are complete. The repository has an installable
+> `0.0.0` core package, isolated optional dependency groups, architecture decisions,
+> API-contract examples, CI quality gates, and the Phase 1 application runtime (composition,
+> typed configuration, registry, lifecycle, and dependency injection) with its exit-criteria
+> tests and [runtime guide](runtime.md). Phase 2 has not started.
+
+## Purpose and release boundary
+
+Ship a small, well-tested Python application framework whose stable surface is:
+
+- application composition, lifecycle, configuration, and typed dependencies;
+- Starlette-backed HTTP applications;
+- SQLite-backed application data through a replaceable provider;
+- in-process, explicit `Flow` execution; and
+- in-process, trusted plugins.
+
+The SQLite durable executor is an opt-in **experimental** package. It must not be imported, configured, or migrated by a normal application. It is single-host only, and must never be described as exactly-once execution.
+
+## Review of `PLAN.md`
+
+> Status: recommendations 1–8 below are all accepted. Items 1, 2, 3, and 5 are implemented by
+> Phases 0–1; items 4 and 8 are scheduled in the phases that own them; items 6 and 7 belong to
+> Phase 4. The external review of this baseline is dispositioned in `PLAN.md` Appendix A.
+
+### What is already strong
+
+The architectural boundary between capability registration (what services exist) and execution (how work runs) is the right foundation. The plan also makes three important scope decisions: direct calls remain the default, Flow is explicit, and durability cannot block the stable release. The acceptance criteria and test categories are good starting quality gates.
+
+### Recommendations to adopt before implementation
+
+1. **Write API contracts before modules.** Phase 0 needs versioned, executable API examples and decision records for `App`, `Inject`, provider scope, plugin lifecycle, `Flow`, and error types. This prevents the proposed directory layout from becoming the de-facto design.
+2. **Make lifecycle and DI graph validation precise.** Validate the provider graph at startup, including missing providers, cycles, scope violations, and incompatible types. Construct lazy app-scoped services on first use unless they opt into eager startup; validation must still happen before traffic. This avoids expensive or side-effectful construction merely to validate an app.
+3. **Define the scope model explicitly.** Use only `app`, `request`, and `transient` initially. A request-scoped dependency may depend on app-scoped services but not the reverse. Flow execution context is not a DI scope; Flow input/state must be passed explicitly.
+4. **Separate SQLite files, not just tables.** Use one application database and a separate executor-journal database. Enable WAL mode at database creation, set a bounded `busy_timeout`, keep write transactions short, and document that SQLite still permits one writer at a time. `synchronous=NORMAL` is a performance/durability trade-off and should be an explicit configurable default, not an unconditional guarantee.
+5. **Treat context propagation as observability, not authorization.** Store trace/correlation IDs in `contextvars` and copy context when crossing into threads or custom background workers. `asyncio.create_task` already copies the current context at task creation on supported Python versions. Do not rely on ambient context for identity, tenancy, permissions, or transaction handles; pass those explicitly and re-authorize background work.
+6. **Keep Flow definitions declarative first.** A builder API produces an inspectable graph and is compatible with retries, tracing, and future durability. A decorator/imperative API can be evaluated later, but arbitrary Python control flow cannot reliably be inspected or recovered. Do not make it part of the first stable Flow contract.
+7. **Use AI adapters as Flow test fixtures, not a reason to reorder core work.** Define the provider protocol and a deterministic fake during Flow development. Deliver the public AI facade after Flow semantics stabilize, while using simulated slow/failing calls to test retries, deadlines, cancellation, and usage reporting.
+8. **Add compatibility and security boundaries.** Publish supported Python and Starlette version ranges, plugin API versioning, configuration precedence, secret redaction, and a public-versus-internal import policy before accepting third-party plugins.
+
+### Corrections and clarifications
+
+- A persisted activity result does not prove an external side effect occurred once. Durable activities require an idempotency key, an idempotent operation, or a documented reconciliation policy.
+- Lease ownership needs a monotonically increasing fencing token. Every state-changing commit must condition on the current owner and token, so a stale worker cannot commit after a lease is reclaimed.
+- Timeout terminology needs two levels: a cooperative step deadline and a whole-flow deadline. Python cannot safely kill arbitrary in-process code; cancellation is cooperative and blocking/CPU-bound work needs a documented executor policy.
+- The current `PLAN.md` contains mojibake (for example, `â€”` in headings and tree characters). Re-save it as UTF-8 before publishing it as project documentation.
+
+## Technical decisions to lock in Phase 0
+
+| Area | Decision |
+| --- | --- |
+| Python baseline | Python 3.10+; CI tests every supported minor version. Use `typing.Annotated` and `contextvars`; provide a small `TaskGroup` compatibility layer because `asyncio.TaskGroup` starts in Python 3.11. |
+| Public package | `xyberos` is the sole stable import root; modules not re-exported from it are internal until documented otherwise. |
+| Configuration | `xyberos.toml`, parsed with stdlib `tomllib` on Python 3.11+ and `tomli` on 3.10. Precedence is explicit arguments, environment, file, then defaults. Keep secrets in environment variables and redact them in errors/diagnostics. |
+| Providers | Providers declare key/type, factory or instance, scope, dependencies, and optional close hook. Duplicate keys fail unless an explicit replacement/override is active. |
+| Lifecycle | `register -> validate -> start -> ready -> stop`; startup follows dependency order and shutdown reverses successfully started resources. Collect shutdown failures without skipping later cleanup. |
+| Plugins | Trusted, in-process Python code with a name, API version, declared dependencies, `register`, optional async `start`, and optional async `stop`. No entry-point auto-discovery in the first cut unless explicitly configured. |
+| HTTP | Thin Starlette adapter. Runtime readiness completes inside ASGI lifespan before routes accept requests. |
+| Database | SQLAlchemy 2.x Core with the `aiosqlite` async dialect, plus Alembic migrations. Xyberos owns configuration and transaction ownership; it does not require applications to adopt SQLAlchemy ORM. |
+| Flow | Declarative named graph; unique immutable step IDs; serializable metadata; explicit retry, timeout, and error policy. |
+| AI | Ollama is the first provider, implemented as an optional `xyberos[ollama]` adapter over its HTTP API. It must not be imported or contacted by core. |
+| Versioning | Development begins at `0.0.0`. The project follows SemVer/PEP 440, with pre-1.0 compatibility explicitly marked as preview; plugin, configuration, Flow-definition, and journal-schema compatibility are versioned independently. |
+| Optionality | Ollama and durable dependencies are extras, e.g. `xyberos[ollama]` and `xyberos[durable]`; importing core must not load either. |
+
+## Adopted implementation decisions
+
+### Python support policy
+
+Xyberos supports CPython **3.10 and newer**. CI must test 3.10, the current supported Python minors, and the newest stable CPython release. Type hints use `from __future__ import annotations` where needed to keep 3.10 support clean.
+
+`asyncio.TaskGroup` is not available in Python 3.10. The runtime must expose its own small structured-concurrency abstraction with identical documented cleanup semantics, implemented using `TaskGroup` on 3.11+ and a tested compatibility implementation on 3.10. No public API may require a caller to depend directly on `TaskGroup`.
+
+When a Python minor reaches end of life, removal is announced in a minor release and takes effect only in the next Xyberos major release, except where an urgent security/runtime incompatibility requires a documented exception.
+
+### SQLite access and migration stack
+
+Adopt the following implementation stack:
+
+| Concern | Selection | Rationale |
+| --- | --- | --- |
+| Database toolkit | SQLAlchemy 2.x Core | Mature SQL construction, connection/transaction management, async support, and a credible path to future providers without imposing ORM entities on users. |
+| SQLite async driver | `aiosqlite` | Integrates with SQLAlchemy's async SQLite dialect and keeps database calls off the ASGI event-loop thread. It still serializes work per SQLite connection and does not remove SQLite's single-writer constraint. |
+| Migrations | Alembic | The established SQLAlchemy migration tool; it supports async integration and SQLite batch/table-rebuild migrations. |
+| Mapping style | SQLAlchemy Core first | The framework exposes provider/transaction boundaries and does not make SQLAlchemy ORM models part of the Xyberos public API. Applications may use the ORM privately. |
+
+Place these in a `database` optional dependency group rather than core, for example `sqlalchemy>=2.0,<2.1`, `aiosqlite>=0.20,<1`, and `alembic>=1.13,<2`; resolve and lock exact tested versions in the project lock/constraints file. Exact lower bounds must be verified against the selected Python support matrix before release.
+
+Use `create_async_engine` with the `sqlite+aiosqlite` dialect. The provider owns engine lifetime and supplies an explicit async transaction context; an `AsyncSession` must never be shared across concurrent tasks. Configure each newly opened SQLite connection with foreign keys enabled, WAL where supported, a bounded busy timeout, and the selected synchronous policy. The database provider documentation must state that `aiosqlite` uses a worker thread per connection rather than true non-blocking SQLite I/O, so it improves event-loop behavior but not write parallelism. [SQLAlchemy SQLite documentation](https://docs.sqlalchemy.org/en/20/dialects/sqlite.html) describes the dialect and its pooling behavior; [Alembic's SQLite batch guidance](https://alembic.sqlalchemy.org/en/latest/batch.html) explains why some SQLite schema changes require a table-rebuild migration.
+
+Use one Alembic migration environment for application data and a separate, durable-extra migration environment for the journal database. Never auto-run migrations at normal production application startup; make migration execution an explicit CLI/deployment action. Automatic migration is acceptable only for an isolated local-development template with a clearly marked option.
+
+### Configuration format and precedence
+
+Adopt **TOML** in a dedicated `xyberos.toml` file. TOML fits Python packaging conventions, is readable for nested typed configuration, has a standard-library parser from Python 3.11 onward, and needs only the small, well-established `tomli` fallback on 3.10. Do not use `pyproject.toml` for runtime application settings: package-build metadata and deploy-time configuration have different owners and lifecycles. PEP 680 documents the standard-library `tomllib` addition and its `tomli` basis. [PEP 680](https://peps.python.org/pep-0680/)
+
+The loader checks an explicit config path first; otherwise it checks `XYBEROS_CONFIG`, then `./xyberos.toml`. It fails with a clear error if an explicitly requested file is missing or malformed. There is no upward directory search, which avoids accidentally loading a parent project's settings.
+
+Settings use this precedence, highest to lowest:
+
+1. explicit `App(settings=...)` values supplied by the embedding application;
+2. environment variables prefixed `XYBEROS_`;
+3. values in `xyberos.toml`;
+4. documented safe defaults.
+
+Map nested environment settings with double underscores, for example `XYBEROS_DATABASE__URL` maps to `[database] url`. Parse environment values through the same typed schema as TOML values; reject unknown keys by default, except for an explicit `extra = "allow"` extension namespace if the plugin contract later requires it.
+
+```toml
+schema_version = 1
+
+[app]
+name = "support-service"
+environment = "development"
+
+[database]
+url = "sqlite+aiosqlite:///./var/app.db"
+busy_timeout_ms = 5_000
+journal_mode = "WAL"
+synchronous = "NORMAL"
+
+[ai.ollama]
+base_url = "http://127.0.0.1:11434"
+model = "llama3.2"
+request_timeout_s = 60
+```
+
+TOML is for non-secret settings. Secrets such as provider credentials belong in environment variables or an application-supplied secret provider, never committed configuration. The loader must redact values for fields classified as secrets in logs, validation errors, and diagnostics. `schema_version` is mandatory from the first public config format and is migrated/validated before other settings are consumed.
+
+### First AI provider: Ollama
+
+Ollama is the first provider because it offers a local HTTP API and supports the required initial facade capabilities: chat, streaming, embeddings, JSON-schema structured outputs, and tool-call payloads. The adapter uses the documented HTTP API directly through an internal async HTTP client, rather than making an Ollama Python SDK part of the framework contract. This keeps provider-specific types isolated and makes requests straightforward to mock. Ollama documents tool calls and JSON-schema `format` structured outputs in its [API documentation](https://docs.ollama.com/api).
+
+The `xyberos[ollama]` extra contains the adapter and its HTTP-client dependency. Core import, application startup, and tests must not require the Ollama service, a downloaded model, or an accelerator. The adapter's default base URL is `http://127.0.0.1:11434`, but the model is **required configuration** in production; `llama3.2` may appear only in examples. Xyberos never pulls, starts, stops, or upgrades an Ollama model automatically.
+
+The first adapter release includes:
+
+- non-streaming and streaming chat completion;
+- embeddings through the current Ollama embedding endpoint;
+- structured output by sending a JSON schema and then independently validating the returned payload;
+- tool-call parsing and Xyberos-side validation/authorization before any tool is executed;
+- configurable connect/read/overall timeouts, cancellation propagation, request IDs, model metadata, and normalized errors; and
+- a health/readiness check that distinguishes an unreachable service, unavailable model, and model response failure.
+
+Model capabilities vary. The adapter must not infer that a model supports tools or structured output merely because the Ollama API accepts those fields. It validates configured capability claims at initialization where possible, retains response validation at runtime, and reports an actionable unsupported-capability error. Prompt and response content remain excluded from logs by default.
+
+### Recommended versioning and compatibility policy
+
+The distributable package begins at **`0.0.0`** and follows [Semantic Versioning 2.0.0](https://semver.org/) together with PEP 440 spelling for Python packaging. Development releases use forms such as `0.1.0.dev1`, `0.1.0a1`, `0.1.0b1`, and `0.1.0rc1`; pre-releases are opt-in and never selected by a normal compatible-version constraint. The first release that claims the stable runtime and Flow guarantees in this plan is `1.0.0`, not a `0.x` release.
+
+| Version change | Permitted changes | Compatibility obligation |
+| --- | --- | --- |
+| Patch `0.0.x` | Bug fixes, documentation, and internal scaffolding changes. | No compatibility promise beyond fixing an immediately preceding preview release; document every user-visible change. |
+| Minor `0.x.0` | Preview features, additions, removals, and breaking changes needed to reach the stable design. | Breaking changes are allowed, but need an "Upgrade notes" entry and migration assistance where practical. Do not silently reuse configuration or persisted-data meanings. |
+| `1.0.0` | First stable release of the runtime and Flow surfaces defined in this plan. | Freeze the documented public contract and start the stable-major policy below. |
+| Patch `1.x.y` or later | Backward-compatible bug/security fixes, documentation, and internal changes. | No public API, config, plugin, Flow-definition, or journal-schema breaking change. |
+| Minor `1.x.0` or later | Backward-compatible public features, new optional capabilities, and deprecations. | Existing supported public APIs/configuration keep working. Deprecations warn and appear in release notes. |
+| Major `x.0.0`, `x >= 2` | Removal of deprecated API, changed stable semantics, supported-Python removal, or incompatible config/plugin/protocol change. | Migration guide, automated migration where feasible, and an overlap/deprecation period in the preceding stable major/minor line. |
+
+Before `1.0.0`, every documented surface is preview unless explicitly marked stable for a limited contract. After `1.0.0`, stable public API comprises documented imports under `xyberos`, documented CLI commands, `xyberos.toml` schema, provider/plugin protocols, documented Flow definition format, and documented error fields. Internal module paths and underscored APIs have no compatibility promise. Experimental APIs live under `xyberos.experimental` or an explicitly marked optional package and may change in a **minor** release; every such change is listed prominently in release notes and emits `ExperimentalWarning` where practical.
+
+Compatibility is independently versioned where persisted or third-party contracts demand it:
+
+| Contract | Policy |
+| --- | --- |
+| Plugin API | `PLUGIN_API_VERSION = 0` before `1.0.0`. Preview plugins declare a package range such as `>=0.1,<1`; a different plugin API major is rejected before startup. Promote this to `PLUGIN_API_VERSION = 1` at the first stable release. |
+| Configuration schema | `schema_version = 1`. A preview minor release may add keys or make a documented breaking correction with upgrade notes; silently changing a key's meaning is forbidden. After `1.0.0`, breaking removal/reinterpretation requires a new schema version plus migration guidance and support for the prior schema for at least two minor releases whenever feasible. |
+| Flow definition format | Explicit `definition_version`. Until `1.0.0`, an incompatible meaning requires a new version and release note. After `1.0.0`, stable versions are readable for the complete major release; incompatible meaning requires a new version and converter or rejection before execution. |
+| Durable journal schema | Alembic revision plus journal `schema_version`. Upgrade is forward-only in normal operation, tested from every supported prior journal revision, and never automatic at production app startup. |
+| Serialized events/errors | Additive fields only within a major release. Consumers must ignore unknown fields. |
+
+Deprecation policy: mark a stable API deprecated in documentation and runtime warnings in one minor release, retain it for at least two subsequent minor releases or six months (whichever is longer), and remove it only in the next major release. Security or data-corruption fixes may bypass this period, with a release-note explanation. The changelog must include an "Upgrade notes" section for every minor and major release.
+
+## Phase status
+
+The detailed work packages live in the phase-by-phase plan below; this table is the at-a-glance
+state. Phase 0 and Phase 1 are complete; Phase 2 has not started.
+
+| Phase | Scope | Status | Exit-gate evidence |
+| --- | --- | --- | --- |
+| 0 | Architecture, repository, and API contracts | complete | installable core package, ADR set, CI quality gates, contract examples |
+| 1 | Application runtime, registry, lifecycle, and dependency injection | complete | `tests/runtime/`, `tests/test_public_api.py`, `tests/contracts/test_phase1_example.py`, `docs/runtime.md`, [ADR 0005](adr/0005-phase-1-runtime-contract.md) |
+| 2 | Starlette adapter and SQLite CRUD slice | next | see the Phase 2 entry checklist below |
+| 3 | Trusted plugin and capability model | planned | — |
+| 4 | Stable, in-process Flow engine | planned | — |
+| 5 | Optional AI facade | planned | — |
+| 6 | Experimental single-host durable executor | planned | — |
+| 7 | Developer experience, hardening, and release | planned | — |
+
+### Phase 2 entry checklist
+
+Confirm these before starting Phase 2:
+
+1. The Phase 1 runtime contract is frozen in [ADR 0005](adr/0005-phase-1-runtime-contract.md)
+   and `docs/runtime.md` matches the shipped behavior.
+2. The `database` extra installs independently, and importing core still pulls in no optional
+   capability.
+3. `App` supplies what the ASGI adapter needs — readiness gating, `request_context()`, and
+   aggregated shutdown — with no adapter-side workarounds. Fix gaps in the runtime, not the
+   adapter.
+4. Phase 2 picks up these Phase 1 follow-ups: a configurable drain bound for shutdown while
+   request contexts are in flight, and provider `source` attribution in diagnostics (shared
+   with Phase 3).
+
+## Detailed phase-by-phase execution plan
+
+The phases are intentionally sequential at their public-contract boundaries. Work inside a phase can proceed in parallel only after its API contract is accepted. Do not begin a dependent phase by importing unfinished internal modules; use a fake contract implementation instead.
+
+### Phase 0 - architecture, repository, and API contracts
+
+**Objective:** make the first implementation decisions reviewable and make every later phase start from a reproducible development environment.
+
+**Prerequisites:** the adopted Python, configuration, database, Ollama, and versioning decisions above are recorded as accepted ADRs. The project owner selects the license before distribution; it does not block local architecture work.
+
+**Work packages**
+
+1. Create the `src/` package layout, `pyproject.toml`, lock/constraints policy, editable-install workflow, README, contribution guide, and test layout. Set `requires-python = ">=3.10"`; core, database, Ollama, and durable dependencies must be separate extras from day one.
+2. Configure a formatter, linter, type checker, test runner, coverage threshold, dependency audit, and build verification. Add CI jobs for each supported Python version and for core-only, AI-extra, and durable-extra installation.
+3. Write ADRs for the adopted database stack, TOML loader, Ollama adapter, and versioning policy, plus runtime ownership, DI scopes, lifecycle ordering, HTTP adaptation, Flow semantics, durable-execution limits, plugin trust, logging/redaction, and public-import policy.
+4. Add executable API examples for a minimal app, an injected service, a SQLite transaction, a plugin, and a simple Flow. These are contract tests, not merely documentation snippets.
+5. Establish the error taxonomy. Errors must include safe, actionable context and preserve root exceptions; define `ExperimentalWarning` for unstable durable APIs. The taxonomy is introduced incrementally by the phase that owns each family: Phases 0–1 define configuration, registration, dependency-resolution, and lifecycle errors; Phase 2 adds HTTP-adaptation and database errors; Phase 3 adds plugin and provider errors; Phase 4 adds Flow-validation and Flow-execution errors; Phase 6 adds durable-state errors.
+6. Define documentation conventions: stable versus experimental labels, version support policy, deprecation policy, and the rule that all public examples are tested in CI.
+
+**Implementation detail:** keep the initial root module deliberately small. Public re-exports should be explicit, and every other module is internal unless the docs say otherwise. This creates freedom to reorganize implementation files without an accidental compatibility commitment.
+
+**Verification and exit criteria**
+
+- A fresh virtual environment can install the wheel and run the minimal example without optional extras.
+- Format, lint, type checking, tests, package build, and documentation-example tests run in one documented command.
+- Contract tests compile and execute the intended public APIs, using temporary fakes where a subsystem is not yet implemented.
+- CI tests both source and built-wheel installation, so missing package data and accidental imports are found early.
+
+**Deliverables:** repository baseline, CI workflow, ADR set, contribution guide, public API contract tests, and a minimal runnable app example.
+
+### Phase 1 - application runtime, registry, lifecycle, and dependency injection
+
+**Status:** complete. [`src/xyberos/app.py`](../src/xyberos/app.py),
+[`src/xyberos/config.py`](../src/xyberos/config.py),
+[`src/xyberos/errors.py`](../src/xyberos/errors.py), and
+[`src/xyberos/runtime/`](../src/xyberos/runtime/) implement the public runtime; the
+exit-criteria tests live in [`tests/runtime/`](../tests/runtime/) and
+[`tests/test_public_api.py`](../tests/test_public_api.py); the executable example and the
+[runtime guide](runtime.md) are in place.
+
+**Objective:** implement application composition without HTTP, database, AI, or Flow dependencies.
+
+**Prerequisites:** Phase 0 contracts for `App`, provider records, scopes, lifecycle, configuration, and errors are accepted.
+
+**Work packages**
+
+1. Implement typed configuration loading and validation. Inputs are explicit constructor arguments, then environment variables, then selected config file/default values. Return field-level validation errors without echoing secret values.
+2. Implement an application-local registry. A provider record includes its contract key/type, factory or supplied instance, declared dependencies, scope, ownership/close hook, source plugin, and eager/lazy flag.
+3. Build a dependency graph from registration metadata and annotations. On validation, reject missing providers, ambiguous providers, cycles, unsupported annotations, and illegal scope edges. Error output must show the resolution path and registration source.
+4. Implement `app`, `request`, and `transient` resolution. Cache app-scoped instances on the app and request-scoped instances on the request context; construct transient instances each time. A longer-lived service may not capture a shorter-lived service.
+5. Implement `register -> validate -> start -> ready -> stop`. Start dependencies first. On a partial startup failure, stop only successfully started resources in reverse order. On shutdown, attempt all cleanup and raise/record an aggregated cleanup failure only after cleanup completes.
+6. Provide context helpers for correlation IDs, logger bindings, cancellation/deadline metadata, and safe background-task creation. Context variables are copied deliberately across custom worker/thread boundaries.
+7. Implement test-only overrides as a bounded context manager or app clone. Overrides must never mutate global state or bleed to parallel tests.
+
+**Non-goals:** parameter-name DI, a global service locator, auto-wiring arbitrary classes, nested custom scopes, and automatic thread/process execution.
+
+**Verification and exit criteria**
+
+- Two applications with different config and overrides run concurrently in one interpreter without cross-talk.
+- Unit tests prove graph ordering, cycle reports, app/request/transient cache behavior, illegal-scope rejection, lazy construction, eager-start behavior, and reverse cleanup after each failure point.
+- Test cases prove that a failure before readiness prevents work from being accepted and that all shutdown hooks receive a chance to run.
+- Public type checking accepts `Annotated[T, Inject()]` and rejects injection without an explicit marker where the API requires one.
+
+**Deliverables:** `App`, registry and DI APIs, lifecycle engine, configuration module, context/logging primitives, runtime documentation, and isolated-app tests.
+
+### Phase 2 - Starlette adapter and SQLite CRUD vertical slice
+
+**Objective:** prove that the runtime supports a conventional production-style web application before adding Flow or AI complexity.
+
+**Prerequisites:** Phase 1 readiness/lifecycle and request-scope contracts are complete; the SQLAlchemy Core, `aiosqlite`, and Alembic stack is available through the database extra.
+
+**Work packages**
+
+1. Build a thin ASGI adapter around Starlette. `App` owns the runtime while Starlette owns ASGI routing, request/response types, middleware mechanics, and test client compatibility.
+2. Add route decorators and route registration. Inspect handler signatures at registration/validation time, compile explicit injected arguments, and keep ordinary request parameters separate from service injection.
+3. Coordinate Starlette lifespan with the runtime. Runtime validation and startup occur before requests are accepted; runtime shutdown executes after the HTTP server stops taking new work.
+4. Define middleware order and error behavior. Document the outer-to-inner order, correlation-ID placement, exception normalization, logging, and which errors are safe to expose to a client. Do not silently translate programmer errors into successful responses.
+5. Implement the database provider over SQLAlchemy 2.x `AsyncEngine`/`AsyncConnection` and the `sqlite+aiosqlite` dialect: URL/path configuration, connection creation, transaction context manager, explicit migration command integration, health/readiness check, close behavior, and temporary-file test fixture. Do not expose ORM sessions as a required framework abstraction.
+6. At database initialization, configure the SQLite connection with foreign keys enabled, WAL mode where compatible, a bounded busy timeout, and an explicit synchronous policy. Set database-level PRAGMAs on connection initialization, not ad hoc inside requests. Keep transactions application-defined and short; do not hold a write transaction across network calls.
+7. Build one complete `sqlite_crud` example with an Alembic migration, SQLAlchemy Core table/query definitions, service layer, injected database provider, route-level validation, domain errors, and tests. Exercise SQLite batch migration once in the suite so its table-rebuild behavior is understood before production use.
+
+**Concurrency policy:** SQLite permits a single writer. The provider may retry a small, documented set of transient lock failures only when the operation is safe to retry; it must never hide an indefinitely blocked write. The application database and future durable journal use distinct files and connection pools/configuration.
+
+**Verification and exit criteria**
+
+- The ASGI test client observes that startup completes before a request succeeds and that shutdown releases provider resources.
+- CRUD tests cover successful operations, validation failures, missing data, rollback after an exception, and a migration from an empty database.
+- Integration tests use a real temporary SQLite file and simulate concurrent writers. Expected outcomes are either bounded success/retry or a documented retryable failure, never a hung test.
+- An import-boundary test proves runtime does not import Starlette unless the HTTP adapter is selected, and the database layer does not depend on route/request objects.
+
+**Deliverables:** Starlette adapter, routing/handler injection, middleware/error policy, SQLite provider and migrations integration, CRUD example, test utilities, and database operations guide.
+
+### Phase 3 - trusted plugin and capability model
+
+**Objective:** make independently authored, in-process capability integrations predictable without turning the registry into a global service locator.
+
+**Prerequisites:** Phase 1 registry and lifecycle behavior are stable; Phase 2 supplies an HTTP capability as a real plugin consumer.
+
+**Work packages**
+
+1. Define a versioned plugin protocol with immutable name, plugin API compatibility range, declared capability dependencies, optional typed configuration schema, `register`, optional async `start`, and optional async `stop`.
+2. Implement an explicit `app.add_plugin(plugin)` path. In the first release, application code chooses plugins directly; defer package entry-point discovery so startup remains visible and reproducible.
+3. Add plugin dependency ordering and diagnostics. A failure identifies plugin name/version, lifecycle phase, capability/setting involved, and the original exception chain with secrets redacted.
+4. Define provider replacement behavior. Production duplicate registration fails; a named replacement is permitted only by configuration or a test override. Record the source of the active provider in diagnostics.
+5. Allow plugins to register routes only through the HTTP adapter contract, and prevent route mutation after readiness.
+6. Create a fixture package representing a separately distributed plugin. Test installation, compatibility rejection, duplicate name/provider failures, configuration failures, partial startup cleanup, and route contribution.
+
+**Security boundary:** plugins are trusted arbitrary Python code. Document this in the API and do not imply a sandbox, permission model, or safe execution of untrusted package code.
+
+**Verification and exit criteria**
+
+- A separately packaged plugin supplies a service and optional route to an app without importing undocumented runtime internals.
+- Plugin order is deterministic and a dependent plugin cannot start before its requirements are ready.
+- Replacement and test override precedence are visible in a diagnostic command/result.
+- Compatibility tests reject a plugin built for an incompatible plugin API version before startup work begins.
+
+**Deliverables:** plugin protocol/API, lifecycle integration, custom-plugin example, plugin test fixture package, compatibility guide, and diagnostics output.
+
+### Phase 4 - stable, in-process Flow engine
+
+**Objective:** provide explicit, inspectable multi-step execution with no persistence or recovery promises.
+
+**Prerequisites:** Phase 1 context and error conventions are stable. A deterministic fake external-service provider is available as a test double; it does not require the Phase 5 public AI facade.
+
+**Work packages**
+
+1. Define immutable `Flow`, `Step`, `Edge`, input/output contract, retry policy, backoff policy, timeout policy, cancellation token, execution context, event format, and result/error models.
+2. Implement build-time graph validation: unique IDs, legal entry/exit nodes, no unsupported cycles, valid branch targets, compatible declared inputs/outputs, and serializable definition metadata. Start with sequential execution plus conditional branch edges; do not claim arbitrary DAG parallelism.
+3. Implement execution using structured concurrency. The executor owns every task it creates and awaits/cancels it before returning. A step gets an explicit input, execution context, and deadline.
+4. Implement bounded retries. Retry classification must be policy driven; preserve each attempt's outcome; calculate backoff from an injectable clock/random source; stop retrying on cancellation or overall deadline expiry.
+5. Implement step and whole-flow deadlines. Cancellation is cooperative. Detect/block documentation for synchronous CPU-bound or blocking I/O step functions, and provide a deliberate future executor boundary rather than unsafe forced thread termination.
+6. Emit structured execution events for started, succeeded, failed, retried, skipped, timed-out, and cancelled states. Integrate trace/correlation metadata without storing sensitive input/output by default.
+7. Add a Flow inspection representation suitable for logs, tests, and documentation. It should display nodes, edges, policies, and definition version without executing handlers.
+
+**Required semantics**
+
+- A step’s side effect may occur more than once when a retry policy applies; callers own idempotency for side-effecting steps.
+- Cancellation requested before a next step starts prevents that step from starting. Cancellation of an already-running operation is best effort and depends on the operation cooperating.
+- The executor does not retain execution state after process termination. Do not reuse Flow events as a durable journal.
+
+**Verification and exit criteria**
+
+- Tests deterministically cover order, branching, invalid definitions, retry limits/classification/backoff, step deadline, flow deadline, cancellation before/during a step, error chaining, and event sequencing.
+- Tests assert the executor has no child task still running after success, failure, timeout, or cancellation.
+- A fake provider simulates latency, rate-limit errors, transient failures, malformed results, and a cancellation-aware call.
+- Flow documentation clearly distinguishes direct calls, Flow execution, and experimental durable execution.
+
+**Deliverables:** Flow builder/executor, policies/models, event/tracing contract, graph inspection, Flow example, deterministic fake provider, and stable Flow API documentation.
+
+### Phase 5 - optional AI facade
+
+**Objective:** add model capabilities as adapters that use core runtime and Flow interfaces but do not shape either one.
+
+**Prerequisites:** Phase 3 provider/plugin conventions and Phase 4 error, deadline, cancellation, and tracing semantics are complete. Ollama is the first supported provider; its adapter is tested against a mocked HTTP API and, separately, a pinned supported Ollama release in opt-in integration tests.
+
+**Work packages**
+
+1. Define provider-neutral protocols for chat/text generation, embeddings, structured output, and optional tool invocation. Normalize request metadata, timeouts, usage, model identity, provider errors, and cancellation signals.
+2. Implement a deterministic fake provider first. It supports scripted responses, structured-output failures, token/usage data, delay, rate limit, transient fault, and cancellation tests without network access.
+3. Add `xyberos[ollama]` as the first provider adapter. Call the documented Ollama HTTP API through an internal async client; keep Ollama request/response models entirely inside the adapter. Configure `base_url`, required model, timeout, streaming, and optional request options through the typed TOML/environment schema. Do not auto-pull models or make Ollama a core dependency.
+4. Implement structured output validation at the facade boundary. Distinguish provider transport failure, refusal, invalid provider payload, and schema validation failure so retry policy can make correct decisions.
+5. Define a tool contract with explicit registration and allowlists. Tool invocations need input validation, deadline/cancellation propagation, audit events, and no implicit access to every registered app service.
+6. Add Ollama embeddings and streaming chat, then validate the adapter's behavior for models that do and do not support tool calls or schema-constrained output. Defer knowledge/retrieval until its own storage, chunking, filtering, authorization, and evaluation contracts are designed.
+7. Build an AI assistant example that runs entirely against the fake provider in CI and offers an explicitly configured Ollama profile for local use. Ollama-backed smoke tests are opt-in, never download models automatically, and keep prompts/responses out of CI logs.
+
+**Security and operations policy:** never log API keys; default to metadata-only request logging; make prompt/response capture an explicit, redacted opt-in; document tool permissions and provider data-handling implications.
+
+**Verification and exit criteria**
+
+- Core package imports and tests pass with no AI SDK installed.
+- Fake-provider tests cover timeouts, cancellation, malformed JSON/structured output, tool validation, provider errors, usage accounting, and error redaction.
+- The Ollama adapter has request-shape, streaming, embedding, structured-output, tool-capability, and error-mapping tests; live service tests are separately marked and never required for normal CI.
+- The AI example uses the same DI, plugin, and Flow contracts as other services.
+
+**Deliverables:** optional AI package, provider-neutral contracts, fake provider, selected adapters, structured-output/tool APIs, assistant example, and AI security/operations documentation.
+
+### Phase 6 - experimental single-host durable executor
+
+**Objective:** provide opt-in persisted Flow progress for a carefully bounded SQLite, single-host deployment model.
+
+**Prerequisites:** stable Flow definition/policy/event schemas have versioning; migration tooling, temporary-file test fixtures, monotonic clock abstraction, and process-kill test harness are available. The durable package remains optional and its migrations use a separate journal database.
+
+**Work packages**
+
+1. Write a formal transition table and invariants before implementing workers. Specify every legal source/target state, terminal-state rules, retry scheduling, cancellation races, timeout behavior, lease expiry, worker recovery, and workflow-version incompatibility outcome.
+2. Define journal schema and migrations: workflow definitions, executions, step attempts/results, ordered events, worker leases/fencing tokens, scheduled retries, and migration metadata. Include schema and workflow definition version fields in persisted records.
+3. Implement execution submission transactionally: persist a known workflow definition/version, validate serializable input and payload size/redaction rules, create `PENDING` execution/event records, and expose read-only inspection.
+4. Implement atomic claims with short SQLite transactions. A claim assigns worker identity, monotonic fencing token, and lease expiry. Every heartbeat, result, transition, retry, or cancellation-sensitive update has a conditional `WHERE` clause on current ownership and fencing token.
+5. Implement the single worker loop: wake eligible pending/retrying work, claim, execute one permitted step through an activity boundary, persist result/transition, schedule retry, and release/renew lease. Define bounded polling/backoff and resource limits.
+6. Implement cancellation. Persist the request first; prevent unstarted steps; signal running cooperative work; record final state only when the current worker has the valid fence. A cancellation request must not let a stale worker mark completed afterward.
+7. Implement startup recovery: inspect expired leases/non-terminal executions, acquire a new fenced claim, and decide whether to resume, retry, reconcile, fail safely, or report incompatible definition. Recovery decisions become events.
+8. Implement activity idempotency/reconciliation contracts. A side-effecting activity must accept an idempotency key or register a reconciliation operation. Surface `outcome_unknown` when a crash occurs after an external call but before result persistence.
+9. Add durable inspection and operational diagnostics: execution status, event timeline, blocked/incompatible work, queue depth, lease age, worker liveness, journal schema version, and explicit experimental/single-host warnings.
+
+**Explicit non-guarantees:** no multi-host ownership, quorum, HA, distributed locks, exactly-once external effects, arbitrary Python checkpointing, transparent replay, or recovery of non-idempotent side effects without a supplied policy.
+
+**Verification and exit criteria**
+
+- Unit tests exercise every state-transition-table row and verify illegal transitions cannot be persisted.
+- SQL/integration tests prove atomic claim behavior, contention handling, stale-fence rejection, retry scheduling, lease expiry, cancellation races, and schema/version rejection using a real SQLite file.
+- Controlled subprocess termination tests cover crash before start, during activity, after result write, before final transition, and during lease renewal. Restart results must match the documented policy.
+- A side-effect simulation proves at-least-once behavior and demonstrates idempotency/reconciliation or `outcome_unknown`, never an unsupported exactly-once claim.
+- Documentation provides backup/restore, journal growth/retention, supported deployment topology, incident triage, and data sensitivity guidance.
+
+**Deliverables:** optional durable package, schema/migrations, store, scheduler/worker/recovery components, process-fault test harness, durable-workflow example, operator guide, and experimental API label.
+
+### Phase 7 - developer experience, hardening, and release
+
+**Objective:** turn validated features into a release that users can install, understand, upgrade, and operate safely.
+
+**Prerequisites:** stable scope is feature complete (Phases 0-5) and durable capabilities are either explicitly experimental or omitted from the release if their exit gate is not met.
+
+**Work packages**
+
+1. Audit the public API and freeze the stable surface. Add deprecation mechanics, semantic-versioning rules, supported-version policy, and compatibility tests for public imports, configuration fields, plugin protocol, and serialized Flow definition metadata.
+2. Complete documentation: getting started, runtime/DI, configuration, lifecycle, HTTP, SQLite, plugins, Flow, AI, testing, migrations, error troubleshooting, security considerations, and a separate durable-execution limitations/operator guide.
+3. Finish minimal CLI commands only where they wrap proven APIs: project scaffold, development server, configuration validation/diagnostics, and migrations. Avoid making the CLI a second runtime implementation.
+4. Publish tested examples: hello app, SQLite CRUD, custom plugin, Flow with retry/branch, AI assistant using fake provider, and durable workflow with its limitations displayed prominently.
+5. Add release engineering: changelog, release notes, signed/tagged artifacts as appropriate, SBOM/dependency license audit, vulnerability response policy, wheel/sdist checks, clean-install smoke test, and rollback/release instructions.
+6. Run performance and resource smoke tests. Establish only modest, reproducible baselines for app startup, simple route latency, Flow overhead, SQLite contention behavior, and durable journal throughput. Treat regressions as signals for investigation, not premature optimization targets.
+7. Conduct a final threat/abuse review covering secret handling, configuration diagnostics, provider/plugin trust, tool allowlists, SQL/path input handling, journal payload retention, and logging redaction.
+
+**Release decision gate**
+
+| Release area | Required evidence |
+| --- | --- |
+| Core runtime | Lifecycle/DI/configuration tests, clean install, docs examples, supported-version CI. |
+| HTTP and SQLite | CRUD integration suite, migration test, contention policy test, documented deployment limits. |
+| Plugins | Independent fixture-plugin compatibility suite and versioning documentation. |
+| Flow | Deterministic behavior suite for validation, retries, cancellation, deadlines, and events. |
+| AI | Core-without-AI install, fake-provider suite, redaction/tool tests, adapter contract tests. |
+| Durable (experimental) | Fault/restart suite, state/lease tests, limitations/operator documentation; omit it if incomplete. |
+
+**Deliverables:** release candidate, versioned docs, tested examples/templates, changelog/release notes, CI evidence, and a go/no-go checklist signed off by the project owner.
+
+## Cross-phase controls
+
+### Dependency and import boundaries
+
+```text
+core runtime/config/registry
+        |
+        +-- HTTP adapter -- SQLite application provider
+        |
+        +-- plugin protocol
+        |
+        +-- Flow
+              |
+              +-- AI adapters (optional)
+              |
+              +-- durable executor (optional, separate journal)
+```
+
+Dependencies point downward in this diagram. The runtime cannot import HTTP, AI, or durable modules; Flow cannot import a particular AI SDK; the durable executor consumes stable Flow definition contracts but does not replace the in-process executor for ordinary work.
+
+### Definition of phase completion
+
+A phase is complete only when its documented public API, tests, examples, operational constraints, and exit gate are present. A demo, passing happy-path test, or unreviewed internal module is not completion. New work discovered during a phase belongs in one of three places: required to satisfy the accepted exit gate, a documented later-phase dependency, or the deferred backlog.
+
+### Delivery cadence
+
+At the end of each phase, conduct a short design and operational review: confirm import boundaries, run the phase exit suite from a clean environment, update ADRs/docs, review public error messages and redaction, and decide whether the next public contract is ready to freeze. This makes the 10-18+ week estimate in `PLAN.md` measurable rather than calendar-only.
+
+## First implementation contracts
+
+These are the target shapes for the public API. The Phase 1 runtime portion is implemented and
+executed by `tests/contracts/examples/phase1_minimal_app.py`; the routed handler belongs to
+Phase 2 (`tests/contracts/examples/phase2_http_app.py`) and the Flow builder to Phase 4.
+
+```python
+from typing import Annotated
+from xyberos import App, Inject
+
+app = App()
+app.provide(UserService, factory=UserService, scope="app")
+
+@app.get("/users")
+async def list_users(users: Annotated[UserService, Inject()]) -> list[User]:
+    return await users.list_users()
+```
+
+`provide` should reject ambiguous registrations. `Inject()` is required for handler injection; the type annotation identifies the contract. Runtime validation reports a path such as `UserService -> DatabaseProvider` when resolution fails. Test overrides are scoped to an app or test context and must never mutate another `App` instance.
+
+```python
+flow = (
+    Flow("support", version="1")
+    .step("retrieve", retrieve_documents, retry=Retry(max_attempts=3))
+    .step("answer", generate_answer, timeout=seconds(30))
+    .edge("retrieve", "answer")
+)
+result = await flow.run(input=request_data, deadline=seconds(45))
+```
+
+The initial Flow state is an explicit input/result mapping, not mutable ambient state. Step functions receive only their declared input and an execution context containing cancellation/deadline/tracing facilities. Flow definitions and policies are immutable after validation.
+
+## Durable executor state and storage requirements
+
+Implement and test the transition table before writing a worker loop. At minimum, terminal states are `COMPLETED`, `FAILED`, `CANCELLED`, and `TIMED_OUT`; non-terminal states are `PENDING`, `RUNNING`, `RETRYING`, and `WAITING`. Every transition records event sequence, timestamp, reason, worker/lease identity when relevant, and a schema version.
+
+Use a journal database such as `xyberos_journal.db`, distinct from `app.db`. On initialization, apply migrations and configure WAL, a bounded busy timeout, and a documented synchronous setting. Perform claims with a single conditional transaction; retain a lease token and require it in every completion, retry, heartbeat, and cancellation-sensitive update. Store payload/result references with size limits and redaction rules rather than unbounded sensitive JSON.
+
+Recovery must be intentionally at-least-once for activities unless an activity provides idempotency/reconciliation. Each activity contract must state its idempotency key or its recovery policy. A restart test must cover crash-before-start, crash-after-result-persisted, crash-during-activity, expired lease, and cancellation race.
+
+## Test and quality strategy
+
+| Layer | Mandatory checks |
+| --- | --- |
+| Unit | Dependency graph/scopes, lifecycle order, config precedence, graph validation, policies, state transitions. |
+| Integration | ASGI lifespan/routes, SQLite transactions and write contention, plugins, Flow cancellation and timeouts, optional extras. |
+| Fault injection | Provider startup failure, transaction lock/error, Flow step failure, stale lease, controlled worker termination. |
+| Packaging | Build wheel/sdist, clean install of core and each extra, public-import audit, supported Python matrix. |
+| Static quality | Formatting, linting, strict type checking for public contracts, dependency audit, and documentation example tests. |
+
+Use a monotonic clock abstraction for Flow and durability tests. Avoid sleep-based timing assertions. Use a real temporary SQLite file, rather than only in-memory SQLite, for WAL, locking, migration, and restart coverage.
+
+## Backlog deliberately deferred
+
+- Distributed workers, multi-host coordination, and HA scheduling.
+- Exactly-once effects, transparent replay, and arbitrary workflow code recovery.
+- A custom ORM, migration engine, task queue, or plugin sandbox.
+- Automatic plugin discovery, arbitrary third-party plugin isolation, and large project-generation CLI features.
+- Dynamic/imperative decorator Flows until declarative Flow semantics and introspection are stable.
+- Knowledge/RAG subsystem until it has a bounded, independently useful provider contract.
+
+The disposition of the external review proposals — including the deferred decorator Flow API and
+the rejected reordering of the AI facade — is recorded in `PLAN.md` Appendix A.
+
+## Remaining owner decisions
+
+The license remains intentionally undecided and must be selected before any public distribution. The adopted Python, database, TOML, Ollama, and versioning decisions above remove the other Phase 0 blockers.
+
+Before the relevant delivery phase begins, the project owner should also approve the Ollama model(s) used in examples and integration smoke tests, the supported Ollama release range, any model-download/container distribution policy, and the data-retention/privacy policy for optional AI telemetry. These are operational choices, not reasons to delay the provider-neutral facade or fake-provider tests.
