@@ -421,8 +421,9 @@ contracts are understood. Phases 1–2 currently implement:
 ```text
 src/xyberos/
 ├── __init__.py          # public re-exports
-├── app.py               # App, RequestContext, lifecycle
-├── config.py            # typed settings
+├── app.py               # App, RequestContext, lifecycle, plugins
+├── config.py            # typed settings, including plugin sections
+├── diagnostics.py       # provider and plugin diagnostics
 ├── errors.py            # error taxonomy
 ├── routing.py           # dependency-free route records
 ├── runtime/
@@ -430,18 +431,24 @@ src/xyberos/
 │   ├── context.py       # contextvars and logging helpers
 │   ├── dependencies.py  # registry, records, graph validation
 │   └── lifecycle.py     # LifecycleState
+├── plugins/             # trusted plugin contract, configuration, and registry
+│   ├── protocol.py, config.py, registry.py
 ├── http/                # optional "http" extra (Starlette)
 │   ├── adapter.py, middleware.py, routing.py, requests.py, testing.py
 └── database/            # optional "database" extra (SQLAlchemy Core, aiosqlite, Alembic)
     ├── contracts.py, migrations.py, sqlite.py, testing.py
 
-examples/sqlite_crud/    # worked CRUD slice with Alembic migrations
+examples/
+├── sqlite_crud/         # worked CRUD slice with Alembic migrations
+└── custom_plugin/       # plugin authoring example
 
 tests/
 ├── runtime/             # Phase 1 exit-criteria tests
 ├── http/                # adapter and handler-compilation tests
 ├── database/            # provider, PRAGMA, and contention tests
-├── integration/         # end-to-end example and migration tests
+├── plugins/             # plugin contract, configuration, and lifecycle tests
+├── integration/         # end-to-end example, migration, and plugin-package tests
+├── fixtures/            # separately packaged plugin used as a test fixture
 ├── contracts/           # executable public-API examples
 ├── test_import_boundary.py
 └── test_public_api.py
@@ -529,8 +536,8 @@ is the summary.
 | 0 | Architecture and API specification | ADRs and executable API-contract examples | 3–5 days | complete |
 | 1 | Runtime foundation | A working minimal application | 1–2 weeks | complete |
 | 2 | HTTP and traditional application support | A working CRUD application | 1–2 weeks | complete |
-| 3 | Plugins and capabilities | An independently developed plugin | 1–2 weeks | next |
-| 4 | Stable in-process Flow | A tested, inspectable workflow engine without durability promises | 2–3 weeks | planned |
+| 3 | Plugins and capabilities | An independently developed plugin | 1–2 weeks | complete |
+| 4 | Stable in-process Flow | A tested, inspectable workflow engine without durability promises | 2–3 weeks | next |
 | 5 | AI facade and integration | An AI application built on the same runtime and Flow APIs | 1–2 weeks | planned |
 | 6 | Experimental durable execution | An experimental single-instance executor with documented limits | 3–6+ weeks | planned |
 | 7 | DX, hardening, and release | A stable runtime and Flow release; durability remains experimental | 1–2 weeks | planned |

@@ -16,3 +16,4 @@ Status values are **proposed**, **accepted**, **superseded**, and **rejected**.
 | [0004](0004-initial-ai-provider.md) | Use Ollama as the first AI provider | accepted |
 | [0005](0005-phase-1-runtime-contract.md) | Freeze the Phase 1 runtime contract | accepted |
 | [0006](0006-http-and-database-adapters.md) | Keep the HTTP and database layers behind adapters | accepted |
+| [0007](0007-trusted-plugins.md) | Trusted plugins as an explicit, ordered capability model | accepted |

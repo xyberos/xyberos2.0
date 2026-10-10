@@ -140,6 +140,11 @@ class ProviderRegistry:
         self._providers[contract] = provider
         return provider
 
+    @property
+    def providers(self) -> tuple[Provider, ...]:
+        """Return the registered providers in registration order."""
+        return tuple(self._providers.values())
+
     def get(self, contract: Contract) -> Provider | None:
         """Return a provider without mutating the registry."""
         return self._providers.get(contract)

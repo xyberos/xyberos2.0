@@ -34,7 +34,10 @@ dev = [
   "ruff>=0.6,<1",
   "tomli>=2,<3",
 ]
-http = ["starlette>=0.40,<1"]
+http = [
+  "httpx>=0.27,<1",
+  "starlette>=0.40,<1",
+]
 database = [
   "aiosqlite>=0.20,<1",
   "alembic>=1.13,<2",
@@ -52,7 +55,7 @@ packages = ["src/xyberos"]
 
 [tool.pytest.ini_options]
 addopts = "-ra"
-pythonpath = ["src", "examples"]
+pythonpath = ["src", "examples", "tests/fixtures/metrics_plugin"]
 testpaths = ["tests"]
 
 [tool.ruff]

@@ -19,6 +19,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: python -m pip install --upgrade pip
       - run: python -m pip install -e ".[dev,http,database]"
+      - run: python -m pip install --no-deps -e tests/fixtures/metrics_plugin
       - run: python -m pytest
       - run: ruff check src tests examples
       - run: ruff format --check src tests examples

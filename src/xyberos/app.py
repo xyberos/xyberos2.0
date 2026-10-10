@@ -7,9 +7,10 @@ import inspect
 from collections.abc import AsyncIterator, Awaitable, Callable, Hashable, Mapping
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
-from typing import TypeVar, cast, overload
+from typing import Any, TypeVar, cast, overload
 
 from xyberos.config import Settings
+from xyberos.diagnostics import Diagnostics, ProviderInfo
 from xyberos.errors import (
     DependencyResolutionError,
     LifecycleError,
@@ -17,6 +18,8 @@ from xyberos.errors import (
     MissingProviderError,
     ShutdownError,
 )
+from xyberos.plugins.protocol import Plugin
+from xyberos.plugins.registry import PluginRegistry
 from xyberos.routing import Handler, Route, RouteRegistry
 from xyberos.runtime.dependencies import (
     _UNSET,
@@ -79,6 +82,7 @@ class App:
         self.settings = Settings.load() if settings is None else settings
         self._registry = ProviderRegistry()
         self._routes = RouteRegistry()
+        self._plugins = PluginRegistry()
         self._state = LifecycleState.NEW
         self._validated_plan: tuple[Provider, ...] | None = None
         self._app_instances: dict[Contract, object] = {}
@@ -104,6 +108,39 @@ class App:
         """Return a monotonic count of route registrations for adapter cache invalidation."""
         return self._routes.version
 
+    def diagnostics(self) -> Diagnostics:
+        """Return provider sources and plugin order for troubleshooting."""
+        return Diagnostics(
+            providers=tuple(
+                ProviderInfo(
+                    contract=_contract_name(provider.contract),
+                    scope=provider.scope.value,
+                    eager=provider.eager,
+                    source=provider.source,
+                )
+                for provider in self._registry.providers
+            ),
+            plugins=self._plugins.describe(),
+        )
+
+    def add_plugin(
+        self,
+        plugin: Plugin[Any],
+        *,
+        config: Mapping[str, object] | None = None,
+    ) -> App:
+        """Register a trusted plugin before the application starts.
+
+        A plugin's declared requirements must already be registered, so plugin order is explicit
+        and deterministic. Plugins are ordinary Python code; Xyberos does not sandbox them.
+        """
+        self._ensure_registration_allowed()
+        self._plugins.add(self, plugin, config=config)
+        self._validated_plan = None
+        if self._state is LifecycleState.VALIDATED:
+            self._state = LifecycleState.NEW
+        return self
+
     def provide(
         self,
         contract: Contract,
@@ -114,9 +151,17 @@ class App:
         eager: bool = False,
         close: CloseHook | None = None,
         replace: bool = False,
+        source: str | None = None,
     ) -> App:
-        """Register an explicit typed provider before the application starts."""
+        """Register an explicit typed provider before the application starts.
+
+        ``source`` records where the provider came from; it defaults to the plugin that is
+        currently registering, otherwise the application. Diagnostics report it.
+        """
         self._ensure_registration_allowed()
+        resolved_source = (
+            source if source is not None else (self._plugins.active_source or "application")
+        )
         self._registry.register(
             contract,
             factory,
@@ -125,6 +170,7 @@ class App:
             eager=eager,
             close=close,
             replace=replace,
+            source=resolved_source,
         )
         self._validated_plan = None
         if self._state is LifecycleState.VALIDATED:
@@ -207,6 +253,7 @@ class App:
                 for provider in plan:
                     if provider.scope is Scope.APP and provider.eager:
                         await self._resolve(provider.contract, request=None, path=())
+                await self._plugins.start_all()
             except BaseException as error:
                 failures = await self._close_owned(self._owned)
                 self._app_instances.clear()
@@ -247,6 +294,7 @@ class App:
                         LifecycleError(f"shutdown timed out after {timeout}s"),
                     )
                 )
+            failures.extend(await self._plugins.stop_all())
             failures.extend(await self._close_owned(self._owned))
             self._app_instances.clear()
             self._state = LifecycleState.STOPPED

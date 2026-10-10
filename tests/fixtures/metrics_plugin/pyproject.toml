@@ -1,0 +1,17 @@
+[build-system]
+requires = ["hatchling>=1.25,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "xyberos-plugin-metrics"
+version = "0.0.0"
+description = "A separately distributed example plugin for the Xyberos test suite"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["xyberos"]
+
+[project.optional-dependencies]
+dev = ["xyberos[http]"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["xyberos_plugin_metrics"]

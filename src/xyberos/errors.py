@@ -108,3 +108,40 @@ class TransactionError(DatabaseError):
 
 class TransientDatabaseError(DatabaseError):
     """Raised when a retryable lock failure exhausts its bounded retry budget."""
+
+
+class PluginError(XyberosError):
+    """Base class for plugin failures.
+
+    ``plugin`` names the plugin and ``phase`` names the lifecycle phase, so a failure is always
+    attributable. The original exception is preserved as the cause; plugin failures never echo
+    configuration values.
+    """
+
+    def __init__(self, message: str, *, plugin: str, phase: str) -> None:
+        self.plugin = plugin
+        self.phase = phase
+        super().__init__(message)
+
+
+class PluginValidationError(PluginError):
+    """Raised when a plugin is malformed, duplicated, or fails to register."""
+
+    def __init__(self, message: str, *, plugin: str) -> None:
+        super().__init__(message, plugin=plugin, phase="registration")
+
+
+class PluginCompatibilityError(PluginValidationError):
+    """Raised when a plugin targets an unsupported plugin API version."""
+
+
+class PluginConfigurationError(PluginValidationError):
+    """Raised when a plugin's configuration is missing, unknown, or invalid."""
+
+
+class PluginDependencyError(PluginValidationError):
+    """Raised when plugin requirements are missing or form a cycle."""
+
+
+class PluginLifecycleError(PluginError):
+    """Raised when a plugin fails during ``start`` or ``stop``."""

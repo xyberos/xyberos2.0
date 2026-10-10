@@ -167,6 +167,22 @@ rejected after `app.start()`, and duplicate method+path or duplicate route names
 Handler signatures, request/response types, and middleware belong to the adapter; see
 [the HTTP guide](./http.md).
 
+## Plugins
+
+Trusted, in-process plugins extend an application explicitly:
+
+```python
+app.add_plugin(GreetingPlugin(), config={"greeting": "hi"})
+```
+
+A plugin declares a unique name, an optional plugin API version and dependency list, an optional
+typed configuration schema, and a `register` hook that contributes providers and routes. Its
+requirements must already be registered, so plugin order is deterministic. See
+[the plugin guide](./plugins.md).
+
+`App.diagnostics()` reports the source of every active provider (`application`, `test override`, or
+`plugin:<name>`) and the plugin order, and `render()` formats it for troubleshooting.
+
 ## Context and logging
 
 Context values are stored in `contextvars` and are diagnostic only. Never use them for
@@ -214,6 +230,6 @@ Phase 1 raises these types, all rooted at `XyberosError`:
 ## Later phases
 
 HTTP support is provided by the optional `http` extra ([guide](./http.md)) and the SQLite
-provider by the optional `database` extra ([operations guide](./database.md)). Plugins, Flow,
-AI adapters, and durable execution arrive in later phases. See
+provider by the optional `database` extra ([operations guide](./database.md)); plugins are part of
+core ([guide](./plugins.md)). Flow, AI adapters, and durable execution arrive in later phases. See
 [the implementation plan](./implementation.md#detailed-phase-by-phase-execution-plan).

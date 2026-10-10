@@ -1,0 +1,175 @@
+# Plugin guide
+
+> Status: Phase 3. The plugin API is preview API and lives in the core package — no extra is
+> needed.
+
+## Trust boundary
+
+**Plugins are trusted, in-process Python code.** Adding a plugin is equivalent to importing a
+library: it runs with the full privileges of your process. Xyberos provides no sandbox, no
+permission model, and no protection from a plugin that misbehaves, and it makes no attempt to
+limit what a plugin can do with the objects it is handed. Only add plugins you trust.
+
+Entry-point discovery is deliberately not implemented. Application code chooses plugins
+explicitly with `app.add_plugin(...)`, so startup stays visible and reproducible.
+
+## The contract
+
+Subclass `xyberos.Plugin`:
+
+```python
+from dataclasses import dataclass
+
+from xyberos import App, Plugin
+
+
+@dataclass(frozen=True)
+class GreetingConfig:
+    greeting: str = "hello"
+    excited: bool = False
+
+
+class GreetingPlugin(Plugin[GreetingConfig]):
+    name = "greeting"              # required, unique, an identifier
+    api_version = "1"              # the plugin API version this plugin targets
+    requires = ()                  # plugin names that must be registered first
+    config_type = GreetingConfig   # optional dataclass configuration schema
+
+    def register(self, app: App, config: GreetingConfig) -> None:
+        app.provide(Greeter, instance=Greeter(config))
+        app.get("/greet")(self._greet)
+
+    async def start(self) -> None:   # optional
+        ...
+
+    async def stop(self) -> None:    # optional
+        ...
+
+
+app = App()
+app.add_plugin(GreetingPlugin())
+```
+
+| Member | Required | Purpose |
+| --- | --- | --- |
+| `name` | yes | unique plugin name; also its configuration key |
+| `api_version` | no | plugin API version the plugin targets; must match the runtime major version |
+| `requires` | no | other plugins that must already be registered |
+| `config_type` | no | frozen dataclass describing the plugin's settings |
+| `register` | yes | add providers and routes while the application is still mutable |
+| `start` | no | prepare plugin-owned resources after app-scoped providers are constructed |
+| `stop` | no | release plugin-owned resources before app-owned resources are closed |
+
+`Plugin` is an abstract base class, so a missing `register` fails at import time rather than at
+startup. A plugin can only be added before `app.start()`.
+
+## Ordering
+
+A plugin's `requires` must already be registered when it is added, so registration order is
+dependency order and startup order is deterministic. A missing requirement fails immediately with
+a message naming the plugin and the missing dependency; requirement cycles are impossible.
+
+Lifecycle integration, in order:
+
+1. `app.add_plugin(plugin)` — validate metadata, build typed configuration, run `register`.
+2. `app.start()` — validate the provider graph, construct eager app-scoped providers, then start
+   plugins in registration order.
+3. `app.stop()` — stop plugins in reverse order, then close app-owned resources in reverse order.
+   A failing `stop` hook is collected and reported through `ShutdownError.resources` as
+   `plugin:<name>`, and every remaining hook still runs.
+
+If a plugin fails to start, the plugins that already started are stopped in reverse order, the
+application moves to `FAILED`, and the error names the plugin and the phase:
+
+```text
+PluginLifecycleError: plugin 'metrics' failed during start: <original error>
+```
+
+The original exception is preserved as the cause. If cleanup also fails, the message names the
+plugins whose `stop` hook failed.
+
+## Configuration
+
+Plugin settings use the same precedence as core settings: the explicit mapping passed to
+`app.add_plugin`, then the environment, then the configuration file, then the dataclass defaults.
+
+```toml
+# xyberos.toml
+[plugins.greeting]
+greeting = "hey"
+excited = true
+```
+
+```powershell
+$env:XYBEROS_PLUGINS__GREETING__EXCITED = "true"
+```
+
+```python
+app.add_plugin(GreetingPlugin(), config={"greeting": "hi"})
+```
+
+- Settings sections are matched case-insensitively and normalized to lowercase.
+- Supported field types are `str`, `int`, `float`, `bool`, and their `| None` forms. `int` and
+  `float` accept numeric strings, and `bool` accepts `true`/`false`/`yes`/`no`/`on`/`off`/`1`/`0`,
+  which is what environment variables provide.
+- Unknown keys, missing required settings, and invalid values raise `PluginConfigurationError`
+  naming the plugin and the setting location — never the configured value.
+- A plugin that declares no `config_type` and is given configuration is rejected, so a typo in a
+  settings section cannot pass silently.
+
+## Plugin API compatibility
+
+`PLUGIN_API_VERSION` is the version of the plugin contract this runtime implements. A plugin
+declares the version it targets; the **major** component must match, so `"1"` and `"1.4"` are
+compatible with a runtime at `PLUGIN_API_VERSION = "1"`. A mismatch raises
+`PluginCompatibilityError` during `add_plugin`, before `register` runs and before any startup
+work begins.
+
+## Providers, replacements, and diagnostics
+
+A plugin registers providers exactly as application code does: `app.provide(...)`. A duplicate
+registration fails, so a plugin cannot silently replace an existing provider. Replacement is
+explicit — application configuration calls `app.provide(..., replace=True)`, and tests use
+`app.with_overrides({...})`.
+
+Providers registered from a plugin's `register` hook are attributed automatically, and
+`app.diagnostics()` reports the source of every active provider plus the plugin order:
+
+```python
+print(app.diagnostics().render())
+```
+
+```text
+providers:
+  Recorder [app] from application
+  Metrics [app] from plugin:metrics
+  Repository [app] from test override
+plugins:
+  metrics 1 [registered] requires: -
+  summary 1 [registered] requires: metrics
+```
+
+## Routes
+
+Plugins contribute routes through the same `App` route API the application uses
+(`app.get`, `app.post`, `app.route`). Route records are compiled by the HTTP adapter, so a plugin
+that adds routes needs the `http` extra installed in the application, and a plugin that adds only
+services needs nothing beyond core. Route registration is rejected after `app.start()`, so a
+plugin cannot add or change routes once the application is ready.
+
+## Testing plugins
+
+- `app.with_overrides({...})` isolates provider values. A test clone copies providers and routes
+  but not plugin registrations, so plugin lifecycle hooks do not run twice across clones.
+- A plugin package should be tested as a separately distributed package. The suite includes one at
+  `tests/fixtures/metrics_plugin`, and `tests/integration/test_plugin_packages.py` asserts that it
+  imports only public `xyberos` names.
+
+## Deliberate limitations
+
+- No plugin sandbox, permission model, or isolation of untrusted code.
+- No entry-point discovery; plugins are added explicitly.
+- A plugin cannot resolve application services from its `start` hook, because the application is
+  not `READY` yet. Register an eager provider whose factory performs that work instead, or do it
+  in `register`.
+- Plugins cannot be added, removed, or replaced after `app.start()`.

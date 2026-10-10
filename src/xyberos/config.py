@@ -38,6 +38,16 @@ class Settings:
 
     schema_version: int = _SUPPORTED_SCHEMA_VERSION
     app: AppSettings = field(default_factory=AppSettings)
+    plugins: Mapping[str, Mapping[str, object]] = field(default_factory=dict)
+
+    def plugin_options(self, name: str) -> Mapping[str, object]:
+        """Return the configuration section for one plugin, or an empty mapping.
+
+        Plugin sections are normalized to lowercase, so ``[plugins.metrics]``,
+        ``[plugins.Metrics]``, and ``XYBEROS_PLUGINS__METRICS__ENABLED=true`` all resolve to the
+        same section.
+        """
+        return self.plugins.get(name.lower(), {})
 
     @classmethod
     def load(
@@ -144,7 +154,7 @@ def _deep_merge(base: Mapping[str, object], override: Mapping[str, object]) -> d
 
 
 def _settings_from_mapping(values: Mapping[str, object]) -> Settings:
-    _reject_unknown_keys(values, {"schema_version", "app"}, "root")
+    _reject_unknown_keys(values, {"schema_version", "app", "plugins"}, "root")
     schema_version = _as_int(
         values.get("schema_version", _SUPPORTED_SCHEMA_VERSION), "schema_version"
     )
@@ -175,7 +185,25 @@ def _settings_from_mapping(values: Mapping[str, object]) -> Settings:
                 typed_app_values.get("shutdown_timeout"), "app.shutdown_timeout"
             ),
         ),
+        plugins=_plugins_from_mapping(values.get("plugins")),
     )
+
+
+def _plugins_from_mapping(values: object) -> dict[str, Mapping[str, object]]:
+    if values is None:
+        return {}
+    if not isinstance(values, Mapping):
+        raise ConfigurationError("plugins must be a table/object")
+    plugins: dict[str, Mapping[str, object]] = {}
+    for name, section in cast(Mapping[object, object], values).items():
+        if not isinstance(name, str) or not name.strip():
+            raise ConfigurationError("plugin names must be non-empty strings")
+        if not isinstance(section, Mapping):
+            raise ConfigurationError(
+                f"the configuration for plugin {name!r} must be a table/object"
+            )
+        plugins[name.lower()] = dict(cast(Mapping[str, object], section))
+    return plugins
 
 
 def _reject_unknown_keys(values: Mapping[str, object], allowed: set[str], location: str) -> None:
@@ -194,20 +222,29 @@ def _as_non_empty_string(value: object, location: str) -> str:
 def _as_optional_timeout(value: object, location: str) -> float | None:
     if value is None:
         return None
+    message = f"{location} must be a positive number of seconds"
     if isinstance(value, bool):
-        raise ConfigurationError(f"{location} must be a positive number of seconds")
-    if isinstance(value, int | float):
-        timeout = float(value)
-    elif isinstance(value, str):
-        try:
-            timeout = float(value.strip())
-        except ValueError as error:
-            raise ConfigurationError(f"{location} must be a positive number of seconds") from error
-    else:
-        raise ConfigurationError(f"{location} must be a positive number of seconds")
+        raise ConfigurationError(message)
+    try:
+        timeout = _as_float(value, location)
+    except ConfigurationError as error:
+        raise ConfigurationError(message) from error
     if timeout <= 0:
-        raise ConfigurationError(f"{location} must be greater than zero")
+        raise ConfigurationError(message)
     return timeout
+
+
+def _as_float(value: object, location: str) -> float:
+    if isinstance(value, bool):
+        raise ConfigurationError(f"{location} must be a number")
+    if isinstance(value, int | float):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value.strip())
+        except ValueError as error:
+            raise ConfigurationError(f"{location} must be a number") from error
+    raise ConfigurationError(f"{location} must be a number")
 
 
 def _as_bool(value: object, location: str) -> bool:

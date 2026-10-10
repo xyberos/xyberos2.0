@@ -8,6 +8,7 @@ their contracts are validated in later phases.
 
 from xyberos.app import App, RequestContext
 from xyberos.config import AppSettings, Settings, load_settings
+from xyberos.diagnostics import Diagnostics, ProviderInfo
 from xyberos.errors import (
     ConfigurationError,
     DatabaseConfigurationError,
@@ -20,6 +21,12 @@ from xyberos.errors import (
     LifecycleError,
     LifecycleStateError,
     MissingProviderError,
+    PluginCompatibilityError,
+    PluginConfigurationError,
+    PluginDependencyError,
+    PluginError,
+    PluginLifecycleError,
+    PluginValidationError,
     RegistrationError,
     RequestValidationError,
     RouteRegistrationError,
@@ -29,6 +36,13 @@ from xyberos.errors import (
     TransientDatabaseError,
     XyberosError,
 )
+from xyberos.plugins.protocol import (
+    PLUGIN_API_VERSION,
+    Plugin,
+    PluginInfo,
+    PluginState,
+)
+from xyberos.plugins.registry import PluginRegistry
 from xyberos.routing import Route, RouteRegistry
 from xyberos.runtime.context import (
     ContextLogFilter,
@@ -58,13 +72,26 @@ __all__ = [
     "DependencyCycleError",
     "DependencyError",
     "DependencyResolutionError",
+    "Diagnostics",
     "HttpError",
     "Inject",
     "LifecycleError",
     "LifecycleState",
     "LifecycleStateError",
     "MissingProviderError",
+    "PLUGIN_API_VERSION",
+    "Plugin",
+    "PluginCompatibilityError",
+    "PluginConfigurationError",
+    "PluginDependencyError",
+    "PluginError",
+    "PluginInfo",
+    "PluginLifecycleError",
+    "PluginRegistry",
+    "PluginState",
+    "PluginValidationError",
     "Provider",
+    "ProviderInfo",
     "ProviderRegistry",
     "RegistrationError",
     "RequestContext",

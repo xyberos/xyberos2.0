@@ -2,8 +2,8 @@
 
 > Status: Phase 2. The adapter is preview API and lives in the optional `http` extra.
 
-Install it with `pip install "xyberos[http]"`. The Starlette test client additionally needs
-`httpx`, which the `dev` extra provides.
+Install it with `pip install "xyberos[http]"`, which provides Starlette and `httpx` (the Starlette
+test client is built on `httpx`).
 
 Xyberos owns the runtime — configuration, dependency resolution, lifecycle, and route records.
 Starlette owns ASGI mechanics: routing internals, request/response types, middleware plumbing,

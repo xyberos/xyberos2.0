@@ -1,7 +1,6 @@
 """Test utilities for the HTTP adapter.
 
-Importing this module requires ``httpx`` (the ``dev`` extra), because Starlette's test client is
-built on it.
+Starlette's test client is built on ``httpx``, which the optional ``http`` extra provides.
 """
 
 from __future__ import annotations

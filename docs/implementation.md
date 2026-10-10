@@ -1,11 +1,11 @@
 # Xyberos implementation plan
 
-> Implementation status: Phases 0–2 are complete. The repository has an installable `0.0.0` core
+> Implementation status: Phases 0–3 are complete. The repository has an installable `0.0.0` core
 > package, isolated optional dependency groups, architecture decisions, API-contract examples, CI
-> quality gates, the Phase 1 application runtime (composition, typed configuration, registry,
-> lifecycle, and dependency injection), and the Phase 2 Starlette HTTP adapter plus SQLite
-> provider with the `sqlite_crud` example. Guides: [runtime](runtime.md), [HTTP](http.md),
-> [database](database.md). Phase 3 has not started.
+> quality gates, the Phase 1 application runtime, the Phase 2 Starlette HTTP adapter plus SQLite
+> provider with the `sqlite_crud` example, and the Phase 3 trusted plugin/capability model with its
+> separately packaged fixture plugin. Guides: [runtime](runtime.md), [HTTP](http.md),
+> [database](database.md), [plugins](plugins.md). Phase 4 has not started.
 
 ## Purpose and release boundary
 
@@ -181,25 +181,29 @@ state. Phase 0 and Phase 1 are complete; Phase 2 has not started.
 | 0 | Architecture, repository, and API contracts | complete | installable core package, ADR set, CI quality gates, contract examples |
 | 1 | Application runtime, registry, lifecycle, and dependency injection | complete | `tests/runtime/`, `tests/test_public_api.py`, `tests/contracts/test_phase1_example.py`, `docs/runtime.md`, [ADR 0005](adr/0005-phase-1-runtime-contract.md) |
 | 2 | Starlette adapter and SQLite CRUD slice | complete | `tests/http/`, `tests/database/`, `tests/integration/`, `tests/test_import_boundary.py`, `examples/sqlite_crud/`, [ADR 0006](adr/0006-http-and-database-adapters.md) |
-| 3 | Trusted plugin and capability model | next | see the Phase 3 entry checklist below |
-| 4 | Stable, in-process Flow engine | planned | — |
+| 3 | Trusted plugin and capability model | complete | `src/xyberos/plugins/`, `src/xyberos/diagnostics.py`, `tests/plugins/`, `tests/integration/test_plugin_packages.py`, `tests/fixtures/metrics_plugin/`, `examples/custom_plugin/`, [ADR 0007](adr/0007-trusted-plugins.md) |
+| 4 | Stable, in-process Flow engine | next | see the Phase 4 entry checklist below |
 | 5 | Optional AI facade | planned | — |
 | 6 | Experimental single-host durable executor | planned | — |
 | 7 | Developer experience, hardening, and release | planned | — |
 
-### Phase 3 entry checklist
+### Phase 4 entry checklist
 
-Confirm these before starting Phase 3:
+Confirm these before starting Phase 4:
 
-1. The Phase 2 contracts are frozen in [ADR 0006](adr/0006-http-and-database-adapters.md) and the
-   HTTP and database guides match the shipped behavior.
-2. The `http` and `database` extras install independently, and importing core still pulls in no
-   optional capability — enforced by the subprocess import-boundary test.
-3. Plugins register through `App.provide` and the existing app-local registry. A global registry
-   stays out of scope.
-4. Phase 3 owns the remaining Phase 2 follow-up: provider `source` attribution in diagnostics. The
-   registry already records a source per provider; `App.provide` needs to expose it, and plugin
-   failures must name the plugin, the phase, and the dependency.
+1. The Phase 1–3 contracts are frozen in [ADR 0005](adr/0005-phase-1-runtime-contract.md),
+   [ADR 0006](adr/0006-http-and-database-adapters.md), and [ADR 0007](adr/0007-trusted-plugins.md),
+   and the guides match the shipped behavior.
+2. Context helpers already carry correlation IDs, logger bindings, and cooperative deadline
+   metadata, and cover task and thread boundaries through `create_task_in_context` and
+   `capture_context_runner`.
+3. Flow stays declarative: definitions are inspectable and serializable, conditional edges come
+   before any parallelism, and the imperative/decorator surface stays deferred (see `PLAN.md`
+   Appendix A).
+4. Phase 4 supplies its own deterministic fake external-service provider as a test double; it must
+   not depend on the Phase 5 AI facade.
+5. Flow does not import HTTP, database, AI, or durable modules, and it must be usable without the
+   `http` and `database` extras installed.
 
 ## Detailed phase-by-phase execution plan
 
@@ -300,6 +304,12 @@ shutdown drain landed as `app.shutdown_timeout`.
 **Deliverables:** Starlette adapter, routing/handler injection, middleware/error policy, SQLite provider and migrations integration, CRUD example, test utilities, and database operations guide.
 
 ### Phase 3 - trusted plugin and capability model
+
+**Status:** complete. `src/xyberos/plugins/` implements the contract, configuration, and registry;
+`src/xyberos/diagnostics.py` reports provider sources and plugin order; the separately packaged
+fixture plugin is `tests/fixtures/metrics_plugin/`, the example is `examples/custom_plugin/`, and
+the guide is [plugins](plugins.md). The Phase 2 follow-up on provider `source` attribution landed
+here: plugin registrations record `plugin:<name>` automatically.
 
 **Objective:** make independently authored, in-process capability integrations predictable without turning the registry into a global service locator.
 
