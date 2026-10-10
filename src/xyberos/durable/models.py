@@ -59,6 +59,7 @@ class FailureKind(str, Enum):
 
     STEP_FAILED = "step_failed"
     INCOMPATIBLE_DEFINITION = "incompatible_definition"
+    DEFINITION_CONFLICT = "definition_conflict"
     OUTCOME_UNKNOWN = "outcome_unknown"
     TIMED_OUT = "timed_out"
     CANCELLED = "cancelled"
@@ -228,7 +229,7 @@ class ActivityPolicy:
     """
 
     idempotent: bool = False
-    reconcile: Callable[[str, object], Any] | None = None
+    reconcile: Callable[[str, object], Reconciliation] | None = None
 
     def __post_init__(self) -> None:
         if self.idempotent and self.reconcile is not None:
@@ -238,6 +239,32 @@ class ActivityPolicy:
             )
         if self.reconcile is not None and not callable(self.reconcile):
             raise DurableStateError("reconcile must be callable")
+
+
+@dataclass(frozen=True)
+class Reconciliation:
+    """What a reconciler decided about an interrupted attempt.
+
+    A reconciler is the only thing allowed to say "the effect happened" after a crash, so it returns
+    one of three answers: the step succeeded (with the output the effect produced), the step never
+    happened and may be run again, or the step definitely failed.
+    """
+
+    state: StepState
+    output: object = None
+    detail: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.state not in (
+            StepState.SUCCEEDED,
+            StepState.PENDING,
+            StepState.FAILED,
+            StepState.OUTCOME_UNKNOWN,
+        ):
+            raise DurableStateError(
+                f"a reconciler cannot decide {self.state.value!r}; it reports succeeded, pending, "
+                "failed, or outcome_unknown"
+            )
 
 
 @dataclass(frozen=True)

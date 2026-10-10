@@ -243,6 +243,28 @@ class JournalStore:
             fence=claim.fence,
         )
 
+    async def _release_lease(
+        self, connection: AsyncConnection, claim: Claim, *, now: datetime
+    ) -> None:
+        """Mark the claim's lease as finished.
+
+        An execution that is ready, retrying, or parked is owned by nobody, so it must not carry a
+        live lease: a live lease means "a worker is on this right now", and holding one after
+        yielding would only delay the next worker and the operator.
+        """
+        await connection.execute(
+            text(
+                "UPDATE worker_leases SET expires_at = :now"
+                " WHERE execution_id = :execution_id AND owner = :owner AND fence = :fence"
+            ),
+            {
+                "now": to_iso(now),
+                "execution_id": claim.execution_id,
+                "owner": claim.owner,
+                "fence": claim.fence,
+            },
+        )
+
     async def _execution_row(self, connection: AsyncConnection, execution_id: str) -> RowMapping:
         row = (
             (
@@ -545,7 +567,7 @@ class JournalStore:
                         "SELECT e.execution_id FROM executions AS e"
                         " LEFT JOIN scheduled_retries AS r ON r.execution_id = e.execution_id"
                         " LEFT JOIN worker_leases AS l ON l.execution_id = e.execution_id"
-                        " WHERE e.cancellation_requested_at IS NULL"
+                        " WHERE (e.cancellation_requested_at IS NULL OR e.status = 'running')"
                         " AND (e.deadline_at IS NULL OR e.deadline_at > :now)"
                         " AND ("
                         "   (e.status IN ('pending', 'retrying')"
@@ -569,7 +591,7 @@ class JournalStore:
                     "UPDATE executions SET status = 'running', updated_at = :now"
                     " WHERE execution_id = :execution_id"
                     " AND status IN ('pending', 'retrying', 'running')"
-                    " AND cancellation_requested_at IS NULL"
+                    " AND (cancellation_requested_at IS NULL OR status = 'running')"
                     " AND ("
                     "   status IN ('pending', 'retrying')"
                     "   OR NOT EXISTS ("
@@ -874,6 +896,7 @@ class JournalStore:
                 now=now,
                 extra=", current_step = NULL",
             )
+            await self._release_lease(connection, claim, now=now)
             await self._append_event(
                 connection,
                 claim.execution_id,
@@ -1029,6 +1052,7 @@ class JournalStore:
                 attempt=attempt,
                 detail=error_type,
             )
+            await self._release_lease(connection, claim, now=now)
             await self._append_event(
                 connection,
                 claim.execution_id,
@@ -1120,6 +1144,7 @@ class JournalStore:
                 now=now,
                 extra=", current_step = NULL",
             )
+            await self._release_lease(connection, claim, now=now)
             await self._append_event(
                 connection,
                 claim.execution_id,
@@ -1425,6 +1450,65 @@ class JournalStore:
                 )
             ).fetchall()
             return {row[0]: StepState(row[1]) for row in rows}
+
+        return await self._read(operation)
+
+    async def running_steps(self, execution_id: str) -> tuple[str, ...]:
+        """Return the steps an interrupted worker left mid-attempt.
+
+        A step is here only if a worker stopped between recording its start and recording its
+        result, which is exactly the case where nobody can say whether the effect happened.
+        """
+
+        async def operation(connection: AsyncConnection) -> tuple[str, ...]:
+            rows = (
+                await connection.execute(
+                    text(
+                        "SELECT step_id FROM execution_steps"
+                        " WHERE execution_id = :execution_id AND state = 'running'"
+                        " ORDER BY rowid"
+                    ),
+                    {"execution_id": execution_id},
+                )
+            ).fetchall()
+            return tuple(row[0] for row in rows)
+
+        return await self._read(operation)
+
+    async def completed_outputs(self, execution_id: str) -> dict[str, object]:
+        """Return the persisted output of every succeeded step, for branch predicates."""
+
+        async def operation(connection: AsyncConnection) -> dict[str, object]:
+            rows = (
+                await connection.execute(
+                    text(
+                        "SELECT step_id, output FROM execution_steps"
+                        " WHERE execution_id = :execution_id AND state = 'succeeded'"
+                        " ORDER BY rowid"
+                    ),
+                    {"execution_id": execution_id},
+                )
+            ).fetchall()
+            return {row[0]: _load(row[1]) for row in rows}
+
+        return await self._read(operation)
+
+    async def cancellation_requested(self, execution_id: str) -> bool:
+        """Whether a cancellation request is persisted for this execution."""
+
+        async def operation(connection: AsyncConnection) -> bool:
+            row = (
+                await connection.execute(
+                    text(
+                        "SELECT cancellation_requested_at FROM executions"
+                        " WHERE execution_id = :execution_id"
+                    ),
+                    {"execution_id": execution_id},
+                )
+            ).first()
+            if row is None:
+                raise DurableStateError(f"execution {execution_id} is no longer in the journal")
+            return row[0] is not None
 
         return await self._read(operation)
 

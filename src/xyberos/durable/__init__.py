@@ -19,6 +19,12 @@ from __future__ import annotations
 import warnings
 
 from xyberos.durable.contracts import SystemWallClock, WallClock
+from xyberos.durable.definitions import (
+    DefinitionLookup,
+    lookup_definition,
+    require_definition,
+    workflow_key,
+)
 from xyberos.durable.journal import (
     JOURNAL_SCHEMA_VERSION,
     Journal,
@@ -40,6 +46,7 @@ from xyberos.durable.models import (
     ExecutionView,
     FailureKind,
     JournalStats,
+    Reconciliation,
     StepState,
     StepView,
     execution_is_terminal,
@@ -49,7 +56,10 @@ from xyberos.durable.models import (
     step_is_terminal,
     step_transition_allowed,
 )
+from xyberos.durable.recovery import RecoveryReport, recover, resolve_interrupted_attempt
+from xyberos.durable.scheduler import Plan, PlanKind, plan_next, select_edge
 from xyberos.durable.store import JournalStore, definition_fingerprint
+from xyberos.durable.worker import DurableWorker, WorkerSettings, WorkOutcome
 from xyberos.errors import ExperimentalWarning
 
 __all__ = [
@@ -61,6 +71,8 @@ __all__ = [
     "TERMINAL_STEP_STATES",
     "ActivityPolicy",
     "Claim",
+    "DefinitionLookup",
+    "DurableWorker",
     "EventKind",
     "EventView",
     "ExecutionHandle",
@@ -72,19 +84,32 @@ __all__ = [
     "JournalSettings",
     "JournalStats",
     "JournalStore",
+    "Plan",
+    "PlanKind",
+    "Reconciliation",
+    "RecoveryReport",
     "StepState",
     "StepView",
     "SystemWallClock",
     "WallClock",
+    "WorkOutcome",
+    "WorkerSettings",
     "definition_fingerprint",
     "execution_is_terminal",
     "execution_transition_allowed",
+    "lookup_definition",
     "open_journal",
+    "plan_next",
+    "recover",
+    "require_definition",
     "require_execution_transition",
     "require_step_transition",
+    "resolve_interrupted_attempt",
+    "select_edge",
     "step_is_terminal",
     "step_transition_allowed",
     "warn_experimental",
+    "workflow_key",
 ]
 
 _LIMITS = (

@@ -1,11 +1,14 @@
 """Deterministic doubles for durable-execution tests.
 
-Lease expiry and retry scheduling are timing behavior, so they are tested with a clock that only
-moves when a test moves it. Nothing here needs a service, a thread, or a sleep.
+Lease expiry, heartbeats, and retry scheduling are timing behavior, so they are tested with a clock
+that only moves when a test moves it. A virtual sleeper waits until ``advance`` reaches its
+deadline, which is what lets a test sit inside a running step and decide what happens to the lease
+and to cancellation next.
 """
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
@@ -18,7 +21,9 @@ class ManualWallClock:
 
     start: datetime = field(default_factory=lambda: datetime(2026, 1, 1, tzinfo=timezone.utc))
     _now: datetime = field(init=False, repr=False)
-    sleepers: list[float] = field(default_factory=list, init=False, repr=False)
+    _waiters: list[tuple[datetime, asyncio.Future[None]]] = field(
+        default_factory=list, init=False, repr=False
+    )
 
     def __post_init__(self) -> None:
         self._now = self.start
@@ -28,14 +33,43 @@ class ManualWallClock:
         return self._now
 
     async def sleep(self, delay: float) -> None:
-        """Advance virtual time instead of waiting, so a polling loop cannot hang a test."""
-        self.sleepers.append(delay)
-        self.advance(delay)
+        """Wait until virtual time reaches ``now + delay``."""
+        target = self._now + timedelta(seconds=delay)
+        waiter: asyncio.Future[None] = asyncio.get_running_loop().create_future()
+        self._waiters.append((target, waiter))
+        try:
+            await waiter
+        except asyncio.CancelledError:
+            self._waiters = [entry for entry in self._waiters if entry[1] is not waiter]
+            raise
+
+    @property
+    def sleepers(self) -> int:
+        """How many virtual sleeps are waiting right now."""
+        return len(self._waiters)
 
     def advance(self, seconds: float) -> datetime:
-        """Move virtual time forward and return the new instant."""
+        """Move virtual time forward and wake every sleeper whose deadline has passed."""
         self._now += timedelta(seconds=seconds)
+        remaining: list[tuple[datetime, asyncio.Future[None]]] = []
+        for target, waiter in self._waiters:
+            if target <= self._now:
+                if not waiter.done():
+                    waiter.set_result(None)
+            else:
+                remaining.append((target, waiter))
+        self._waiters = remaining
         return self._now
+
+    async def wait_for_sleepers(self, count: int = 1, *, rounds: int = 1000) -> None:
+        """Yield until ``count`` sleeps are registered, or fail if they never arrive."""
+        for _ in range(rounds):
+            if len(self._waiters) >= count:
+                return
+            await asyncio.sleep(0)
+        raise AssertionError(
+            f"only {len(self._waiters)} virtual sleeper(s) registered after {rounds} rounds"
+        )
 
 
 def idempotent_activity() -> ActivityPolicy:
