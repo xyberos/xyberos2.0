@@ -22,7 +22,11 @@ from configparser import ConfigParser
 from pathlib import Path
 
 import pytest
-import tomllib
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:  # pragma: no cover - Python 3.10 uses the tomli fallback.
+    import tomli as tomllib
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 DIST = REPOSITORY_ROOT / "dist"
