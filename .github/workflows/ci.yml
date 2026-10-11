@@ -59,6 +59,9 @@ jobs:
       - run: .smoke/bin/xyberos new smoke --directory .
       # A core-only install must explain which extra the application needs...
       - run: |
+          # Without pipefail this tests tee's status rather than the check's, so the guard below would
+          # fire on every run and no passing build could survive it.
+          set -o pipefail
           if .smoke/bin/xyberos check --app smoke.app:create_app --app-dir smoke/src 2>&1 | tee missing.txt; then
             echo "check succeeded without the http extra" >&2
             exit 1
@@ -67,6 +70,7 @@ jobs:
       # ... and the same command must pass once it is installed.
       - run: .smoke/bin/python -m pip install "starlette>=0.40,<1" "httpx>=0.27,<1"
       - run: |
+          set -o pipefail
           .smoke/bin/xyberos check --app smoke.app:create_app --app-dir smoke/src | tee report.txt
           grep -q "routes: 2 (handler signatures valid)" report.txt
 
