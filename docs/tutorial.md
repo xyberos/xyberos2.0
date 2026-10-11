@@ -27,14 +27,12 @@
 ## What you need
 
 - **Python 3.10 or newer.**
-- **A checkout of the Xyberos repository**, because it is not published yet.
+- **Xyberos**, from PyPI, with the `http` and `database` extras.
 - **A terminal.** The examples use PowerShell on Windows; the same commands work in any shell.
 
 ```powershell
-git clone <repository> <directory>
-cd <directory>
 python -m venv .venv
-.venv\Scripts\python -m pip install -e ".[http,database]" uvicorn
+.venv\Scripts\python -m pip install "xyberos[http,database]" uvicorn
 ```
 
 `uvicorn` is the web server we will use. It is *not* part of Xyberos: a framework that refuses to

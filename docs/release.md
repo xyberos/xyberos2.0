@@ -65,12 +65,12 @@ at all rather than published with a caveat.
    optional-dependency story is true for an artefact, not only for a checkout. CI runs the same
    sequence in the `installed-artefact` job.
 
-6. **Update what publication makes false.** Three places say the framework is not published: the
-   prerequisites note in [the tutorial](./tutorial.md), the install section in
-   [getting started](./getting-started.md), and the comment above the generated project's dependency
-   in [src/xyberos/cli/scaffold.py](../src/xyberos/cli/scaffold.py). Replace the checkout instructions
-   with the published command, then run the gate below, because the tutorial's output blocks and
-   `tests/integration/test_tutorial.py` are what keep that page honest.
+6. **Update what publication makes false — done for `2.0.0`.** This step existed because three places
+   said the framework was not published: the prerequisites note in [the tutorial](./tutorial.md), the
+   install section in [getting started](./getting-started.md), and the comment above the generated
+   project's dependency in [src/xyberos/cli/scaffold.py](../src/xyberos/cli/scaffold.py). They now
+   install from the index, and the step is a first-release step only: a later release has nothing to
+   flip, because the framework stays published.
 7. **Confirm the gate.** Every row of the release decision gate in
    [implementation.md](./implementation.md) has evidence, and the open owner decisions listed under
    "Remaining owner decisions" are either decided or explicitly deferred with a trigger.

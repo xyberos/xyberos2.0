@@ -4,13 +4,10 @@
 > only stable core APIs and the optional `http` extra. For what "stable" means here, see the
 > [stability guide](./stability.md).
 
-Xyberos is not published to PyPI yet, so install it from a checkout of this repository. Python 3.10
-or newer is required.
+Xyberos requires Python 3.10 or newer. Install it, with the `http` extra, alongside an ASGI server:
 
 ```powershell
-git clone <repository> <directory>
-cd <directory>
-python -m pip install -e ".[http]" uvicorn
+python -m pip install "xyberos[http]" uvicorn
 ```
 
 `uvicorn` is not a Xyberos dependency. Xyberos does not implement an ASGI server, so any ASGI server
