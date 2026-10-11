@@ -165,6 +165,53 @@ plugin cannot add or change routes once the application is ready.
   `tests/fixtures/metrics_plugin`, and `tests/integration/test_plugin_packages.py` asserts that it
   imports only public `xyberos` names.
 
+## The catalogue
+
+There is no plugin *registry service* and no discovery: a plugin is a package you install and add
+explicitly, and `xyberos` never looks for one ([ADR 0007](./adr/0007-trusted-plugins.md)). That is a
+supply-chain decision — entry-point loading means a dependency can change what your process does at
+import time — but it does not mean extensions are invisible. This section is the list, maintained by
+hand.
+
+**Known extensions.** None are published yet. The reference implementations in this repository are:
+
+| Package | What it shows |
+| --- | --- |
+| [`tests/fixtures/metrics_plugin`](../tests/fixtures/metrics_plugin) | a *separately distributed* plugin, imported by the test suite as a package and asserted to use only public `xyberos` names |
+| [`examples/custom_plugin`](../examples/custom_plugin/README.md) | a plugin written inside an application: a service, a route, and typed configuration |
+
+A database backend for an engine other than SQLite is a package too — see
+[writing a database provider](./database-providers.md).
+
+**Publishing one.** A plugin package needs very little:
+
+```text
+mycompany-xyberos-metrics/
+├── pyproject.toml            # depends on xyberos >= the release you target
+├── src/mycompany_metrics/
+│   ├── __init__.py           # exports the Plugin subclass
+│   └── plugin.py             # name, api_version, config_type, register
+└── tests/
+    └── test_plugin.py        # imports xyberos, never an internal module
+```
+
+Four rules make a plugin safe to depend on:
+
+1. **Declare `api_version`** and keep the major component honest. `"1"` means "I only use what the
+   version-1 plugin contract promises"; a runtime with a different major refuses to load you,
+   before `register` runs.
+2. **Import only public names.** `xyberos`, `xyberos.plugins`, and the documented `xyberos.*` modules —
+   never an internal module. The fixture plugin's test is the pattern to copy: assert that every
+   module your plugin imports is in the public surface, so an internal change surfaces as your test
+   failing rather than your users breaking.
+3. **Validate your own configuration.** `config_type` is checked by the runtime and unknown keys are
+   rejected, so a typo fails at startup instead of being ignored.
+4. **Do not reach for the application in `start`.** It is not `READY` yet; register an eager provider
+   whose factory does the work, or do it in `register` ([existing limitation](#deliberate-limitations)).
+
+**To be listed here**, open an issue with a link to the repository and one sentence on what the plugin
+contributes. The only requirement is that it passes its own tests against a released version.
+
 ## Deliberate limitations
 
 - No plugin sandbox, permission model, or isolation of untrusted code.

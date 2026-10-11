@@ -28,6 +28,40 @@ The route measurement is deliberately honest about the test client: it is the la
 component of that number, and reporting the framework's share separately would mean measuring
 something no user experiences.
 
+## Capacity: where the wall is
+
+Three of the numbers above decide almost every capacity question, and one of them is counter-intuitive
+enough to be worth stating explicitly.
+
+| Scenario | best | median | p95 |
+| --- | --- | --- | --- |
+| SQLite, one write per transaction (`synchronous=NORMAL`, WAL) | 0.32 ms | 0.47 ms | 0.62 ms |
+| SQLite, 20 concurrent writers with the retry policy | — | 120 ms for all 20 | — |
+
+**One writer, no contention: about 2 000 writes per second.** The reciprocal of 0.47 ms is the ceiling
+a single writer approaches, so a workload that fits in tens of millions of rows on one box is not
+limited by the framework. Reads are never blocked under WAL, so read volume is a different question.
+
+**Under contention, the retry backoff — not the disk — sets the pace.** Twenty concurrent writers take
+120 ms in total, which is about 170 writes per second: an order of magnitude *below* the sequential
+figure, on hardware that has no trouble writing. The reason is in
+[the retry policy](./database.md#concurrency-and-the-retry-policy): a contended writer waits
+`base_delay` (10 ms in the baseline) before retrying, and twenty writers serialising through one lock
+spend most of their time sleeping rather than writing. Two consequences follow, and both are design
+guidance rather than tuning advice:
+
+- **Contention is a design smell, not a throughput lever.** Batch writes into one transaction, or
+  serialise them through one writer, rather than raising concurrency and hoping.
+- **`base_delay` trades latency for aggregate throughput.** A smaller backoff recovers throughput under
+  contention at the cost of more failed lock attempts; the default is chosen to keep retries cheap and
+  bounded, not to maximise throughput.
+
+**What this means for a decision.** If your write volume fits one box's single writer — thousands of
+writes per second, if writes are batched — SQLite is enough and the framework is not your bottleneck.
+If it does not, the engine is the limit and the answer is a different provider
+([writing a database provider](./database-providers.md)), not a faster runtime. That boundary is stated
+for adopters in [where Xyberos fits](./positioning.md).
+
 ## The recorded baseline
 
 Taken 2026-10-11 on Windows 11 (CPython 3.12.10, local NVMe), one run of the suite. Treat these as

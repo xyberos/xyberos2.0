@@ -46,6 +46,7 @@ REQUESTS = 100
 WORKFLOW_STEPS = 20
 JOURNAL_EXECUTIONS = 20
 CONCURRENT_WRITERS = 20
+WRITES = 50
 
 
 @pytest.fixture(scope="module")
@@ -162,6 +163,42 @@ def test_sqlite_contention_under_the_retry_policy(report: Report) -> None:
 
         assert int(written) == CONCURRENT_WRITERS
         assert elapsed < CONTENTION_CEILING_SECONDS
+
+    asyncio.run(run())
+
+
+def test_sqlite_write_throughput(report: Report, tmp_path: Path) -> None:
+    """Writes are serialised, so this is the number that decides whether SQLite is enough.
+
+    One connection, one transaction per write, no contention: this is the *best* a single writer
+    does, which makes it the ceiling a busy deployment approaches rather than a figure to be
+    optimistic about. The reciprocal of the median is the implied write rate.
+    """
+
+    async def run() -> None:
+        async with temporary_database(directory=tmp_path) as database:
+            async with database.transaction() as connection:
+                await connection.execute(
+                    text("CREATE TABLE writes (id INTEGER PRIMARY KEY, name TEXT NOT NULL)")
+                )
+
+            samples: list[float] = []
+            for index in range(WRITES):
+                started = time.perf_counter()
+                async with database.transaction() as connection:
+                    await connection.execute(
+                        text("INSERT INTO writes (name) VALUES (:name)"),
+                        {"name": f"write-{index}"},
+                    )
+                samples.append(time.perf_counter() - started)
+            report.add(f"sqlite: one write per transaction ({WRITES}x)", samples)
+
+            async with database.transaction() as connection:
+                written = (
+                    await connection.execute(text("SELECT COUNT(*) FROM writes"))
+                ).scalar_one()
+
+        assert int(written) == WRITES
 
     asyncio.run(run())
 

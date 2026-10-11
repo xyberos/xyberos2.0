@@ -174,7 +174,7 @@ Deprecation policy: mark a stable API deprecated in documentation and runtime wa
 ## Phase status
 
 The detailed work packages live in the phase-by-phase plan below; this table is the at-a-glance
-state. Phases 0–7 are complete. Nothing is released: the release decision itself is the project
+state. Phases 0–8 are complete. Nothing is released: the release decision itself is the project
 owner's and no artefact is published before it.
 
 | Phase | Scope | Status | Exit-gate evidence |
@@ -187,6 +187,7 @@ owner's and no artefact is published before it.
 | 5 | Optional AI facade | complete | `src/xyberos/ai/`, `tests/ai/` (125 tests), `tests/integration/test_ai_assistant.py` (11 tests), `examples/ai_assistant/`, `docs/ai.md`, [ADR 0010](adr/0010-ai-facade-contract.md) |
 | 6 | Experimental single-host durable executor | complete | `src/xyberos/durable/` (10 modules), `tests/durable/` (100 tests), `tests/crash_recovery/` (17 process-kill tests), `tests/integration/test_durable_example.py`, `examples/durable_workflow/`, `docs/durable.md`, [ADR 0011](adr/0011-durable-executor-contract.md) |
 | 7 | Developer experience, hardening, and release | complete (release decision pending owner sign-off) | all seven work packages: `docs/stability.md` + [ADR 0013](adr/0013-stable-surface-and-versioning.md) + `tests/test_public_surface.py` + `tests/test_compatibility.py` + `tests/test_deprecation.py` + `src/xyberos/deprecation.py`; `docs/getting-started.md`, `docs/testing.md`, `docs/troubleshooting.md`, `docs/security.md`, `examples/hello_app/`; `src/xyberos/cli/` + `docs/cli.md` + `tests/cli/`; `CHANGELOG.md`, `SECURITY.md`, `docs/release.md`, `tests/test_release_artefacts.py`; `tests/perf/` + `docs/performance.md`; the threat review with two credential-echo defects fixed |
+| 8 | Boundary legibility and extension points | complete | [ADR 0014](adr/0014-no-identity-or-authorization-model.md), [0015](adr/0015-durability-is-single-host.md), [0016](adr/0016-database-providers-are-an-extension-point.md); `docs/positioning.md`, `docs/database-providers.md`; `assert_provider_contract` in `xyberos.database.testing` + `tests/database/test_provider_contract.py`; `examples/tenancy/`, `examples/broker_worker/` and their integration tests; the write-throughput baseline |
 
 ### Phase 7 entry checklist
 
@@ -534,10 +535,66 @@ Two rows are decisions rather than evidence lists:
 
 **Deliverables:** release candidate, versioned docs, tested examples/templates, changelog/release notes, CI evidence, and a go/no-go checklist signed off by the project owner. Concretely: the release
 candidate is the `python -m build` output at the tagged commit, the versioned docs are `docs/` at that
-tag ([stability](stability.md) and [release](release.md) included), the examples are the six under
+tag ([stability](stability.md) and [release](release.md) included), the examples are the eight under
 `examples/` — each exercised by `tests/integration/` — the changelog is [`CHANGELOG.md`](../CHANGELOG.md),
 the evidence is the `quality`, `installed-artefact`, and `optional-installation` jobs, and the
 procedure that ties them together is [the release guide](release.md).
+
+### Phase 8 - boundary legibility and extension points
+
+**Objective:** make the limits of the framework *legible and actionable* rather than discovered, without
+growing core. Phase 7 ended with a list of things Xyberos is a poor fit for; leaving them as an
+unexplained absence is what loses a reader, and fixing them by adding features is what loses the
+project's reason to exist.
+
+**Prerequisites:** Phase 7 complete, so the surface, the docs, and the release procedure are frozen
+enough that a new document is a claim about something stable.
+
+**Work packages**
+
+1. **Record the refusals as decisions.** [ADR 0014](adr/0014-no-identity-or-authorization-model.md)
+   (no identity, tenancy, or authorization, plus the sanctioned explicit-principal shape),
+   [ADR 0015](adr/0015-durability-is-single-host.md) (single-host durability, with the worker role as
+   the integration point and the alternatives named), and
+   [ADR 0016](adr/0016-database-providers-are-an-extension-point.md) (one provider shipped, the contract
+   reusable). Each records why, and what to do instead.
+2. **Publish the positioning page.** [`docs/positioning.md`](positioning.md): who it is for and who it
+   is not for, the "if you need X, use Y" table, supported topologies, the capacity summary, and the
+   table of defaults with the seam that replaces each one. This is the cheapest artifact in the phase
+   and the one that protects the most: it stops wrong adopters arriving.
+3. **Make the database provider contract reusable.** `assert_provider_contract` ships in
+   `xyberos.database.testing` (preview tier, extra-gated, so core is untouched); the shipped SQLite
+   provider runs it in `tests/database/test_provider_contract.py`, which also proves the suite *fails*
+   for two deliberately broken providers — one that commits rolled-back work, one whose `retrying`
+   drops the operation's result. [`docs/database-providers.md`](database-providers.md) is the author
+   guide, including what stays SQLite-specific.
+4. **Publish capacity guidance with measured numbers.** A write-throughput scenario joined
+   `tests/perf/`, and [`docs/performance.md`](performance.md#capacity-where-the-wall-is) states the two
+   findings: about 2 000 writes per second from one writer, and the counter-intuitive one — under
+   contention the retry backoff, not the disk, sets the pace.
+5. **Ship the two highest-demand integrations as tested recipes.**
+   [`examples/tenancy/`](../examples/tenancy/README.md) proves that a payload claiming another tenant
+   changes nothing and that an unsigned assertion is refused;
+   [`examples/broker_worker/`](../examples/broker_worker/README.md) proves that a redelivered item
+   reuses its execution instead of repeating its effects. Both are asserted by
+   `tests/integration/`, so a recipe that stops being true fails the suite.
+6. **Make extensions visible without discovery.** The [plugin guide](plugins.md#the-catalogue) now has a
+   catalogue section: what known extensions exist (none published yet), the four rules a plugin must
+   follow, the package layout, and how to be listed. Discovery stays absent by decision
+   ([ADR 0007](adr/0007-trusted-plugins.md)); visibility was the actual gap.
+
+**Exit gate**
+
+| Criterion | Evidence |
+| --- | --- |
+| Every poor fit has a recorded disposition | three ADRs and the positioning page; none is left as an unexplained absence |
+| The database seam is proven, not asserted | `assert_provider_contract` passes for SQLite and fails for two broken providers |
+| Capacity is a number, not a vibe | the write-throughput baseline in `tests/perf/`, quoted in two documents |
+| The integrations that matter are tested code | `tests/integration/test_tenancy_example.py`, `tests/integration/test_broker_worker_example.py` |
+| Core did not grow | no change to `src/xyberos/__init__.py`, the runtime, or the core dependency set; the one new public name lives in the `database` extra's testing module |
+
+**Deliverables:** three ADRs, three documents (positioning, database providers, and the capacity
+section), one reusable conformance suite, and two tested examples — all of it outside the runtime.
 
 ## Cross-phase controls
 

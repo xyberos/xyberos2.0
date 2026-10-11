@@ -43,6 +43,30 @@ the tag. See [the release guide](docs/release.md) for what that involves.
   stability, and command-line guides; six tested examples.
 - **Licence** — Apache-2.0 with an explicit patent grant ([ADR 0012](docs/adr/0012-project-licence.md)).
 
+### Added
+
+- **Boundary legibility.** [ADR 0014](docs/adr/0014-no-identity-or-authorization-model.md) records why
+  there is no identity, tenancy, or authorization model and what to build instead;
+  [ADR 0015](docs/adr/0015-durability-is-single-host.md) records why durability is single-host and how a
+  queue owns delivery while the journal owns progress;
+  [ADR 0016](docs/adr/0016-database-providers-are-an-extension-point.md) makes the database provider an
+  extension point rather than a core feature. [The positioning page](docs/positioning.md) states who the
+  framework is for, who it is not for, which alternative to reach for, and which seam replaces each
+  default.
+- **`assert_provider_contract`** in `xyberos.database.testing`: a conformance suite a third-party
+  database provider runs against its own implementation, proving the same claims as the shipped SQLite
+  provider. The suite is itself tested against two deliberately broken providers, and
+  [the author guide](docs/database-providers.md) covers what to implement and what stays SQLite-specific.
+- **Two tested integration recipes**: [`examples/tenancy`](examples/tenancy/README.md) shows a verified
+  principal as an explicit argument, with tests proving a payload cannot choose its tenant, and
+  [`examples/broker_worker`](examples/broker_worker/README.md) shows idempotent submission on a broker
+  delivery id, with a test proving redelivery does not repeat an effect.
+- **Capacity guidance with measured numbers**: a write-throughput baseline, about 2 000 writes per
+  second from one writer, and the finding that under contention the retry backoff rather than the disk
+  sets the pace ([performance](docs/performance.md#capacity-where-the-wall-is)).
+- A catalogue section in the [plugin guide](docs/plugins.md#the-catalogue): what is known to exist, the
+  four rules a plugin follows, and how to be listed.
+
 ### Changed
 
 - The stable public surface is now declared and frozen per module, and `docs/stability.md` states

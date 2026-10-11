@@ -10,6 +10,13 @@ Xyberos owns configuration, connection PRAGMAs, transaction boundaries, and shut
 owns the driver integration. Applications use Core statements; ORM sessions are not a required
 framework abstraction.
 
+**SQLite is the default, not the contract.** A service depends on `DatabaseProvider` — three members
+over a SQLAlchemy `AsyncConnection` — so a different backend is a provider package rather than a change
+to your business code. That path, and the conformance suite that proves a provider satisfies the
+contract, is documented in [writing a database provider](./database-providers.md). Whether SQLite is
+enough for a given workload is answered with numbers in [performance](./performance.md) and
+[where Xyberos fits](./positioning.md).
+
 ## Configuration
 
 ```python

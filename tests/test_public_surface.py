@@ -389,6 +389,7 @@ MODULE_SURFACES = {
         "create_test_client",
     },
     "xyberos.database.testing": {
+        "assert_provider_contract",
         "temporary_database",
     },
     "xyberos.durable.testing": {

@@ -12,6 +12,7 @@ structure, roadmap, and risk analysis. It is not the task tracker.
 | [`runtime.md`](./runtime.md) | The implemented Phase 1 public runtime surface |
 | [`tutorial.md`](./tutorial.md) | The step-by-step tutorial, whose every output block is checked by a test |
 | [`architecture.md`](./architecture.md) | The reviewer's entry point: shape, mechanisms, trade-offs, gaps |
+| [`positioning.md`](./positioning.md) | Who it is for, who it is not for, and which default each seam replaces |
 | [`stability.md`](./stability.md) | The frozen public surface: what is promised, in which tier, and how it changes |
 | [`release.md`](./release.md) | The release procedure, the artefact checks, and the dependency audit |
 | [`adr/`](./adr/) | Immutable decisions that affect public behavior |
@@ -511,6 +512,8 @@ src/xyberos/
 examples/
 ├── hello_app/           # the smallest complete application, walked through in getting-started
 ├── tutorial/            # the tutorial's runnable chapters, one module each
+├── tenancy/             # a verified principal as an explicit argument, with tests
+├── broker_worker/       # a queue owns delivery, the journal owns progress, with tests
 ├── sqlite_crud/         # worked CRUD slice with Alembic migrations
 ├── custom_plugin/       # plugin authoring example
 ├── workflow/            # workflow example with retries, branching, and events
@@ -567,6 +570,8 @@ xyberos3/
 │   ├── cli.md               # the four commands
 │   ├── release.md           # release procedure, artefact checks, dependency audit
 │   ├── performance.md       # the recorded resource baselines and what they mean
+│   ├── positioning.md       # who it is for, and which seam replaces each default
+│   ├── database-providers.md # writing a provider for another database
 │   └── adr/                 # decision records
 ├── examples/
 │   ├── hello_app/
@@ -657,6 +662,7 @@ is the summary.
 | 5 | AI facade and integration | An AI application built on the same runtime and Workflow APIs | 1–2 weeks | complete |
 | 6 | Experimental durable execution | An experimental single-instance executor with documented limits | 3–6+ weeks | complete |
 | 7 | DX, hardening, and release | A stable runtime and Workflow release; durability remains experimental | 1–2 weeks | complete |
+| 8 | Boundary legibility and extension points | Recorded refusals, a reusable provider contract, tested integration recipes, and capacity guidance — with core unchanged | 3–5 days | complete |
 
 Estimated initial implementation: approximately 10–18+ working weeks for one experienced developer, including a limited experimental durable executor. The work can take longer if building and validating recovery semantics reveals additional requirements.
 

@@ -76,8 +76,10 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.mypy]
 files = [
   "src",
+  "examples/broker_worker/app.py",
   "examples/durable_workflow/app.py",
   "examples/hello_app/app.py",
+  "examples/tenancy/app.py",
   "examples/tutorial",
   "tests/contracts/examples/phase1_minimal_app.py",
   "tests/contracts/examples/phase4_workflow.py",

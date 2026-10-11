@@ -41,3 +41,6 @@ backlog. Annotate anything newly satisfied, and give an owner to anything that h
 | [0011](0011-durable-executor-contract.md) | Freeze the durable executor contract | accepted |
 | [0012](0012-project-licence.md) | License the project under Apache-2.0 | accepted |
 | [0013](0013-stable-surface-and-versioning.md) | Freeze the stable surface and its versioning rules | accepted |
+| [0014](0014-no-identity-or-authorization-model.md) | No identity, tenancy, or authorization model | accepted |
+| [0015](0015-durability-is-single-host.md) | Durability is single-host; the worker role is the integration point | accepted |
+| [0016](0016-database-providers-are-an-extension-point.md) | Database providers are an extension point, not a core feature | accepted |
