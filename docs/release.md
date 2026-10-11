@@ -90,9 +90,10 @@ Apache-2.0. Two details are worth knowing rather than assuming:
 - **`certifi` is MPL-2.0**, a file-level copyleft. It is a transitive dependency of `httpx` and is not
   modified here, which is what MPL-2.0 requires; it is listed because it is the one licence in the
   set that is not permissive.
-- **The ranges are floored, not capped** (`starlette>=0.40`, `sqlalchemy>=2.0,<2.1`,
-  `httpx>=0.27,<1`). A newer release inside a range can therefore change the closure, which is why
-  this audit is repeated at each release and why `docs/stability.md` states the policy.
+- **The floors are what move.** Every range has a floor, and only two have a ceiling
+  (`sqlalchemy>=2.0,<2.1`, `httpx>=0.27,<1`, because the next major is where a breaking change lands).
+  A newer release inside a range is reachable by resolution, so fixing a vulnerable dependency means
+  moving its floor, not rewriting the cap.
 
 There is no `NOTICE` file: nothing in the dependency set requires one, and Apache-2.0 requires it only
 when the work itself carries notices.

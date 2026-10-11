@@ -63,8 +63,8 @@ the tag. See [the release guide](docs/release.md) for what that involves.
 
 Nothing has been *fixed for a user*, because no version has been released: these were caught before
 the first release rather than after it, which is the point of testing recovery with a real
-process-kill harness. They are recorded here because they are the kind of defect a first release
-should be able to say it already survived.
+process-kill harness and of reviewing secrets handling before publishing. They are recorded here
+because they are the kind of defect a first release should be able to say it already survived.
 
 - An expired lease was counted for any non-terminal execution, so a yielded execution looked like an
   orphaned claim. Only `running` executions count now, and the lease row survives because it carries
@@ -73,9 +73,18 @@ should be able to say it already survived.
   now waits for a decision instead.
 - A missing optional dependency now names the extra to install, including when the failure comes from
   a user's module importing a third-party package directly.
+- A database URL containing a percent sign no longer fails Alembic's configuration, which used to
+  raise with the whole URL — password included — in the message. See "Security" above.
+- A rejected Ollama `base_url` no longer repeats the URL it rejected, which could include a credential.
 
 ### Security
 
-- No security issues are known in this codebase. The trust model, the secrets handling rules, and the
-  resource limits are documented in [the security guide](docs/security.md); the reporting process is
-  in [SECURITY.md](SECURITY.md).
+No security issue is known in a released version, because nothing has been released. The phase 7
+threat and abuse review found two credential-echo defects, both fixed before the first release:
+a database password could be quoted in a traceback when a migration URL contained a percent sign,
+and a rejected Ollama `base_url` could repeat a credential it carried. The first is now impossible
+because the URL survives Alembic's configuration intact, and the second because the credential rule
+runs first and no message describes the configured value.
+
+The trust model, the secrets handling rules, and the resource limits are documented in
+[the security guide](docs/security.md); the reporting process is in [SECURITY.md](SECURITY.md).

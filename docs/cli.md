@@ -107,8 +107,10 @@ xyberos migrate --migrations migrations --url "sqlite:///var/app.db"
 
 - The URL is the **synchronous** one, because Alembic's engine is synchronous.
 - `--async` applies inside an event loop, for a caller that is already there.
-- A password in the URL is never printed: it is redacted in the summary line, because that line ends
-  up in terminal scrollback and CI logs.
+- A password in the URL is never printed. The success line quotes a redacted form, and a failure is
+  reported as this command's own message with the URL and every encoding of its password scrubbed
+  out — because a traceback is the ordinary way a configured value ends up in a CI log. A URL
+  containing a percent sign works rather than failing, which it did not always.
 - Migrations are never applied at application startup, and this command does not change that: it is
   the explicit deploy step, not an implicit one.
 

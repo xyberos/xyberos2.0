@@ -34,9 +34,13 @@ never persists anything you did not hand it as a step output.
   name, a scope, an `eager` flag, and a source — never a value — and plugin diagnostics report a name,
   an API version, a state, and requirements.
 - **A provider URL that embeds credentials is rejected.** An Ollama `base_url` carrying user
-  information is refused outright, because it would otherwise end up in logs and error messages. Keep
-  credentials in whatever the provider's own mechanism is (a header, a proxy, an environment
-  variable), not in the URL.
+  information is refused outright, and the rejection never quotes the value it rejected, because the
+  rule exists precisely so a credential cannot reach a log. Keep credentials in whatever the
+  provider's own mechanism is (a header, a proxy, an environment variable), not in the URL.
+- **Nothing that may contain a secret is interpolated into a message.** The database URL is the other
+  place a credential lives: it is escaped before Alembic reads it, and a migration failure reports a
+  redacted form with the password scrubbed from the underlying error, because a traceback is the
+  ordinary way configuration reaches a log.
 - **Model prompts are metadata-only by default.** The `xyberos.ai` logger records provider, model,
   outcome, message and tool counts, durations, and token usage — not content. Capturing content is an
   explicit opt-in (`LoggingPolicy.capturing(...)`) that truncates and applies literal `redact` values

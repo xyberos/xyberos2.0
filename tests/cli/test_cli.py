@@ -19,7 +19,7 @@ import pytest
 from xyberos.cli.check import check
 from xyberos.cli.errors import CliError
 from xyberos.cli.main import EXIT_OK, main
-from xyberos.cli.migrations import _redact, migrate
+from xyberos.cli.migrations import migrate, redact, scrub
 from xyberos.cli.project import new
 from xyberos.cli.scaffold import files_for
 from xyberos.cli.server import run
@@ -367,6 +367,54 @@ def test_migrate_applies_revisions_to_a_temporary_database(tmp_path: Path) -> No
 
 def test_migrate_never_prints_a_password() -> None:
     assert (
-        _redact("postgresql://user:secret@db.example/app") == "postgresql://user:***@db.example/app"
+        redact("postgresql://user:secret@db.example/app") == "postgresql://user:***@db.example/app"
     )
-    assert _redact("sqlite:///var/app.db") == "sqlite:///var/app.db"
+    assert redact("sqlite:///var/app.db") == "sqlite:///var/app.db"
+
+
+def test_migrate_handles_a_url_a_migration_runner_cannot_interpolate(tmp_path: Path) -> None:
+    """A percent sign in the URL used to be a crash, and the crash quoted the whole URL.
+
+    A password is percent-encoded as a matter of course, so this is the ordinary case rather than an
+    exotic one; the file-path form is used here because it needs no database server.
+    """
+    database = tmp_path / "a%b.db"
+
+    report = migrate(MIGRATIONS, url=f"sqlite:///{database.as_posix()}")
+
+    assert database.exists()
+    assert "applied" in report
+
+
+def test_a_failed_migration_never_prints_the_url_or_the_password(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The failure path is where a traceback would otherwise quote the configured value."""
+    password = "S3cr3t%40pw"
+    url = f"postgresql://user:{password}@db.invalid:5432/app"
+    empty = tmp_path / "revisions"
+    empty.mkdir()
+
+    assert main(["migrate", "--migrations", str(empty), "--url", url]) == 1
+
+    printed = capsys.readouterr().err
+    assert password not in printed
+    assert url not in printed
+    assert "S3cr3t" not in printed
+    assert "migrations failed" in printed
+
+
+def test_scrub_removes_the_url_and_the_password_in_either_encoding() -> None:
+    url = "postgresql://user:S3cr3t%40pw@db.invalid:5432/app"
+
+    assert scrub(f"could not connect to {url}", url) == (
+        "could not connect to postgresql://user:***@db.invalid:5432/app"
+    )
+    assert "S3cr3t%40pw" not in scrub(f"invalid syntax in '{url}'", url)
+    assert "S3cr3t@pw" not in scrub("decoded S3cr3t@pw here", url)
+    assert scrub("nothing to hide", url) == "nothing to hide"
+
+
+def test_redact_leaves_a_url_without_a_password_alone() -> None:
+    assert redact("postgresql://db.example/app") == "postgresql://db.example/app"
+    assert redact("not a url") == "not a url"

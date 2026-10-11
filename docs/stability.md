@@ -79,9 +79,11 @@ The package uses PEP 440 spelling for SemVer concepts, starting at `0.0.0`.
 - **Python support** is `3.10` through `3.13`, tested in CI. Adding a newer Python is a minor
   release; dropping the oldest is a breaking change and is done as a `0.x` minor with upgrade notes
   (or a major release after `1.0.0`).
-- **Third-party ranges are floored, not capped** where the dependency is stable: `starlette>=0.40`,
-  `sqlalchemy>=2.0,<2.1`, `httpx>=0.27,<1`. A dependency's major release forces a decision rather
-  than a surprise.
+- **Third-party ranges are floored, and capped below a major where the dependency is not yet at one.**
+  `starlette>=0.40` has no ceiling because Starlette's surface is stable; `sqlalchemy>=2.0,<2.1` and
+  `httpx>=0.27,<1` do, because the next major is where a breaking change lands. A cap is not a
+  promise about the release inside it: the floor is what moves when a defect is fixed, and a
+  dependency's new major forces a decision rather than a surprise.
 
 ### The Ollama release floor
 

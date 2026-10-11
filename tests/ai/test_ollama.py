@@ -112,6 +112,47 @@ def test_settings_validate_the_base_url_and_never_accept_credentials() -> None:
         OllamaSettings(model="m", base_url="")
 
 
+@pytest.mark.parametrize(
+    "base_url",
+    [
+        "ftp://user:pass@127.0.0.1:11434",
+        "redis://user:pass@127.0.0.1:6379",
+        "https://user:pass@ollama.test",
+    ],
+)
+def test_a_rejected_base_url_never_repeats_what_was_configured(base_url: str) -> None:
+    """Whatever the reason for the rejection, the message must not quote the value.
+
+    The order of the checks is what this pins: a scheme the adapter does not accept must not be
+    reported by a branch that describes the URL, because the password in it is what gets described.
+    """
+    with pytest.raises(AIConfigurationError) as error:
+        OllamaSettings(model="m", base_url=base_url)
+
+    message = str(error.value)
+    assert "pass" not in message
+    assert base_url not in message
+    assert "must not embed credentials" in message
+
+
+def test_a_credential_url_with_no_scheme_is_rejected_without_being_quoted() -> None:
+    """``user:pass@host`` is not a URL at all: ``urlsplit`` calls ``user`` the scheme.
+
+    So the credentials rule never sees it, and the shape rule rejects it instead. That is the
+    correct outcome — it is not an http URL — and the point of the test is that the value still
+    does not appear in the message.
+    """
+    base_url = "user:pass@127.0.0.1:11434"
+
+    with pytest.raises(AIConfigurationError) as error:
+        OllamaSettings(model="m", base_url=base_url)
+
+    message = str(error.value)
+    assert "pass" not in message
+    assert base_url not in message
+    assert "must be an http(s) URL" in message
+
+
 def test_settings_validate_timeouts_and_options() -> None:
     with pytest.raises(AIConfigurationError, match="timeout must be greater than zero"):
         OllamaSettings(model="m", timeout=0)

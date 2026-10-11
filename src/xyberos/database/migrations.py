@@ -24,10 +24,16 @@ def alembic_config(script_location: str | Path, *, url: str) -> Config:
 
     ``sqlite+aiosqlite`` URLs are not usable by Alembic's synchronous engine, so pass the
     synchronous form (``SqliteSettings.sync_url``).
+
+    The URL is escaped rather than passed through. A URL is data: a password containing ``%`` is
+    percent-encoded by definition, and a SQLite path may contain one too, so configparser would read
+    a bare ``%`` as the start of a substitution. Escaping makes the value survive the round trip —
+    configparser resolves ``%%`` back to ``%`` on read — and removes the failure mode that quoting a
+    raw value produced: an exception message carrying the whole URL, password included.
     """
     config = Config()
     config.set_main_option("script_location", str(Path(script_location)))
-    config.set_main_option("sqlalchemy.url", url)
+    config.set_main_option("sqlalchemy.url", url.replace("%", "%%"))
     return config
 
 

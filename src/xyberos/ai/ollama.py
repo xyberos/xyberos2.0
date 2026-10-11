@@ -176,16 +176,24 @@ class OllamaSettings:
 
 
 def _validate_base_url(base_url: object) -> None:
+    """Reject anything that is not a plain http(s) URL, and never echo the value.
+
+    Credentials are checked first, because the check that rejects them must win over the one that
+    describes the value: a URL such as ``ftp://user:secret@host`` would otherwise be quoted in the
+    message, which is exactly what the credential rule exists to prevent. No branch echoes the
+    input for the same reason — a free-form string from configuration is the one thing here that may
+    hold a password, so the messages state the expected shape instead.
+    """
     if not isinstance(base_url, str) or not base_url.strip():
         raise AIConfigurationError("base_url must be a non-empty URL")
     parts = urlsplit(base_url)
-    if parts.scheme not in {"http", "https"} or not parts.netloc:
-        raise AIConfigurationError(
-            f"base_url must be an http(s) URL, got {base_url!r}; the default is {DEFAULT_BASE_URL}"
-        )
     if parts.username or parts.password:
         raise AIConfigurationError(
             "base_url must not embed credentials, because they would reach logs and error messages"
+        )
+    if parts.scheme not in {"http", "https"} or not parts.netloc:
+        raise AIConfigurationError(
+            f"base_url must be an http(s) URL with a host, for example {DEFAULT_BASE_URL}"
         )
 
 

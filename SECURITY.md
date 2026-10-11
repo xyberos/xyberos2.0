@@ -72,8 +72,8 @@ If a report turns out not to be a vulnerability, you get the reasoning rather th
   that evidence precedes a conclusion.
 - A security fix never goes in unannounced. Record it in `CHANGELOG.md` under "Security", with the
   impact and the affected versions, and reference it from the release notes.
-- If the fix requires a dependency range change, say which range and why; the ranges in
-  `pyproject.toml` are floored rather than capped, so a newer vulnerable release is reachable by
-  resolution and the floor is the thing to move.
+- If the fix requires a dependency range change, say which range and why. Every range here has a
+  floor and only two have a ceiling, so a vulnerable release inside a range is reachable by
+  resolution and the **floor** is the thing to move.
 - If a release has to be withdrawn, follow the rollback steps in
   [the release guide](docs/release.md).
