@@ -1,0 +1,81 @@
+# Changelog
+
+All notable changes to this project are documented in this file. The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the versioning rules — including what
+`0.x` and `1.0.0` mean here — are in [the stability guide](docs/stability.md).
+
+There has been no release yet. The package version is `0.0.0`, which is a placeholder rather than a
+release: the first release will be **`0.1.0`**, and the section below becomes its changelog entry at
+the tag. See [the release guide](docs/release.md) for what that involves.
+
+## [Unreleased]
+
+### Added
+
+- **Runtime** — `App` composition with typed providers, three scopes (`app`, `request`,
+  `transient`), a validated provider graph, explicit lifecycle (`validate` → `start` → `stop`),
+  request contexts, cooperative cancellation tokens, context and logging helpers, and
+  dependency-free route records ([ADR 0005](docs/adr/0005-phase-1-runtime-contract.md)).
+- **Configuration** — typed TOML settings with `XYBEROS_` environment mapping and a documented
+  precedence, a `schema_version`, and opaque per-capability sections
+  ([ADR 0002](docs/adr/0002-configuration-and-database-stack.md)).
+- **HTTP adapter** (preview, `http` extra) — Starlette behind one adapter, validated handler
+  signatures, a fixed middleware order, correlation IDs, error normalization, and a test client
+  ([ADR 0006](docs/adr/0006-http-and-database-adapters.md)).
+- **SQLite provider** (preview, `database` extra) — SQLAlchemy Core with SQLite PRAGMAs, short
+  explicit transactions, a bounded retry policy for write contention, and Alembic migrations run as a
+  deploy step.
+- **Plugins** — a trusted in-process capability contract with typed configuration, explicit
+  ordering, provider source attribution, and diagnostics ([ADR 0007](docs/adr/0007-trusted-plugins.md)).
+- **Workflow** — an immutable declarative definition with build-time validation, structured
+  execution, bounded retries with backoff, deadlines, cancellation, and structured events; no
+  persistence or recovery claimed ([ADR 0009](docs/adr/0009-workflow-engine-contract.md)).
+- **AI facade** (preview, core) — provider-neutral chat, structured output, streaming, embeddings,
+  and allowlisted tool calling, with a deterministic fake provider and an Ollama adapter behind the
+  `ollama` extra ([ADR 0010](docs/adr/0010-ai-facade-contract.md)).
+- **Durable execution** (experimental, `durable` extra) — a single-instance executor with a versioned
+  journal, a persisted state machine, atomic claims, leases with fencing tokens, bounded retries,
+  persisted cancellation, definition fingerprinting, and startup recovery
+  ([ADR 0011](docs/adr/0011-durable-executor-contract.md)).
+- **Command line** — `check`, `new`, `run`, and `migrate`, each wrapping an API the runtime already
+  provides.
+- **Documentation** — a guide per subsystem plus getting started, testing, troubleshooting, security,
+  stability, and command-line guides; six tested examples.
+- **Licence** — Apache-2.0 with an explicit patent grant ([ADR 0012](docs/adr/0012-project-licence.md)).
+
+### Changed
+
+- The stable public surface is now declared and frozen per module, and `docs/stability.md` states
+  which tier each surface is in ([ADR 0013](docs/adr/0013-stable-surface-and-versioning.md)).
+- `xyberos.http` no longer advertises its handler-compilation internals, and `xyberos.plugins` no
+  longer advertises `PLUGIN_API_MAJOR`. Both remain importable from the module that defines them.
+- Settings are read from `app.settings.app`, not from attributes on `App`; the earlier documentation
+  was wrong, and the correction is part of this release.
+- The Ollama adapter requires a service at or above `0.5.0` and refuses work below it instead of
+  failing somewhere less clear.
+
+### Deprecated
+
+- Nothing yet. `xyberos.deprecation` ships in this release so the first deprecation has a mechanism
+  rather than an improvised warning.
+
+### Fixed
+
+Nothing has been *fixed for a user*, because no version has been released: these were caught before
+the first release rather than after it, which is the point of testing recovery with a real
+process-kill harness. They are recorded here because they are the kind of defect a first release
+should be able to say it already survived.
+
+- An expired lease was counted for any non-terminal execution, so a yielded execution looked like an
+  orphaned claim. Only `running` executions count now, and the lease row survives because it carries
+  the fencing token.
+- Resuming a parked `outcome_unknown` execution could silently re-run an effect of unknown status. It
+  now waits for a decision instead.
+- A missing optional dependency now names the extra to install, including when the failure comes from
+  a user's module importing a third-party package directly.
+
+### Security
+
+- No security issues are known in this codebase. The trust model, the secrets handling rules, and the
+  resource limits are documented in [the security guide](docs/security.md); the reporting process is
+  in [SECURITY.md](SECURITY.md).

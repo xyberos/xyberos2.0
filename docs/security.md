@@ -123,11 +123,8 @@ A short list that catches most mistakes:
 
 ## Reporting a vulnerability
 
-If a defect in Xyberos itself has security consequences, report it privately to the project owner
-rather than in a public issue, and include the version, the configuration, and the smallest
-reproduction you have. Do not include live credentials or personal data.
-
-Until a formal policy is published alongside the first release, the expectation is: acknowledged
-within a few working days, fixed in a patch release when the fix is contained, and disclosed with the
-release that carries it. The [contributing guide](../CONTRIBUTING.md) covers how changes are
-submitted, including the rule against copying code that cannot be licensed under the project's terms.
+If a defect in Xyberos itself has security consequences, report it privately rather than in a public
+issue. [SECURITY.md](../SECURITY.md) is the policy: what is in scope, what is not, what to expect, and
+what happens to a fix. In short: acknowledge within a few working days, assess within about ten,
+ship the fix as a patch release when it is contained, and disclose with the release that carries it.
+Do not include live credentials or personal data in a report.

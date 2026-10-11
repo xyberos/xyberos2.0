@@ -11,6 +11,7 @@ structure, roadmap, and risk analysis. It is not the task tracker.
 | [`implementation.md`](./implementation.md) | Authoritative phase-by-phase work packages, exit gates, status, and cross-phase controls |
 | [`runtime.md`](./runtime.md) | The implemented Phase 1 public runtime surface |
 | [`stability.md`](./stability.md) | The frozen public surface: what is promised, in which tier, and how it changes |
+| [`release.md`](./release.md) | The release procedure, the artefact checks, and the dependency audit |
 | [`adr/`](./adr/) | Immutable decisions that affect public behavior |
 
 ## 1. Final architecture decisions
@@ -541,6 +542,8 @@ The target layout is:
 xyberos3/
 ├── pyproject.toml
 ├── README.md
+├── CHANGELOG.md             # Keep a Changelog; Unreleased, then one section per release
+├── SECURITY.md              # vulnerability response policy
 ├── docs/
 │   ├── PLAN.md              # architecture baseline (this file)
 │   ├── implementation.md    # phase plan and status
@@ -557,6 +560,7 @@ xyberos3/
 │   ├── troubleshooting.md   # error to cause to fix
 │   ├── security.md          # trust model, secrets, and limits
 │   ├── cli.md               # the four commands
+│   ├── release.md           # release procedure, artefact checks, dependency audit
 │   └── adr/                 # decision records
 ├── examples/
 │   ├── hello_app/

@@ -239,7 +239,7 @@ python -m pip install -e ".[ollama]"
 python -m pip install -e ".[durable]"
 ```
 
-See [the architecture plan](docs/PLAN.md), [the phase-by-phase implementation plan](docs/implementation.md), [the getting started guide](docs/getting-started.md), [the command-line guide](docs/cli.md), [the runtime guide](docs/runtime.md), [the HTTP guide](docs/http.md), [the database operations guide](docs/database.md), [the plugin guide](docs/plugins.md), [the workflow guide](docs/workflow.md), [the AI guide](docs/ai.md), [the durable execution guide](docs/durable.md), [the testing guide](docs/testing.md), [the troubleshooting guide](docs/troubleshooting.md), [the security guide](docs/security.md), [the stability guide](docs/stability.md), and [the architecture decisions](docs/adr/).
+See [the architecture plan](docs/PLAN.md), [the phase-by-phase implementation plan](docs/implementation.md), [the getting started guide](docs/getting-started.md), [the command-line guide](docs/cli.md), [the runtime guide](docs/runtime.md), [the HTTP guide](docs/http.md), [the database operations guide](docs/database.md), [the plugin guide](docs/plugins.md), [the workflow guide](docs/workflow.md), [the AI guide](docs/ai.md), [the durable execution guide](docs/durable.md), [the testing guide](docs/testing.md), [the troubleshooting guide](docs/troubleshooting.md), [the security guide](docs/security.md), [the stability guide](docs/stability.md), [the release guide](docs/release.md), and [the architecture decisions](docs/adr/). Contributors should read [the changelog](CHANGELOG.md) and [the security policy](SECURITY.md).
 
 ## Status and compatibility
 
@@ -253,3 +253,7 @@ behind it. A `0.x` minor release may break a stable name with upgrade notes; a p
 The project is licensed under the [Apache License 2.0](LICENSE), including its express patent
 grant. See [ADR 0012](docs/adr/0012-project-licence.md) for why that licence was chosen, and
 `CONTRIBUTING.md` for the contributor terms that are still open.
+
+Nothing is released yet: the version is a `0.0.0` placeholder, the first release will be `0.1.0`, and
+[the release guide](docs/release.md) is the procedure. Security reports go through
+[SECURITY.md](SECURITY.md), and changes are recorded in [the changelog](CHANGELOG.md).
