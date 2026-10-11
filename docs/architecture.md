@@ -6,9 +6,8 @@
 > way they are, what was rejected, what the evidence is, and where to push back. If this page ever
 > disagrees with an ADR or a guide, they win — and that is a defect in this page worth reporting.
 
-Written at the Phase 8 close, for a reviewer who has not read anything else. Version `0.0.0`, the
-placeholder for a release that has not been cut; this line publishes as `2.0.0`
-([ADR 0017](adr/0017-release-identity-and-lineage.md)).
+Written at the Phase 8 close, for a reviewer who has not read anything else. This line publishes as
+`2.0.0` ([ADR 0017](adr/0017-release-identity-and-lineage.md)).
 
 ## 1. What it is, and what it refuses to be
 

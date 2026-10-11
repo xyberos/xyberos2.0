@@ -1,8 +1,7 @@
 # Release guide
 
-> Status: Phase 7. Nothing has been released yet. This page is the procedure for the first release
-> and for every one after it, the deployment plan for the index it publishes to, and the audit results
-> it rests on.
+> Status: Phase 7. This page is the procedure for the first release and for every one after it, the
+> deployment plan for the index it publishes to, and the audit results it rests on.
 
 The project is at **`2.0.0`**, the first release of this line, because the `xyberos` name is held on the
 package index by the already-published 1.x line.
@@ -24,7 +23,7 @@ at all rather than published with a caveat.
    reader learns that before they read the features.
 2. **Bump the version in all six places.** Two carry it — `version` in
    [pyproject.toml](../pyproject.toml) and `__version__` in
-   [src/xyberos/\_\_init\_\_.py](../src/xyberos/__init__.py) — and four tests pin the placeholder
+   [src/xyberos/\_\_init\_\_.py](../src/xyberos/__init__.py) — and four tests pin the version
    literally: `tests/test_package.py`, `tests/test_public_api.py`, `tests/test_compatibility.py`, and
    `tests/cli/test_cli.py`. The four pins are deliberate: they make the bump a reviewed diff instead
    of a silent string change, and they fail loudly when one of the first two is missed.

@@ -172,8 +172,8 @@ Deprecation policy: mark a stable API deprecated in documentation and runtime wa
 ## Phase status
 
 The detailed work packages live in the phase-by-phase plan below; this table is the at-a-glance
-state. Phases 0–8 are complete. Nothing is released: the release decision itself is the project
-owner's and no artefact is published before it.
+state. Phases 0–8 are complete. The release decision is the project owner's, and no artefact is
+published before it is made.
 
 | Phase | Scope | Status | Exit-gate evidence |
 | --- | --- | --- | --- |
