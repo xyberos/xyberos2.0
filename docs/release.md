@@ -4,8 +4,8 @@
 > and for every one after it, the deployment plan for the index it publishes to, and the audit results
 > it rests on.
 
-The project is at `0.0.0`, which is a placeholder: the first release of this line will be
-**`2.0.0`**, because the `xyberos` name is held on the package index by the already-published 1.x line.
+The project is at **`2.0.0`**, the first release of this line, because the `xyberos` name is held on the
+package index by the already-published 1.x line.
 The versioning rules that make that the right number are in [the stability guide](./stability.md), and
 the decision itself is [ADR 0017](./adr/0017-release-identity-and-lineage.md).
 

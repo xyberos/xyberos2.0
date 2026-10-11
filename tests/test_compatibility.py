@@ -209,4 +209,4 @@ def test_definition_metadata_is_json_serializable() -> None:
 
 
 def test_the_package_version_is_where_the_release_starts() -> None:
-    assert xyberos.__version__ == "0.0.0"
+    assert xyberos.__version__ == "2.0.0"

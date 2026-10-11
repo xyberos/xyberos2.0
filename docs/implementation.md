@@ -1,7 +1,7 @@
 # Xyberos implementation plan
 
-> Implementation status: Phases 0–8 are complete. The repository has an installable `0.0.0` core
-> placeholder that releases as `2.0.0` ([ADR 0017](adr/0017-release-identity-and-lineage.md)): the app
+> Implementation status: Phases 0–8 are complete. The repository is at `2.0.0`, the first release of
+> this line ([ADR 0017](adr/0017-release-identity-and-lineage.md)): the app
 > runtime, the Starlette HTTP adapter with the SQLite provider, the trusted plugin/capability model,
 > the Workflow engine, the optional AI facade, the experimental durable executor, the frozen public
 > surface, and the release engineering. The phase table under "Phase status" is the at-a-glance state,

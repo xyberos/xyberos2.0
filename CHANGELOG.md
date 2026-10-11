@@ -4,17 +4,15 @@ All notable changes to this project are documented in this file. The format foll
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the versioning rules — including what the
 leading digit means here — are in [the stability guide](docs/stability.md).
 
-There has been no release of this line yet. The package version is `0.0.0`, which is a placeholder
-rather than a release: the first release will be **`2.0.0`**, and the section below becomes its
-changelog entry at the tag. See [the release guide](docs/release.md) for what that involves.
+## [Unreleased]
+
+## [2.0.0] - 2026-10-11
 
 `2.0.0` is not an upgrade of the published `1.x` line: it is a different codebase under the same name,
 which is why the number is a major one ([ADR 0017](docs/adr/0017-release-identity-and-lineage.md)). A
 project that depends on the 1.x API should pin `xyberos<2`; the two lines install the same import root
 and cannot share an environment. The 1.x releases stay published and unedited, and this file describes
 only this line.
-
-## [Unreleased]
 
 ### Added
 

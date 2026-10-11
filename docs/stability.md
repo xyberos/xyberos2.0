@@ -3,16 +3,16 @@
 > Status: Phase 7. This page states what you may rely on, what may change, and how a change is
 > announced. The decision behind it is [ADR 0013](./adr/0013-stable-surface-and-versioning.md).
 
-Xyberos is at `0.0.0`, the placeholder for a release that has not been cut: this line publishes as
-`2.0.0`, and the leading digit records lineage rather than maturity
-([ADR 0017](./adr/0017-release-identity-and-lineage.md)). The honest summary is: **the stable tier is
-declared and frozen, and it will not promise stable-major compatibility until `2.0.0` exists.**
+Xyberos is at `2.0.0`, the first release of this line, and the leading digit records lineage rather
+than maturity ([ADR 0017](./adr/0017-release-identity-and-lineage.md)). The honest summary is: **the
+stable tier is declared and frozen, and from `2.0.0` a change to a documented stable name requires a
+major release.**
 
 ## The three tiers
 
 | Tier | What it means | How it is marked | Can it change in `2.x`? |
 | --- | --- | --- | --- |
-| **Stable** | The contract this project intends to keep. Changing it requires an ADR, a changelog entry, and a deprecation where one is possible | Nothing extra — a name in the documented import path and in `__all__` is stable | Only in a major release from `2.0.0`; until `2.0.0` exists, in a minor release with upgrade notes |
+| **Stable** | The contract this project intends to keep. Changing it requires an ADR, a changelog entry, and a deprecation where one is possible | Nothing extra — a name in the documented import path and in `__all__` is stable | Only in a major release |
 | **Preview** | Shipped, documented, and tested, but the shape may still move as real use reveals the right one | The guide says "preview API" in its status line | Yes, in a minor release, with upgrade notes |
 | **Experimental** | Explicitly narrow, with stated non-guarantees that are part of the contract | `ExperimentalWarning` at the entry point, plus a limits section in the guide | Yes, at any time; the non-guarantees are the contract |
 

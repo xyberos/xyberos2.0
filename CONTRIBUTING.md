@@ -36,8 +36,8 @@ compatibility/release-note entry when applicable.
 
 ## Compatibility
 
-The package starts at `0.0.0`; breaking changes may occur in a `0.x` minor release only
-with upgrade notes. Do not describe a preview API as stable. The tiers and the rules are in
+The package is at `2.0.0`; a change to a documented stable name requires a major release. Do
+not describe a preview API as stable. The tiers and the rules are in
 [`docs/stability.md`](docs/stability.md) and [ADR 0013](docs/adr/0013-stable-surface-and-versioning.md).
 
 Adding or removing a public name is a visible change to `tests/test_public_surface.py`, and a change
