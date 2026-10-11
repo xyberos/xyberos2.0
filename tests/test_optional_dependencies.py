@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from xyberos._extras import extra_error
+from xyberos._extras import extra_error, suggest_extra
 
 SOURCE_ROOT = Path(__file__).resolve().parents[1] / "src"
 
@@ -50,6 +50,25 @@ def test_the_error_names_the_extra_and_keeps_the_original_message() -> None:
     assert isinstance(error, ModuleNotFoundError)
     assert "xyberos[ollama]" in str(error)
     assert "No module named 'httpx'" in str(error)
+
+
+@pytest.mark.parametrize(
+    ("missing", "expected"),
+    [
+        ("starlette", "http"),
+        ("starlette.applications", "http"),
+        ("sqlalchemy", "database"),
+        ("alembic", "database"),
+        ("not_an_extra_dependency", None),
+        (None, None),
+    ],
+)
+def test_the_reverse_lookup_names_an_extra_only_when_one_provides_it(
+    missing: str | None, expected: str | None
+) -> None:
+    error = ModuleNotFoundError(f"No module named {missing!r}", name=missing)
+
+    assert suggest_extra(error) == expected
 
 
 @pytest.mark.parametrize(

@@ -32,10 +32,15 @@ happens when a test is not enough and the shape turns out to be wrong.
 | AI facade, contracts, tools, schema subset, fake provider | `xyberos.ai` | preview |
 | Ollama adapter | `xyberos.ai.ollama` | preview |
 | Test doubles (`ManualClock`, `FakeExternalService`, `FakeModelProvider`, `temporary_database`, `create_test_client`) | the `*.testing` modules | preview |
+| Command-line interface: `check`, `new`, `run`, `migrate` | the `xyberos` command | preview |
 | Durable executor | `xyberos.durable` | **experimental** |
 
 A tier applies to a whole surface, not to a version of it: `xyberos.ai` is preview even where it is
 built only on stable pieces, because its contracts are newer and less exercised.
+
+The command-line surface is the command and its documented options, not the modules that implement
+them: nothing under `xyberos.cli` is promised as an import, so a change there is not a breaking
+change even though a changed option is.
 
 ### Minimal support range for the stable tier
 

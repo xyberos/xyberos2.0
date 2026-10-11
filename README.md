@@ -200,6 +200,22 @@ parked for a decision rather than retried on a guess. See the
 [durable execution guide](docs/durable.md), [ADR 0011](docs/adr/0011-durable-executor-contract.md),
 and the [`durable_workflow` example](examples/durable_workflow/README.md).
 
+## Command line
+
+Four commands wrap APIs the runtime already provides — nothing is re-implemented, and no server is
+bundled:
+
+```powershell
+xyberos new myapp                                   # a minimal project that runs
+xyberos check --app myapp.app:create_app --app-dir src   # settings, provider graph, handler signatures
+xyberos run --app myapp.app:asgi_app --app-dir src --reload   # delegate to your ASGI server
+xyberos migrate --migrations migrations --url "sqlite:///var/app.db"
+```
+
+`check` never starts the application, and `run` hands the import string to the ASGI server so
+reloading and shutdown stay the server's business. See the
+[command-line guide](docs/cli.md).
+
 ## Development
 
 Use Python 3.10 or newer. Install the project with development tools and run the quality
@@ -223,7 +239,7 @@ python -m pip install -e ".[ollama]"
 python -m pip install -e ".[durable]"
 ```
 
-See [the architecture plan](docs/PLAN.md), [the phase-by-phase implementation plan](docs/implementation.md), [the getting started guide](docs/getting-started.md), [the runtime guide](docs/runtime.md), [the HTTP guide](docs/http.md), [the database operations guide](docs/database.md), [the plugin guide](docs/plugins.md), [the workflow guide](docs/workflow.md), [the AI guide](docs/ai.md), [the durable execution guide](docs/durable.md), [the testing guide](docs/testing.md), [the troubleshooting guide](docs/troubleshooting.md), [the security guide](docs/security.md), [the stability guide](docs/stability.md), and [the architecture decisions](docs/adr/).
+See [the architecture plan](docs/PLAN.md), [the phase-by-phase implementation plan](docs/implementation.md), [the getting started guide](docs/getting-started.md), [the command-line guide](docs/cli.md), [the runtime guide](docs/runtime.md), [the HTTP guide](docs/http.md), [the database operations guide](docs/database.md), [the plugin guide](docs/plugins.md), [the workflow guide](docs/workflow.md), [the AI guide](docs/ai.md), [the durable execution guide](docs/durable.md), [the testing guide](docs/testing.md), [the troubleshooting guide](docs/troubleshooting.md), [the security guide](docs/security.md), [the stability guide](docs/stability.md), and [the architecture decisions](docs/adr/).
 
 ## Status and compatibility
 

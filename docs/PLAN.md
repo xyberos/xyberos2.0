@@ -556,6 +556,7 @@ xyberos3/
 │   ├── testing.md           # deterministic doubles and test habits
 │   ├── troubleshooting.md   # error to cause to fix
 │   ├── security.md          # trust model, secrets, and limits
+│   ├── cli.md               # the four commands
 │   └── adr/                 # decision records
 ├── examples/
 │   ├── hello_app/
@@ -604,7 +605,7 @@ xyberos3/
 │       │   ├── scheduler.py
 │       │   ├── worker.py
 │       │   └── recovery.py
-│       └── cli/
+│       └── cli/             # implemented (Phase 7): check, new, run, migrate
 └── tests/
     ├── test_import_boundary.py   # implemented
     ├── test_public_api.py        # implemented
@@ -617,6 +618,7 @@ xyberos3/
     ├── ai/               # implemented (Phase 5)
     ├── durable/          # implemented (Phase 6)
     ├── crash_recovery/   # implemented (Phase 6, process-kill harness)
+    ├── cli/              # implemented (Phase 7)
     ├── fixtures/         # implemented (separately packaged plugin)
     ├── contracts/        # implemented (executable API examples)
     ├── integration/      # implemented
@@ -697,6 +699,13 @@ Prioritize these deliverables:
 - Documentation that distinguishes direct, in-process, and durable execution.
 
 The command-line interface can initially be limited to project creation, development server startup, and configuration or diagnostics commands. Do not build a large CLI before the underlying APIs are stable.
+
+**Shipped in Phase 7, with that limit kept.** The command has four subcommands — `check`, `new`,
+`run`, `migrate` — and each is a wrapper over an API the runtime already proves: `check` is
+`Settings.load` plus `App.validate()` plus `App.diagnostics()`, `run` hands an import string to
+whatever ASGI server is installed rather than bundling one, and `migrate` calls the Alembic runner
+the database extra exposes. It is `argparse` from the standard library, so a framework that refuses
+to depend on an HTTP stack does not depend on a CLI framework either.
 
 ## 10. Risks and mitigations
 

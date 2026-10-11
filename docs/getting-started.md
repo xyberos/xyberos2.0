@@ -16,6 +16,18 @@ python -m pip install -e ".[http]" uvicorn
 `uvicorn` is not a Xyberos dependency. Xyberos does not implement an ASGI server, so any ASGI server
 can run the application you build here.
 
+To start a new project instead of reading the rest of this page first, scaffold one:
+
+```powershell
+xyberos new myapp
+cd myapp
+python -m pip install -e ".[http,dev]" uvicorn
+pytest
+```
+
+It writes the same shape this guide builds by hand, plus a settings file and a test. See the
+[command-line guide](./cli.md).
+
 ## The smallest application
 
 An application is a composition root: you name the services it has and the routes it answers, and
@@ -151,6 +163,7 @@ resolution path. The [runtime guide](./runtime.md) covers the rules in full.
 
 | You want | Read | Install |
 | --- | --- | --- |
+| A project scaffold, a config check, a dev server, migrations | [command-line guide](./cli.md) | core |
 | HTTP routes, middleware, error responses | [HTTP guide](./http.md) | `.[http]` |
 | SQLite with migrations and transaction retries | [database operations guide](./database.md) | `.[database]` |
 | Contribution points, typed plugin configuration | [plugin guide](./plugins.md) | core |
@@ -182,5 +195,8 @@ this layout, filled in.
 - Read the [runtime guide](./runtime.md) for providers, scopes, lifecycle, and configuration.
 - Read the [testing guide](./testing.md) before you write your first test; the deterministic doubles
   are what make a clock-dependent or model-dependent test fast.
+- Run `xyberos check --app myapp.app:create_app` before you deploy: it validates the provider graph
+  and compiles handler signatures without starting anything (see the
+  [command-line guide](./cli.md)).
 - Set `environment = "production"` and `debug = false` in your deployment configuration, and read
   the [security guide](./security.md) before you expose the application to a network.
