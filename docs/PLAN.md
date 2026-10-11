@@ -650,7 +650,7 @@ is the summary.
 | 4 | Stable in-process Workflow | A tested, inspectable workflow engine without durability promises | 2–3 weeks | complete |
 | 5 | AI facade and integration | An AI application built on the same runtime and Workflow APIs | 1–2 weeks | complete |
 | 6 | Experimental durable execution | An experimental single-instance executor with documented limits | 3–6+ weeks | complete |
-| 7 | DX, hardening, and release | A stable runtime and Workflow release; durability remains experimental | 1–2 weeks | in progress |
+| 7 | DX, hardening, and release | A stable runtime and Workflow release; durability remains experimental | 1–2 weeks | complete |
 
 Estimated initial implementation: approximately 10–18+ working weeks for one experienced developer, including a limited experimental durable executor. The work can take longer if building and validating recovery semantics reveals additional requirements.
 

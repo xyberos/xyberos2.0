@@ -4,14 +4,16 @@ Xyberos is an experimental, composable Python application runtime. Its planned s
 surface is application composition, typed dependencies, Starlette-backed HTTP, SQLite,
 and explicit in-process Workflow execution. Durable execution and AI adapters are optional.
 
-The project is currently at version `0.0.0`. Phases 0–6 are complete: the architecture baseline, the
+The project is currently at version `0.0.0`. Phases 0–7 are complete: the architecture baseline, the
 application runtime, the Starlette HTTP adapter with the SQLite database provider, the trusted
 plugin/capability model, the in-process workflow engine, the provider-neutral AI facade with Ollama
-as the first adapter, and the experimental durable executor. Phase 7 (developer experience,
-hardening, and release) is in progress: the public surface and its versioning rules are now frozen in
-[the stability guide](docs/stability.md) and [ADR 0013](docs/adr/0013-stable-surface-and-versioning.md),
-and release engineering is what remains. Breaking changes are expected before `1.0.0`. **Durable
-execution is experimental** and is never represented as exactly-once, multi-host, or highly available.
+as the first adapter, the experimental durable executor, and the release engineering. The public
+surface and its versioning rules are frozen in
+[the stability guide](docs/stability.md) and [ADR 0013](docs/adr/0013-stable-surface-and-versioning.md).
+Nothing is released: the first release will be `0.1.0`, and
+[the release guide](docs/release.md) is the procedure. Breaking changes are expected before `1.0.0`.
+**Durable execution is experimental** and is never represented as exactly-once, multi-host, or highly
+available.
 
 ## Runtime
 

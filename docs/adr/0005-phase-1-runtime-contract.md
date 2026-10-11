@@ -64,7 +64,11 @@ graph and its recovery semantics are proven.
   ([ADR 0009](./0009-workflow-engine-contract.md)).*
 - The declarative-first decision is honoured: Phase 4 shipped an immutable builder whose
   definitions validate without executing and render without side effects, and the decorator surface
-  stays in the Phase 7 backlog ([ADR 0009](./0009-workflow-engine-contract.md)).
+  stays in the Phase 7 backlog ([ADR 0009](./0009-workflow-engine-contract.md)). *Discharged in
+  Phase 7 by not building it: the item moves from the Phase 7 backlog to the standing deferred
+  backlog in [`docs/implementation.md`](../implementation.md), because declarative definitions are
+  what make introspection, retries, and durability-definition fingerprinting possible, and nothing in
+  Phase 7 changed that.*
 - A configurable shutdown drain bound and provider source attribution are deliberately left to
   Phase 2 and Phase 3, where HTTP lifespan and plugin diagnostics make them actionable.
   *Satisfied: `settings.app.shutdown_timeout` shipped in Phase 2, and automatic `plugin:<name>`

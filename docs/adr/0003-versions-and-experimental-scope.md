@@ -34,7 +34,9 @@ execution.
   once per process per entry point, the limits are stated in `docs/durable.md`, in the
   [ADR 0011](./0011-durable-executor-contract.md) contract, and in the package docstring, and
   `PLAN.md` section 5.4 keeps the promotion criteria. Phase 7 re-audits the labelling rather than
-  owning it.*
+  owning it. *Re-audited in Phase 7: the labels hold, the tiers and non-guarantees are stated for
+  users in [`docs/stability.md`](../stability.md), and durability stays experimental because the
+  promotion evidence in `PLAN.md` section 5.4 is not complete.*
 - Plugin, configuration, Workflow-definition, and journal-schema compatibility are versioned
   independently from the package. *Plugin API and configuration schema versioning shipped with
   the plugin and configuration work; Workflow-definition versioning shipped in Phase 4, which made

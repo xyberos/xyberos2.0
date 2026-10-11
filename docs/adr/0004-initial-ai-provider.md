@@ -23,4 +23,7 @@ feature.
   default; only `examples/ai_assistant` ships a default model name for convenience.*
 - Prompts, completions, and credentials are excluded from logs by default. *Satisfied in Phase 5:
   `LoggingPolicy.metadata_only()` is the default, content capture is opt-in with truncation and
-  redaction, and a credential-bearing base URL is rejected; Phase 7 re-audits redaction.*
+  redaction, and a credential-bearing base URL is rejected. Re-audited in Phase 7: redaction holds,
+  and the audit found the credential rule bypassable when a URL was also the wrong scheme — the value
+  it had just rejected was quoted back in the message. The credential check now runs first and no
+  message describes the configured value.*

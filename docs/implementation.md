@@ -174,7 +174,8 @@ Deprecation policy: mark a stable API deprecated in documentation and runtime wa
 ## Phase status
 
 The detailed work packages live in the phase-by-phase plan below; this table is the at-a-glance
-state. Phases 0–6 are complete; Phase 7 is in progress.
+state. Phases 0–7 are complete. Nothing is released: the release decision itself is the project
+owner's and no artefact is published before it.
 
 | Phase | Scope | Status | Exit-gate evidence |
 | --- | --- | --- | --- |
@@ -185,7 +186,7 @@ state. Phases 0–6 are complete; Phase 7 is in progress.
 | 4 | Stable, in-process Workflow engine | complete | `src/xyberos/execution/`, `tests/workflow/` (107 tests), `tests/integration/test_workflow_example.py`, `tests/contracts/examples/phase4_workflow.py`, `examples/workflow/`, `docs/workflow.md`, [ADR 0009](adr/0009-workflow-engine-contract.md) |
 | 5 | Optional AI facade | complete | `src/xyberos/ai/`, `tests/ai/` (125 tests), `tests/integration/test_ai_assistant.py` (11 tests), `examples/ai_assistant/`, `docs/ai.md`, [ADR 0010](adr/0010-ai-facade-contract.md) |
 | 6 | Experimental single-host durable executor | complete | `src/xyberos/durable/` (10 modules), `tests/durable/` (100 tests), `tests/crash_recovery/` (17 process-kill tests), `tests/integration/test_durable_example.py`, `examples/durable_workflow/`, `docs/durable.md`, [ADR 0011](adr/0011-durable-executor-contract.md) |
-| 7 | Developer experience, hardening, and release | in progress | work package 1 (surface audit and freeze) complete: `src/xyberos/deprecation.py`, `tests/test_public_surface.py`, `tests/test_compatibility.py`, `tests/test_deprecation.py`, `docs/stability.md`, [ADR 0013](adr/0013-stable-surface-and-versioning.md); work packages 2 and 4 complete: `docs/getting-started.md`, `docs/testing.md`, `docs/troubleshooting.md`, `docs/security.md`, `examples/hello_app/`, `tests/integration/test_hello_app.py`; work package 3 complete: `src/xyberos/cli/`, `docs/cli.md`, `tests/cli/test_cli.py`; work package 5 complete: `CHANGELOG.md`, `SECURITY.md`, `docs/release.md`, `tests/test_release_artefacts.py`, the `installed-artefact` CI job; work package 6 complete: `tests/perf/`, `docs/performance.md`; work package 7 complete: the threat and abuse review, with two credential-echo defects fixed and covered by regression tests in `tests/database/test_migrations.py`, `tests/cli/test_cli.py`, and `tests/ai/test_ollama.py`; the release decision gate below is what remains |
+| 7 | Developer experience, hardening, and release | complete (release decision pending owner sign-off) | all seven work packages: `docs/stability.md` + [ADR 0013](adr/0013-stable-surface-and-versioning.md) + `tests/test_public_surface.py` + `tests/test_compatibility.py` + `tests/test_deprecation.py` + `src/xyberos/deprecation.py`; `docs/getting-started.md`, `docs/testing.md`, `docs/troubleshooting.md`, `docs/security.md`, `examples/hello_app/`; `src/xyberos/cli/` + `docs/cli.md` + `tests/cli/`; `CHANGELOG.md`, `SECURITY.md`, `docs/release.md`, `tests/test_release_artefacts.py`; `tests/perf/` + `docs/performance.md`; the threat review with two credential-echo defects fixed |
 
 ### Phase 7 entry checklist
 
@@ -490,6 +491,13 @@ not represent durability as exactly-once, multi-host, or highly available.
 
 ### Phase 7 - developer experience, hardening, and release
 
+**Status:** work complete; the release decision itself is the project owner's. All seven work packages
+are done: the surface is audited and frozen, the cross-cutting guides and the hello app example are
+published, the CLI exists, the release engineering and the resource baselines are in place, and the
+threat and abuse review is complete with its two findings fixed. The ADR consequence lists were
+walked: every item is satisfied, owned by a named phase, or in the standing deferred backlog. What
+remains is a go/no-go decision, and no artefact is published before it.
+
 **Objective:** turn validated features into a release that users can install, understand, upgrade, and operate safely.
 
 **Prerequisites:** stable scope is feature complete (Phases 0-5) and durable capabilities are either explicitly experimental or omitted from the release if their exit gate is not met.
@@ -506,16 +514,30 @@ not represent durability as exactly-once, multi-host, or highly available.
 
 **Release decision gate**
 
-| Release area | Required evidence |
-| --- | --- |
-| Core runtime | Lifecycle/DI/configuration tests, clean install, docs examples, supported-version CI. |
-| HTTP and SQLite | CRUD integration suite, migration test, contention policy test, documented deployment limits. |
-| Plugins | Independent fixture-plugin compatibility suite and versioning documentation. |
-| Workflow | Deterministic behavior suite for validation, retries, cancellation, deadlines, and events. |
-| AI | Core-without-AI install, fake-provider suite, redaction/tool tests, adapter contract tests. |
-| Durable (experimental) | Fault/restart suite, state/lease tests, limitations/operator documentation; omit it if incomplete. |
+| Release area | Required evidence | Where it is |
+| --- | --- | --- |
+| Core runtime | Lifecycle/DI/configuration tests, clean install, docs examples, supported-version CI | `tests/runtime/`, `tests/contracts/`, `tests/integration/test_hello_app.py`, the `quality` matrix on 3.10–3.13, the `installed-artefact` job |
+| HTTP and SQLite | CRUD integration suite, migration test, contention policy test, documented deployment limits | `tests/http/`, `tests/database/`, `tests/integration/test_sqlite_crud.py`, `tests/database/test_migrations.py`, the contention baseline in `tests/perf/`, [database guide](database.md) |
+| Plugins | Independent fixture-plugin compatibility suite and versioning documentation | `tests/fixtures/metrics_plugin/`, `tests/integration/test_plugin_packages.py`, `tests/plugins/`, [plugin guide](plugins.md) |
+| Workflow | Deterministic behavior suite for validation, retries, cancellation, deadlines, and events | `tests/workflow/`, `tests/contracts/examples/phase4_workflow.py`, [workflow guide](workflow.md) |
+| AI | Core-without-AI install, fake-provider suite, redaction/tool tests, adapter contract tests | `tests/ai/`, `tests/integration/test_ai_assistant.py`, the core-only smoke steps in the `optional-installation` job, [AI guide](ai.md) |
+| Durable (experimental) | Fault/restart suite, state/lease tests, limitations/operator documentation | `tests/durable/`, `tests/crash_recovery/` (17 process-kill tests), `tests/integration/test_durable_example.py`, [durable guide](durable.md), [performance baselines](performance.md) |
 
-**Deliverables:** release candidate, versioned docs, tested examples/templates, changelog/release notes, CI evidence, and a go/no-go checklist signed off by the project owner.
+Two rows are decisions rather than evidence lists:
+
+- **Durable execution ships experimental.** Its exit gate is met — that is why it is in the release at
+  all — but the promotion evidence in `PLAN.md` section 5.4 is not, so the label stays and the API
+  keeps warning.
+- **The extra can be omitted instead.** Nothing in the stable tier depends on it, and the
+  `optional-installation` job tests every extra in isolation, so a release without durability is a
+  supported configuration rather than a diminished one.
+
+**Deliverables:** release candidate, versioned docs, tested examples/templates, changelog/release notes, CI evidence, and a go/no-go checklist signed off by the project owner. Concretely: the release
+candidate is the `python -m build` output at the tagged commit, the versioned docs are `docs/` at that
+tag ([stability](stability.md) and [release](release.md) included), the examples are the six under
+`examples/` — each exercised by `tests/integration/` — the changelog is [`CHANGELOG.md`](../CHANGELOG.md),
+the evidence is the `quality`, `installed-artefact`, and `optional-installation` jobs, and the
+procedure that ties them together is [the release guide](release.md).
 
 ## Cross-phase controls
 

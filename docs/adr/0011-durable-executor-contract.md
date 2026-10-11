@@ -99,6 +99,11 @@ log line written by a process that no longer exists.
 
 - Phase 7 re-audits the labelling and decides promotion; promoting durable execution would require
   demonstrating the backup/restore and resource-bound evidence listed in `PLAN.md` section 5.4.
+  *Re-audited in Phase 7: the label holds. The backup/restore procedure is documented rather than
+  automated, "bounded resource consumption" is a payload ceiling and a documented retention decision
+  rather than a measured one, and the promotion decision stays with the project owner — so the
+  experimental label is not yet earned off, and the release decision gate carries durability as
+  experimental rather than promoted. See [`docs/implementation.md`](../implementation.md).*
 - SQLite write locks are the only coordination, so a journal on a network filesystem is unsupported:
   the locking it relies on is not dependable there. Deployment topology is documented, not enforced.
 - One step per claim costs a claim, a lease upsert, and two events per step. That is the price of a

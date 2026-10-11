@@ -74,4 +74,5 @@ journal, so a golden value turns that into a reviewed diff.
   them would be churn without benefit; they are recorded here so the next audit does not re-litigate
   it.
 - Phase 7's release notes and changelog now have a defined shape to write into: added, changed,
-  deprecated, removed, fixed, and security.
+  deprecated, removed, fixed, and security. *Satisfied: `CHANGELOG.md` uses exactly those sections,
+  and [`docs/release.md`](../release.md) names them as the shape of a release entry.*
