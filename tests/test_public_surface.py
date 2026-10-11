@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import importlib
 import inspect
+import typing
 from types import ModuleType
 from typing import Any
 
@@ -419,6 +420,19 @@ def load(name: str) -> ModuleType:
     return importlib.import_module(name)
 
 
+def declared_callable(value: object) -> bool:
+    """Whether a declared name is a function or a class rather than a type alias.
+
+    Not left to ``inspect.isclass``: some versions report a subscripted generic as a class, so an
+    alias such as ``Callable[[int], None]`` counts as a callable on one interpreter and not on the
+    next. An alias has an origin and no ``__doc__`` of its own, which is why the tests below treat
+    type aliases as exempt.
+    """
+    if typing.get_origin(value) is not None:
+        return False
+    return inspect.isclass(value) or inspect.isfunction(value)
+
+
 @pytest.mark.parametrize("name", sorted(ALL_SURFACES))
 def test_a_documented_module_declares_its_surface(name: str) -> None:
     module = load(name)
@@ -452,9 +466,8 @@ def test_every_declared_callable_documents_itself(name: str) -> None:
     undocumented = []
     for item in module.__all__:
         value = getattr(module, item)
-        if inspect.isclass(value) or inspect.isfunction(value):
-            if not (inspect.getdoc(value) or "").strip():
-                undocumented.append(item)
+        if declared_callable(value) and not (inspect.getdoc(value) or "").strip():
+            undocumented.append(item)
 
     assert not undocumented, f"{name} declares undocumented callable(s): {', '.join(undocumented)}"
 
@@ -472,7 +485,7 @@ def test_an_implementation_module_declares_only_what_it_defines(name: str) -> No
     borrowed = sorted(
         item
         for item in module.__all__
-        if (inspect.isclass(getattr(module, item)) or inspect.isfunction(getattr(module, item)))
+        if declared_callable(getattr(module, item))
         and getattr(getattr(module, item), "__module__", name) != name
     )
 

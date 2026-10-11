@@ -237,7 +237,10 @@ def test_entry_steps_must_agree_about_the_shared_input() -> None:
 def test_input_type_must_be_usable_with_isinstance() -> None:
     rejects(
         Workflow("demo", input_type=dict[str, int]).step("first", passthrough),
-        "must be a class or a tuple of classes",
+        # Which check rejects a subscripted generic is a CPython detail: 3.10 reports dict[str, int]
+        # as a type and fails the isinstance probe, while 3.11+ fails the type test instead.
+        # The invariant is that it is rejected for that reason, in whichever wording applies.
+        r"input_type (must be a class or a tuple of classes|cannot be used with isinstance)",
     )
 
     class HasArea(Protocol):
