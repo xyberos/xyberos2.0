@@ -3,15 +3,17 @@
 > Status: Phase 7. This page states what you may rely on, what may change, and how a change is
 > announced. The decision behind it is [ADR 0013](./adr/0013-stable-surface-and-versioning.md).
 
-Xyberos is at `0.0.0`. Nothing is released yet, so the honest summary is: **the stable tier is
-declared and frozen, and it will not promise `1.0.0` compatibility until `1.0.0` exists.**
+Xyberos is at `0.0.0`, the placeholder for a release that has not been cut: this line publishes as
+`2.0.0`, and the leading digit records lineage rather than maturity
+([ADR 0017](./adr/0017-release-identity-and-lineage.md)). The honest summary is: **the stable tier is
+declared and frozen, and it will not promise stable-major compatibility until `2.0.0` exists.**
 
 ## The three tiers
 
-| Tier | What it means | How it is marked | Can it change before `1.0.0`? |
+| Tier | What it means | How it is marked | Can it change in `2.x`? |
 | --- | --- | --- | --- |
-| **Stable** | The contract this project intends to keep. Changing it requires an ADR, a changelog entry, and a deprecation where one is possible | Nothing extra — a name in the documented import path and in `__all__` is stable | Yes, in a `0.x` minor release, with upgrade notes |
-| **Preview** | Shipped, documented, and tested, but the shape may still move as real use reveals the right one | The guide says "preview API" in its status line | Yes, in any `0.x` release |
+| **Stable** | The contract this project intends to keep. Changing it requires an ADR, a changelog entry, and a deprecation where one is possible | Nothing extra — a name in the documented import path and in `__all__` is stable | Only in a major release from `2.0.0`; until `2.0.0` exists, in a minor release with upgrade notes |
+| **Preview** | Shipped, documented, and tested, but the shape may still move as real use reveals the right one | The guide says "preview API" in its status line | Yes, in a minor release, with upgrade notes |
 | **Experimental** | Explicitly narrow, with stated non-guarantees that are part of the contract | `ExperimentalWarning` at the entry point, plus a limits section in the guide | Yes, at any time; the non-guarantees are the contract |
 
 The tiers are about *promises*, not about quality. Every tier is tested; the difference is what
@@ -65,20 +67,26 @@ implementing the documented class attributes and `register`; and the error types
 
 ## Versioning rules
 
-The package uses PEP 440 spelling for SemVer concepts, starting at `0.0.0`.
+The package uses PEP 440 spelling for SemVer concepts. The version base for this line is `2.x` and its
+first release is `2.0.0`; **the leading digit records lineage, not maturity**, because the `xyberos`
+name is held on the package index by the already-published 1.x line, which installs the same import
+root and cannot be co-installed ([ADR 0017](./adr/0017-release-identity-and-lineage.md)). Maturity is
+stated by the `Development Status` classifier and by the tier table above.
 
-- **`0.x` releases are preview releases.** A breaking change may happen in a minor release
-  (`0.4` → `0.5`) with upgrade notes. A patch release fixes defects and does not break a documented
-  stable name.
-- **`1.0.0` is reserved** for the release that first promises the stable tier. From then on, a
-  breaking change to a stable name requires a major release.
+- **`2.0.0` is the release that first promises the stable tier.** Until it exists, that tier is
+  declared intent plus tested pinning, and a minor release may break a stable name with upgrade notes.
+  From `2.0.0`, a breaking change to a stable name requires a major release.
+- **A minor release may break a preview name** with upgrade notes. A patch release fixes defects and
+  breaks no documented name.
+- **`1.0.0` is not one of this line's versions.** It belongs to the previously published line, which
+  stays installable and is not compatible with this one.
 - **Versioned independently of the package:** the plugin API (`PLUGIN_API_VERSION`), the
   configuration schema (`schema_version`), Workflow definition versions (the `version` you declare),
   and the durable journal schema (`JOURNAL_SCHEMA_VERSION`). Each is a number you will see in an
   error message rather than in the package version.
 - **Python support** is `3.10` through `3.13`, tested in CI. Adding a newer Python is a minor
-  release; dropping the oldest is a breaking change and is done as a `0.x` minor with upgrade notes
-  (or a major release after `1.0.0`).
+  release; dropping the oldest is a breaking change, done as a minor release with upgrade notes until
+  `2.0.0` exists and as a major release from `2.0.0`.
 - **Third-party ranges are floored, and capped below a major where the dependency is not yet at one.**
   `starlette>=0.40` has no ceiling because Starlette's surface is stable; `sqlalchemy>=2.0,<2.1` and
   `httpx>=0.27,<1` do, because the next major is where a breaking change lands. A cap is not a

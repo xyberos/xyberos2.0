@@ -19,6 +19,13 @@ execution.
 > (`xyberos[ollama]`). The intent of this decision — that using the runtime never requires an AI SDK
 > or a model service — is unchanged; [ADR 0010](./0010-ai-facade-contract.md) records the shape.
 
+> **Later decision (release preparation).** The versioning clause above is superseded: the `xyberos`
+> name is held on the package index by the already-published 1.x line, which installs the same import
+> root, so this line publishes as `2.0.0` and `1.0.0` is not one of its versions. The decision in
+> [ADR 0017](./0017-release-identity-and-lineage.md) replaces it. Everything else in this ADR — AI and
+> durable execution are optional installations, and durability is experimental and never represented as
+> exactly-once, multi-host, or highly available — is unchanged and remains in force.
+
 ## Consequences
 
 - Public contracts require explicit compatibility/versioning decisions before `1.0.0`. *Satisfied in

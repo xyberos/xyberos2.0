@@ -42,6 +42,14 @@ the first release that promises the stable tier. Four things are versioned indep
 package and are surfaced in error messages rather than in the version number: the plugin API, the
 configuration schema, Workflow definition versions, and the journal schema.
 
+> **Later decision (release preparation).** The rules above stand; the numbers they hang on changed.
+> This line publishes as `2.0.0` and its version base is `2.x`, because the `xyberos` name is held on
+> the package index by the already-published 1.x line.
+> [ADR 0017](./0017-release-identity-and-lineage.md) records why, and `2.0.0` takes over the role this
+> ADR gives to `1.0.0` below. The distinction drawn here — that the leading digit is a promise about
+> compatibility while the tier table is a promise about change — is unchanged, except that the leading
+> digit now encodes lineage rather than maturity.
+
 **Deprecation is a process with mechanics, not an improvisation.** A deprecated path warns, names its
 replacement, and states the release that will remove it; it keeps working for at least one minor
 release after the announcement. `xyberos.deprecation` provides `warn_deprecated` and a `deprecated`

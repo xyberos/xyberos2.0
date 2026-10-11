@@ -1,12 +1,18 @@
 # Changelog
 
 All notable changes to this project are documented in this file. The format follows
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the versioning rules — including what
-`0.x` and `1.0.0` mean here — are in [the stability guide](docs/stability.md).
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the versioning rules — including what the
+leading digit means here — are in [the stability guide](docs/stability.md).
 
-There has been no release yet. The package version is `0.0.0`, which is a placeholder rather than a
-release: the first release will be **`0.1.0`**, and the section below becomes its changelog entry at
-the tag. See [the release guide](docs/release.md) for what that involves.
+There has been no release of this line yet. The package version is `0.0.0`, which is a placeholder
+rather than a release: the first release will be **`2.0.0`**, and the section below becomes its
+changelog entry at the tag. See [the release guide](docs/release.md) for what that involves.
+
+`2.0.0` is not an upgrade of the published `1.x` line: it is a different codebase under the same name,
+which is why the number is a major one ([ADR 0017](docs/adr/0017-release-identity-and-lineage.md)). A
+project that depends on the 1.x API should pin `xyberos<2`; the two lines install the same import root
+and cannot share an environment. The 1.x releases stay published and unedited, and this file describes
+only this line.
 
 ## [Unreleased]
 
@@ -69,6 +75,11 @@ the tag. See [the release guide](docs/release.md) for what that involves.
 
 ### Changed
 
+- The release identity is decided: this line publishes as `xyberos` `2.0.0`, because the `xyberos` name
+  is held on the package index by the published 1.x line, which is a different codebase and installs
+  the same import root ([ADR 0017](docs/adr/0017-release-identity-and-lineage.md)). The leading digit
+  now records lineage, and the maturity claim moves to the `Development Status` classifier (now
+  `4 - Beta`) and to the tiers in [the stability guide](docs/stability.md).
 - The stable public surface is now declared and frozen per module, and `docs/stability.md` states
   which tier each surface is in ([ADR 0013](docs/adr/0013-stable-surface-and-versioning.md)).
 - `xyberos.http` no longer advertises its handler-compilation internals, and `xyberos.plugins` no

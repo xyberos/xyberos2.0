@@ -3,8 +3,10 @@
 > Status: Phase 7. Nothing has been released yet. This page is the procedure for the first release
 > and for every one after it, plus the audit results it rests on.
 
-The project is at `0.0.0`, which is a placeholder: the first release will be **`0.1.0`**, and the
-versioning rules that make that the right number are in [the stability guide](./stability.md).
+The project is at `0.0.0`, which is a placeholder: the first release of this line will be
+**`2.0.0`**, because the `xyberos` name is held on the package index by the already-published 1.x line.
+The versioning rules that make that the right number are in [the stability guide](./stability.md), and
+the decision itself is [ADR 0017](./adr/0017-release-identity-and-lineage.md).
 
 ## What a release is, here
 
@@ -16,11 +18,15 @@ at all rather than published with a caveat.
 ## Before the tag
 
 1. **Move the changelog.** `CHANGELOG.md` has an `Unreleased` section. Rename it to the version and
-   date, and open a new empty `Unreleased` section above it.
-2. **Bump the version in both places.** There are exactly two, and both are checked by tests:
-   `version` in [pyproject.toml](../pyproject.toml), and `__version__` in
-   [src/xyberos/\_\_init\_\_.py](../src/xyberos/__init__.py). `tests/test_compatibility.py` pins the
-   second one, so bumping only one of them fails the suite rather than shipping a lie.
+   date (`2.0.0` for the first release of this line), and open a new empty `Unreleased` section above
+   it. The entry's first line states that `2.0.0` is not compatible with the published 1.x line, so a
+   reader learns that before they read the features.
+2. **Bump the version in all six places.** Two carry it — `version` in
+   [pyproject.toml](../pyproject.toml) and `__version__` in
+   [src/xyberos/\_\_init\_\_.py](../src/xyberos/__init__.py) — and four tests pin the placeholder
+   literally: `tests/test_package.py`, `tests/test_public_api.py`, `tests/test_compatibility.py`, and
+   `tests/cli/test_cli.py`. The four pins are deliberate: they make the bump a reviewed diff instead
+   of a silent string change, and they fail loudly when one of the first two is missed.
 3. **Run the full gate.** From a clean environment:
 
    ```powershell
@@ -58,7 +64,13 @@ at all rather than published with a caveat.
    optional-dependency story is true for an artefact, not only for a checkout. CI runs the same
    sequence in the `installed-artefact` job.
 
-6. **Confirm the gate.** Every row of the release decision gate in
+6. **Update what publication makes false.** Three places say the framework is not published: the
+   prerequisites note in [the tutorial](./tutorial.md), the install section in
+   [getting started](./getting-started.md), and the comment above the generated project's dependency
+   in [src/xyberos/cli/scaffold.py](../src/xyberos/cli/scaffold.py). Replace the checkout instructions
+   with the published command, then run the gate below, because the tutorial's output blocks and
+   `tests/integration/test_tutorial.py` are what keep that page honest.
+7. **Confirm the gate.** Every row of the release decision gate in
    [implementation.md](./implementation.md) has evidence, and the open owner decisions listed under
    "Remaining owner decisions" are either decided or explicitly deferred with a trigger.
 
@@ -116,7 +128,25 @@ above.
 3. Verify the published artefact by installing *it* rather than the checkout, in a clean environment,
    one last time.
 4. If a package index is used, confirm from a clean environment that resolution picks the release
-   rather than a newer pre-release.
+   rather than a newer pre-release, and not an older release of a previous line: `pip install xyberos`
+   must resolve to this version, not to `1.0.3`. This is the check a name collision breaks silently,
+   and it is why the version has to outrank the line that already holds the name.
+
+## Releasing beside the published 1.x line
+
+`xyberos` is already published at `1.0.3` by this project, and it is a different codebase
+([ADR 0017](./adr/0017-release-identity-and-lineage.md)). Publishing `2.0.0` changes nothing about it:
+the old release is neither edited nor yanked, and an environment that pins it keeps working.
+
+- **What a 1.x user sees.** Their next unconstrained upgrade moves them to a rewrite. The changelog
+  entry says so in its first line, and the README says it where they arrive.
+- **What to tell them.** A project that depends on the 1.x API should pin `xyberos<2`; a project that
+  wants this line installs `xyberos>=2` into a clean environment rather than upgrading in place.
+- **What cannot be fixed.** The two lines install the same import root (`xyberos`) and define
+  `xyberos.runtime` and `xyberos.plugins` differently, so one environment holds one or the other. No
+  packaging trick changes that; a project that needs both runs two environments.
+- **What the index does with the name.** The project page, its description, and its classifiers become
+  this line's. That is intended: one name, one current line, with the previous one still installable.
 
 ## Rollback and withdrawal
 

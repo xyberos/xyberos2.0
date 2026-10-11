@@ -30,7 +30,7 @@ backlog. Annotate anything newly satisfied, and give an owner to anything that h
 | --- | --- | --- |
 | [0001](0001-runtime-boundaries.md) | Keep the runtime small and capability-oriented | accepted |
 | [0002](0002-configuration-and-database-stack.md) | TOML configuration and a SQLAlchemy-based SQLite provider | accepted |
-| [0003](0003-versions-and-experimental-scope.md) | Begin at 0.0.0 and isolate experimental scope | accepted |
+| [0003](0003-versions-and-experimental-scope.md) | Begin at 0.0.0 and isolate experimental scope | superseded by 0017 for the version base; experimental scope stands |
 | [0004](0004-initial-ai-provider.md) | Use Ollama as the first AI provider | accepted |
 | [0005](0005-phase-1-runtime-contract.md) | Freeze the Phase 1 runtime contract | accepted |
 | [0006](0006-http-and-database-adapters.md) | Keep the HTTP and database layers behind adapters | accepted |
@@ -40,7 +40,8 @@ backlog. Annotate anything newly satisfied, and give an owner to anything that h
 | [0010](0010-ai-facade-contract.md) | Freeze the AI facade contract | accepted |
 | [0011](0011-durable-executor-contract.md) | Freeze the durable executor contract | accepted |
 | [0012](0012-project-licence.md) | License the project under Apache-2.0 | accepted |
-| [0013](0013-stable-surface-and-versioning.md) | Freeze the stable surface and its versioning rules | accepted |
+| [0013](0013-stable-surface-and-versioning.md) | Freeze the stable surface and its versioning rules | accepted; numbering re-based by 0017 |
 | [0014](0014-no-identity-or-authorization-model.md) | No identity, tenancy, or authorization model | accepted |
 | [0015](0015-durability-is-single-host.md) | Durability is single-host; the worker role is the integration point | accepted |
 | [0016](0016-database-providers-are-an-extension-point.md) | Database providers are an extension point, not a core feature | accepted |
+| [0017](0017-release-identity-and-lineage.md) | Publish this line as `xyberos` 2.0.0 | accepted |

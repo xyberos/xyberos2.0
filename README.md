@@ -4,14 +4,17 @@ Xyberos is an experimental, composable Python application runtime. Its planned s
 surface is application composition, typed dependencies, Starlette-backed HTTP, SQLite,
 and explicit in-process Workflow execution. Durable execution and AI adapters are optional.
 
-The project is currently at version `0.0.0`. Phases 0–7 are complete: the architecture baseline, the
-application runtime, the Starlette HTTP adapter with the SQLite database provider, the trusted
-plugin/capability model, the in-process workflow engine, the provider-neutral AI facade with Ollama
-as the first adapter, the experimental durable executor, and the release engineering. The public
-surface and its versioning rules are frozen in
+The project is currently at version `0.0.0`, the placeholder for a release that has not been cut.
+Phases 0–8 are complete: the architecture baseline, the application runtime, the Starlette HTTP
+adapter with the SQLite database provider, the trusted plugin/capability model, the in-process
+workflow engine, the provider-neutral AI facade with Ollama as the first adapter, the experimental
+durable executor, the release engineering, and the boundary decisions that state who the framework is
+for. The public surface and its versioning rules are frozen in
 [the stability guide](docs/stability.md) and [ADR 0013](docs/adr/0013-stable-surface-and-versioning.md).
-Nothing is released: the first release will be `0.1.0`, and
-[the release guide](docs/release.md) is the procedure. Breaking changes are expected before `1.0.0`.
+This line publishes as **`2.0.0`** ([ADR 0017](docs/adr/0017-release-identity-and-lineage.md)): the
+`xyberos` name is held on the package index by the published 1.x line, which is a different codebase
+and cannot be installed alongside this one. Nothing is released yet, and
+[the release guide](docs/release.md) is the procedure.
 **Durable execution is experimental** and is never represented as exactly-once, multi-host, or highly
 available.
 
@@ -248,17 +251,23 @@ See [the architecture plan](docs/PLAN.md), [the phase-by-phase implementation pl
 
 ## Status and compatibility
 
-`0.x` releases are preview releases. The first release intended to provide the stable
-runtime and Workflow guarantees described in the implementation plan will be `1.0.0`.
+This line publishes as `2.0.0`, the release that first promises the stable runtime and Workflow
+surfaces described in the implementation plan. The leading digit records lineage rather than maturity,
+because the `xyberos` name is already held on the package index by the published 1.x line
+([ADR 0017](docs/adr/0017-release-identity-and-lineage.md)).
 
 [The stability guide](docs/stability.md) lists which surface is stable, preview, or experimental, and
 how each one changes; [ADR 0013](docs/adr/0013-stable-surface-and-versioning.md) records the rules
-behind it. A `0.x` minor release may break a stable name with upgrade notes; a patch release does not.
+behind it. Until `2.0.0` exists, a minor release may break a stable name with upgrade notes; from
+`2.0.0` that needs a major release, and a minor release may break only a preview name. A patch release
+breaks no documented name.
 
 The project is licensed under the [Apache License 2.0](LICENSE), including its express patent
 grant. See [ADR 0012](docs/adr/0012-project-licence.md) for why that licence was chosen, and
 `CONTRIBUTING.md` for the contributor terms that are still open.
 
-Nothing is released yet: the version is a `0.0.0` placeholder, the first release will be `0.1.0`, and
-[the release guide](docs/release.md) is the procedure. Security reports go through
+Nothing is released yet: the version is a `0.0.0` placeholder, the first release of this line will be
+`2.0.0`, and [the release guide](docs/release.md) is the procedure. A project on the published 1.x line
+should pin `xyberos<2`: that line stays installable, but it is a different codebase, the two cannot
+share an environment, and upgrading changes the API. Security reports go through
 [SECURITY.md](SECURITY.md), and changes are recorded in [the changelog](CHANGELOG.md).

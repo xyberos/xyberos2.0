@@ -684,6 +684,16 @@ Testing should be built into each phase, not postponed until the end.
 | Durability           | Crash recovery, duplicate work, lease expiry, interrupted steps      |
 | Packaging            | Clean installation, optional dependencies, supported Python versions |
 
+### Published identity
+
+This line publishes as **`xyberos` 2.0.0**. The `xyberos` name is already held on the package index by
+the published 1.x line, which installs the same import root and cannot be co-installed, so `0.1.0`
+would be unreachable through a plain install and would read as a regression. The leading digit records
+lineage, not maturity — the `3.0` used as a working name for this rewrite is not a published version
+number — and the maturity claim is carried by the `Development Status` classifier and by the tiers in
+[`stability.md`](./stability.md). The decision and its cost are in
+[ADR 0017](adr/0017-release-identity-and-lineage.md).
+
 ### Required release gates
 
 Stable runtime gate

@@ -57,8 +57,9 @@ belongs to the project owner to revisit before outside contributions arrive in v
   retroactively cover contributions already made, so the window in which the license is cheap to
   change closes with the first outside contribution. This is the one consequence with a deadline
   attached.
-- Contributions carry no warranty and no support obligation, which matches the project's
-  pre-`1.0.0` preview status rather than contradicting it.
+- Contributions carry no warranty and no support obligation, which matches the project's preview
+  status — unreleased, on a `2.x` version base
+  ([ADR 0017](./0017-release-identity-and-lineage.md)) — rather than contradicting it.
 - AI-generated and third-party code contributed to the project inherits the same terms; the project
   makes no claim to provenance it cannot verify, and the review convention in `CONTRIBUTING.md` is
   what keeps that honest.

@@ -6,8 +6,9 @@
 > way they are, what was rejected, what the evidence is, and where to push back. If this page ever
 > disagrees with an ADR or a guide, they win — and that is a defect in this page worth reporting.
 
-Written at the Phase 7 close, for a reviewer who has not read anything else. Version `0.0.0`;
-nothing is released yet.
+Written at the Phase 8 close, for a reviewer who has not read anything else. Version `0.0.0`, the
+placeholder for a release that has not been cut; this line publishes as `2.0.0`
+([ADR 0017](adr/0017-release-identity-and-lineage.md)).
 
 ## 1. What it is, and what it refuses to be
 
@@ -257,7 +258,7 @@ testable, and the tests carry security and compatibility weight.
 | --- | --- | --- |
 | [0001](adr/0001-runtime-boundaries.md) | Keep the runtime small and capability-oriented | the boundary that defines what core may do |
 | [0002](adr/0002-configuration-and-database-stack.md) | TOML + SQLAlchemy-based SQLite | the choice of stdlib `tomllib` and one database stack |
-| [0003](adr/0003-versions-and-experimental-scope.md) | Start at `0.0.0`; isolate experimental scope | why durability warns and why `1.0.0` is a promise |
+| [0003](adr/0003-versions-and-experimental-scope.md) | Start at `0.0.0`; isolate experimental scope | why durability warns; its version base is superseded by 0017 |
 | [0004](adr/0004-initial-ai-provider.md) | Ollama as the first provider | why an HTTP-speaking local provider, and the version floor |
 | [0005](adr/0005-phase-1-runtime-contract.md) | Freeze the Phase 1 runtime contract | the injection and lifecycle guarantees |
 | [0006](adr/0006-http-and-database-adapters.md) | HTTP and database behind adapters | why Starlette owns ASGI mechanics |
@@ -267,10 +268,11 @@ testable, and the tests carry security and compatibility weight.
 | [0010](adr/0010-ai-facade-contract.md) | Freeze the AI facade contract | declared capabilities, closed schema subset, allowlist |
 | [0011](adr/0011-durable-executor-contract.md) | Freeze the durable contract | per-step recovery, fencing, `outcome_unknown` |
 | [0012](adr/0012-project-licence.md) | Apache-2.0 | the patent grant, and the relicensing option that expires with the first outside contribution |
-| [0013](adr/0013-stable-surface-and-versioning.md) | Freeze the surface and the versioning rules | what "stable" means before `1.0.0` |
+| [0013](adr/0013-stable-surface-and-versioning.md) | Freeze the surface and the versioning rules | what "stable" means, and what happens when a name has to leave it |
 | [0014](adr/0014-no-identity-or-authorization-model.md) | No identity, tenancy, or authorization model | why a framework must not pick an authorization model, and the shape to build instead |
 | [0015](adr/0015-durability-is-single-host.md) | Durability is single-host | why multi-host is a different product, and how a queue plus the journal covers the middle ground |
 | [0016](adr/0016-database-providers-are-an-extension-point.md) | Database providers are an extension point | why one provider ships, and what a conformance suite makes that mean |
+| [0017](adr/0017-release-identity-and-lineage.md) | Publish this line as `xyberos` 2.0.0 | why the number is a major one, and why maturity is the classifier's job rather than the version's |
 
 ## 8. Trade-offs accepted, and what was rejected
 
@@ -318,7 +320,11 @@ These are stated so a reviewer does not have to discover them:
   "what is not protected here".
 - **No performance claim beyond the baselines.** [performance.md](performance.md) records numbers from
   one machine for comparison against themselves. Nothing has been optimized.
-- **The framework is pre-`1.0.0`.** A `0.x` minor release may break a stable name with upgrade notes.
+- **The framework is pre-release, on a `2.x` version base.** Until `2.0.0` exists, a minor release may
+  break a stable name with upgrade notes; from `2.0.0` that requires a major release, and a minor
+  release may break only a preview name. The leading digit records lineage rather than maturity
+  ([ADR 0017](adr/0017-release-identity-and-lineage.md)); the tiers and the `4 - Beta` classifier carry
+  the maturity claim.
 
 ## 10. Where to push back
 
