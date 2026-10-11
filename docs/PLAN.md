@@ -10,6 +10,8 @@ structure, roadmap, and risk analysis. It is not the task tracker.
 | `PLAN.md` (this file) | Architecture baseline, subsystem contracts, roadmap rationale, risks, definition of done |
 | [`implementation.md`](./implementation.md) | Authoritative phase-by-phase work packages, exit gates, status, and cross-phase controls |
 | [`runtime.md`](./runtime.md) | The implemented Phase 1 public runtime surface |
+| [`tutorial.md`](./tutorial.md) | The step-by-step tutorial, whose every output block is checked by a test |
+| [`architecture.md`](./architecture.md) | The reviewer's entry point: shape, mechanisms, trade-offs, gaps |
 | [`stability.md`](./stability.md) | The frozen public surface: what is promised, in which tier, and how it changes |
 | [`release.md`](./release.md) | The release procedure, the artefact checks, and the dependency audit |
 | [`adr/`](./adr/) | Immutable decisions that affect public behavior |
@@ -508,6 +510,7 @@ src/xyberos/
 
 examples/
 ├── hello_app/           # the smallest complete application, walked through in getting-started
+├── tutorial/            # the tutorial's runnable chapters, one module each
 ├── sqlite_crud/         # worked CRUD slice with Alembic migrations
 ├── custom_plugin/       # plugin authoring example
 ├── workflow/            # workflow example with retries, branching, and events
@@ -548,6 +551,8 @@ xyberos3/
 │   ├── PLAN.md              # architecture baseline (this file)
 │   ├── implementation.md    # phase plan and status
 │   ├── getting-started.md   # from an empty directory to a running application
+│   ├── tutorial.md          # the step-by-step tutorial, checked output and all
+│   ├── architecture.md      # the reviewer's guide to the design
 │   ├── stability.md         # what is promised, and how it changes
 │   ├── runtime.md           # implemented runtime surface
 │   ├── http.md              # HTTP adapter guide
@@ -625,6 +630,7 @@ xyberos3/
     ├── crash_recovery/   # implemented (Phase 6, process-kill harness)
     ├── cli/              # implemented (Phase 7)
     ├── perf/             # implemented (Phase 7, resource baselines)
+    ├── tutorial/         # implemented (Phase 7, the tutorial's chapter tests)
     ├── fixtures/         # implemented (separately packaged plugin)
     ├── contracts/        # implemented (executable API examples)
     ├── integration/      # implemented

@@ -200,3 +200,7 @@ this layout, filled in.
   [command-line guide](./cli.md)).
 - Set `environment = "production"` and `debug = false` in your deployment configuration, and read
   the [security guide](./security.md) before you expose the application to a network.
+
+If you would rather be walked through all of this one step at a time, read the
+[tutorial](./tutorial.md) instead. If you are reviewing the design rather than using it, read the
+[architecture review](./architecture.md).
