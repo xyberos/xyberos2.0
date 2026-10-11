@@ -96,6 +96,21 @@ class Rig:
             clock=self.clock,
         )
 
+    async def await_event(self, execution_id: str, kind: str, *, ticks: int = 200) -> list[Any]:
+        """Yield until the journal records ``kind``, and return the events.
+
+        Some events are written by a task behind the step, and how many loop turns the write needs
+        is not something a test can assert: two yields are enough on one interpreter and not on the
+        next. This waits for the record itself, and fails loudly rather than reporting a surprising
+        event list when it never arrives.
+        """
+        for _ in range(ticks):
+            events = (await self.store.inspect(execution_id)).events
+            if kind in [event.kind.value for event in events]:
+                return events
+            await asyncio.sleep(0)
+        raise AssertionError(f"the journal never recorded {kind} for {execution_id}")
+
 
 def test_an_idle_worker_reports_no_work(tmp_path: Path) -> None:
     async def scenario() -> None:
@@ -354,9 +369,7 @@ def test_a_heartbeat_keeps_a_long_step_owned(tmp_path: Path) -> None:
 
             # The heartbeat fires well before the lease would expire, and renews it.
             rig.clock.advance(10.0)
-            await asyncio.sleep(0)
-            await asyncio.sleep(0)
-            events = (await rig.store.inspect(handle.execution_id)).events
+            events = await rig.await_event(handle.execution_id, "lease_renewed")
             assert "lease_renewed" in [event.kind.value for event in events]
             assert await rig.store.claim_next("worker-b") is None
 
