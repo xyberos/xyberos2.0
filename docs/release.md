@@ -133,11 +133,10 @@ The upload itself, and the checks that only make sense once a release is on the 
 
 ## Deploying to PyPI
 
-> Status: planned, never performed. The source changes, the repository, and the publishing workflow are
-> in place; what remains before the first upload is a trusted publisher registered on the index, which
-> only a project owner can do. Nothing here reopens the number:
-> [ADR 0017](./adr/0017-release-identity-and-lineage.md) decides that, and this section exists so the
-> decision survives contact with the index.
+> Status: planned, never performed. The source changes, the repository, the workflow, and the trusted
+> publisher are in place; what remains is the version bump, the tag, and the decision to start the run.
+> Nothing here reopens the number: [ADR 0017](./adr/0017-release-identity-and-lineage.md) decides that,
+> and this section exists so the decision survives contact with the index.
 
 ### Preconditions
 
@@ -148,9 +147,9 @@ an existing one, which is why these four things come first.
 
 | # | Precondition | Why it blocks | How to confirm |
 | --- | --- | --- | --- |
-| 1 | An owner of the PyPI project `xyberos` registers the trusted publisher below | Only a project owner can add one, and without it the publish job fails on authentication with nothing to fall back on: there is no second name, and no token is kept | Sign in to PyPI, open the project's *Publishing* settings, and add the publisher with the exact values in [The publishing workflow](#the-publishing-workflow) |
+| 1 | The trusted publisher on the PyPI project — **registered: owner `xyberos`, repository `xyberos2.0`, workflow `publish.yml`, environment left empty** | Only a project owner can add one or correct it, and a single field that disagrees with the workflow fails as an authentication error with nothing to fall back on: there is no second name, and no token is kept | Compare the registration against the table in [The publishing workflow](#the-publishing-workflow), including the empty environment |
 | 2 | The repository this line publishes from — **`https://github.com/xyberos/xyberos2.0`**, default branch `master` | The declared project URLs, the README's links, and a trusted publisher all bind to it, so the URL and the branch name have to be settled before the metadata is written | `git rev-parse master origin/master` matches, and every declared URL resolves — see [Preparing the repository](#preparing-the-repository) |
-| 3 | The publication path — **decided: trusted publishing from `.github/workflows/publish.yml`**, started by hand | The workflow authenticates with an OIDC identity and keeps no secret, so the index-side publisher has to exist before the first attempt rather than during it | See [The publishing workflow](#the-publishing-workflow) |
+| 3 | The publication path — **trusted publishing from `.github/workflows/publish.yml`**, started by hand, with PyPI as its only destination | The run authenticates with an OIDC identity and keeps no secret, and it uploads straight to the index, so the publisher has to be correct before the first attempt rather than during it | See [The publishing workflow](#the-publishing-workflow) |
 | 4 | The `Documentation` URL — **decided for now: the repository's own `docs/` directory** | `https://docs.xyberos.com` documents the 1.x line, so pointing this line's page at it would advertise the wrong codebase | The declared value in `[project.urls]`; it moves when the documentation site carries content for this line |
 
 ### Preparing the repository
@@ -211,49 +210,43 @@ is no token to rotate and none to leak. A project-scoped API token would work to
 index-side configuration, but it buys nothing this pipeline needs in exchange for a long-lived secret
 to protect.
 
-The workflow is started by hand and takes two inputs: the version that is already tagged `v<version>`,
-and the index. It checks out the tag, refuses to continue unless the request, the source, and the
-changelog all name the same version, verifies the metadata with `twine check --strict`, installs the
-built wheel and asks it its version, and only then uploads — with a signed provenance attestation for
-each file, which the publisher produces by default under trusted publishing. It does not repeat the
-test suite, because `ci.yml` already runs it on every push to the default branch; the gate this
-workflow adds is that the artefact agrees with what it claims to be.
+The workflow is started by hand and takes one input: the version that is already tagged `v<version>`.
+It checks out the tag, refuses to continue unless the request, the source, and the changelog all name
+the same version, verifies the metadata with `twine check --strict`, installs the built wheel and asks
+it its version, and only then uploads to PyPI — with a signed provenance attestation for each file,
+which the publisher produces by default under trusted publishing. It does not repeat the test suite,
+because `ci.yml` already runs it on every push to the default branch; the gate this workflow adds is
+that the artefact agrees with what it claims to be.
 
-**The publisher registered on the index has to match this file exactly.** A mismatch is the failure
-that looks like a broken login rather than a configuration error:
+**The publisher registered on PyPI has to match this file exactly.** A mismatch is the failure that
+looks like a broken login rather than a configuration error, and the field most likely to cause one is
+the last, which PyPI marks optional:
 
-| Field | PyPI | TestPyPI |
-| --- | --- | --- |
-| Project name | `xyberos` | `xyberos` |
-| Owner | `xyberos` | `xyberos` |
-| Repository | `xyberos2.0` | `xyberos2.0` |
-| Workflow | `publish.yml` | `publish.yml` |
-| Environment | `pypi` | `testpypi` |
+| Field | Value |
+| --- | --- |
+| PyPI project name | `xyberos` |
+| Owner | `xyberos` |
+| Repository | `xyberos2.0` |
+| Workflow | `publish.yml` |
+| Environment name | **left empty** |
 
-PyPI already has the project, so the publisher is added to it. TestPyPI does not, so it takes a
-*pending* publisher — the same form, which creates the project on the first successful upload.
+The environment is empty because the publish job declares none: a job that declares one puts an
+`environment` claim into the OIDC token, and PyPI then has to find that claim in its record. The trade
+is deliberate — an environment is also where a required reviewer would live, so the only thing between
+this workflow and a release is the person who starts it, which is the same gate the rest of this guide
+describes in words instead of in configuration.
 
-Two settings outside the repository are what make "publishing is a decision" something the pipeline
-enforces rather than something everyone has to remember:
-
-- **Required reviewers on the `pypi` environment.** The run pauses for a person, which is the release
-  gate expressed in the pipeline instead of in a document.
-- **`id-token: write` on the publishing job alone.** The build job holds `contents: read` and no token
-  permission, so a compromised build step cannot mint an upload identity for itself.
+The job that publishes holds `id-token: write` and the job that builds holds `contents: read`, so a
+compromised build step cannot mint an upload identity for itself.
 
 ### The first upload
 
-1. **Rehearse on TestPyPI.** Start `Publish` with `version` set to the version and `index` set to
-   `testpypi`. `xyberos` is unclaimed there, so it is free to use, and the run covers the mechanics end
-   to end: build from the tag, the consistency checks, `twine check`, the wheel install, the upload, and
-   the attestation.
-
-   It does not cover the thing that matters most here: TestPyPI has no `1.0.3`, so it cannot show that
-   `2.0.0` outranks the published line. Only the real index can answer that.
-2. **Publish.** Start the workflow again with `index` set to `pypi`; this is the run the environment's
-   reviewer approves. The build job uploads the sdist and the wheel together, so no index state can
-   resolve a version for which only half an artefact exists.
-3. **Check resolution, not just installation.** From an empty environment:
+1. **Publish.** Start `Publish` with `version` set to the version being released. This is the upload,
+   and the only one this line makes, so the run is the last chance to stop: the checks inside it are the
+   subject of the section above, and everything before it in this guide happens on a checkout. The build
+   job uploads the sdist and the wheel together, so no index state can resolve a version for which only
+   half an artefact exists.
+2. **Check resolution, not just installation.** From an empty environment:
 
    ```powershell
    python -m pip index versions xyberos
@@ -263,11 +256,19 @@ enforces rather than something everyone has to remember:
    `2.0.0` must be the newest version listed and the install must land on it rather than on `1.0.3`.
    An unconstrained install is the only check that distinguishes "published" from "reachable", and it
    is the check a name collision breaks silently.
-4. **Re-run the clean-install smoke test against the index** rather than against a local wheel, with
+3. **Re-run the clean-install smoke test against the index** rather than against a local wheel, with
    the same expectation: `xyberos --version` reports `2.0.0`, and installing the extras resolves the
    optional dependencies from the published metadata.
-5. **Record the resolution check in the release notes** as the evidence that the collision resolved
+4. **Record the resolution check in the release notes** as the evidence that the collision resolved
    the intended way, and attach the SBOM alongside the artefacts.
+
+There is no rehearsal index in that path. A rehearsal could only show the mechanics, since the one
+question that matters — whether `2.0.0` outranks the published line — is a question about PyPI and can
+be asked nowhere else. What stands in for it is the run's own preface: the tag is the only source, the
+version is checked against the source and the changelog before anything is built, the metadata is
+checked with `twine check --strict`, and the built wheel is installed and asked its version. If
+something is still wrong, the release is withdrawn rather than corrected in place — see
+[Rollback and withdrawal](#rollback-and-withdrawal).
 
 ## Releasing beside the published 1.x line
 

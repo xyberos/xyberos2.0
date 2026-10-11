@@ -1,18 +1,18 @@
 name: Publish
 
 # Publishing is a decision, not a consequence of a push. This workflow runs only when a person starts
-# it by hand, so a tag still starts a build and never an upload: the release gate in docs/release.md
-# is signed off first, and the environment it targets is expected to require a reviewer, which is what
-# turns that sign-off into something the pipeline enforces rather than something everyone remembers.
+# it by hand, so a tag still starts a build and never an upload: the release gate in docs/release.md is
+# signed off first, and starting this run is what puts that decision into effect.
 #
-# The trusted publisher registered on the index has to match this file exactly. A mismatch is the one
-# failure that looks like an authentication error:
+# The trusted publisher registered on PyPI has to match this file exactly, and the field that is easiest
+# to get wrong is the optional Environment name. This job declares no environment, so that field has to
+# be left empty; a mismatch surfaces as an authentication failure rather than a configuration one.
 #
-#   PyPI project   xyberos        (TestPyPI: xyberos, registered separately as a pending publisher)
+#   PyPI project   xyberos
 #   Owner          xyberos
 #   Repository     xyberos2.0
 #   Workflow       publish.yml
-#   Environment    pypi           (TestPyPI: testpypi)
+#   Environment    (left empty)
 #
 # No API token is used and none is stored: the upload authenticates with the OIDC token of this run.
 
@@ -23,14 +23,6 @@ on:
         description: "The version being published, without a leading v (for example 2.0.0). The tag v<version> must already exist."
         required: true
         type: string
-      index:
-        description: "Where the artefact goes. TestPyPI rehearses the mechanics only: it has no 1.0.3, so it cannot show that this version outranks the published line."
-        required: true
-        default: testpypi
-        type: choice
-        options:
-          - testpypi
-          - pypi
 
 permissions:
   contents: read
@@ -103,12 +95,9 @@ jobs:
           if-no-files-found: error
 
   publish:
-    name: Publish to ${{ inputs.index == 'pypi' && 'PyPI' || 'TestPyPI' }}
+    name: Publish to PyPI
     needs: [build]
     runs-on: ubuntu-latest
-    environment:
-      name: ${{ inputs.index }}
-      url: ${{ inputs.index == 'pypi' && 'https://pypi.org/p/xyberos' || 'https://test.pypi.org/p/xyberos' }}
     permissions:
       # Trusted publishing needs this and nothing else. It is granted to this job rather than to the
       # one that builds, so a compromised build step cannot mint an upload token for itself.
@@ -119,7 +108,6 @@ jobs:
           name: dist-${{ inputs.version }}
           path: dist/
       # The action builds nothing; it uploads what the previous job produced, and signs provenance
-      # attestations for those files with the same OIDC identity it authenticates with.
+      # attestations for those files with the same OIDC identity it authenticates with. With no
+      # repository-url it uploads to PyPI, which is the only index this line publishes to.
       - uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          repository-url: ${{ inputs.index == 'pypi' && 'https://upload.pypi.org/legacy/' || 'https://test.pypi.org/legacy/' }}
