@@ -133,11 +133,10 @@ The upload itself, and the checks that only make sense once a release is on the 
 
 ## Deploying to PyPI
 
-> Status: planned, never performed. The metadata and README changes below are already in the source;
-> what remains before the first upload is the repository replacement, an index credential, and the two
-> open rows in the preconditions table. Nothing here reopens the number:
-> [ADR 0017](./adr/0017-release-identity-and-lineage.md) decides that, and this section exists so the
-> decision survives contact with the index.
+> Status: planned, never performed. The source changes and the repository are in place; what remains
+> before the first upload is an index credential and the one open row in the preconditions table.
+> Nothing here reopens the number: [ADR 0017](./adr/0017-release-identity-and-lineage.md) decides
+> that, and this section exists so the decision survives contact with the index.
 
 ### Preconditions
 
@@ -149,26 +148,35 @@ an existing one, which is why these four things come first.
 | # | Precondition | Why it blocks | How to confirm |
 | --- | --- | --- | --- |
 | 1 | The uploading account owns or maintains the PyPI project `xyberos` | An upload from any other account is refused as "not allowed to upload to this project", and there is no second name to fall back to | Sign in to PyPI and read the project's *Collaborators* and *Publishing* settings; the account behind the credential must be listed |
-| 2 | The repository this line publishes from — **decided: `https://github.com/xyberos/xyberos2.0`** | The declared project URLs, the README's links, and a trusted publisher all bind to it, and it currently holds unrelated commits, so the local line still has to replace them | See [Preparing the repository](#preparing-the-repository) |
+| 2 | The repository this line publishes from — **`https://github.com/xyberos/xyberos2.0`**, default branch `master` | The declared project URLs, the README's links, and a trusted publisher all bind to it, so the URL and the branch name have to be settled before the metadata is written | `git rev-parse master origin/master` matches, and every declared URL resolves — see [Preparing the repository](#preparing-the-repository) |
 | 3 | The upload mechanism and its credential exist | Publishing is manual by design, so the token or the index-side publisher has to be created before the first attempt rather than during it | See [Choosing the upload mechanism](#choosing-the-upload-mechanism) |
 | 4 | The fate of `https://docs.xyberos.com` — **still open** | The 1.x page publishes it as its Documentation link, and it documents the 1.x line; after the upload the project page is this line's while that link still points at the other one | A decision, not a check. Until it is made, the declared `Documentation` URL is the repository's own `docs/` directory |
 
 ### Preparing the repository
 
-The URL the release declares is `https://github.com/xyberos/xyberos2.0`, and it is not empty. It holds
-an unrelated codebase — `README.md`, `ARCHITECTURE.md`, `REVIEW.md`, `TUTORIAL.md`, an `apps/`
-directory, and a `xyberos/` package at the root instead of `src/xyberos` — with five commits of its
-own. The two histories share no ancestor, so this line cannot be pushed onto it as a fast-forward, and
-a merge would produce a tree that is neither project.
+The URL the release declares is `https://github.com/xyberos/xyberos2.0`, and it began empty. The first
+plan was to overwrite the unrelated codebase that held that name; instead it was renamed to
+`https://github.com/xyberos/xyberos3.0`, where it is preserved, and the name was recreated empty. That
+is the better of the two: nothing is destroyed, the redirect from the old name still resolves, and this
+line's history contains only its own commits — which is what a provenance attestation describes.
 
-1. **Archive what is there first, if it is worth keeping.** Clone it, or push its `master` to a branch
-   or tag within the same repository. The next step replaces it, and the index is not a backup.
-2. **Add the remote and replace the content.** `git remote add origin` with the declared URL, then
-   `git push --force origin master`. A force push is the right tool exactly here: the histories are
-   unrelated and there is nothing to preserve by merging.
-3. **Confirm the declared links resolve.** The default branch is `master`, and the `Repository`,
-   `Issues`, and documentation URLs declared below, plus every link in the README, point at it. A URL
-   that 404s is worse than an absent one, because the page still shows the link.
+| | |
+| --- | --- |
+| Repository | `https://github.com/xyberos/xyberos2.0` |
+| Default branch | `master`, which is also the local branch and the one every declared link names |
+| First push | `5ebef0a`, a normal push into an empty repository rather than a force push |
+| Displaced codebase | `https://github.com/xyberos/xyberos3.0`, preserved |
+
+Two properties of that arrangement are load-bearing, and both are easy to undo by accident:
+
+- **The branch name is load-bearing.** The README's links and the `Documentation` URL name `master`
+  explicitly. Renaming the default branch to `main` later breaks all of them at once, and the project
+  page keeps showing the links it can no longer resolve.
+- **An empty repository is not a valid target for the declared URLs.** Until the first push lands, the
+  `Repository`, `Issues`, and `Documentation` links and every link in the README resolve to a
+  repository with no content, which is worse than declaring nothing at all. The push is part of
+  preparing the release rather than an afterthought. All 38 URLs that the metadata and the long
+  description declare were requested after the first push, and all of them resolve.
 
 ### What the upload declares
 

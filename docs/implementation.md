@@ -770,6 +770,6 @@ expires with the first outside contribution, so it cannot be added after the fac
 decide is therefore one event, not a date: **settle it before merging the first pull request from
 anyone other than the copyright holder** ([ADR 0012](adr/0012-project-licence.md)). Also still
 owner-owned: any future promotion of durable execution beyond experimental status, whose criteria are
-`PLAN.md` section 5.4. The first upload adds its own owner decisions — index access, the repository
-URL, and the fate of the documentation site — and they are listed as preconditions in
+`PLAN.md` section 5.4. The first upload adds its own owner decisions — index access and the fate of the
+documentation site — and they are listed as preconditions in
 [the release guide](release.md#preconditions).
