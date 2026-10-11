@@ -185,7 +185,7 @@ state. Phases 0–6 are complete; Phase 7 is in progress.
 | 4 | Stable, in-process Workflow engine | complete | `src/xyberos/execution/`, `tests/workflow/` (107 tests), `tests/integration/test_workflow_example.py`, `tests/contracts/examples/phase4_workflow.py`, `examples/workflow/`, `docs/workflow.md`, [ADR 0009](adr/0009-workflow-engine-contract.md) |
 | 5 | Optional AI facade | complete | `src/xyberos/ai/`, `tests/ai/` (125 tests), `tests/integration/test_ai_assistant.py` (11 tests), `examples/ai_assistant/`, `docs/ai.md`, [ADR 0010](adr/0010-ai-facade-contract.md) |
 | 6 | Experimental single-host durable executor | complete | `src/xyberos/durable/` (10 modules), `tests/durable/` (100 tests), `tests/crash_recovery/` (17 process-kill tests), `tests/integration/test_durable_example.py`, `examples/durable_workflow/`, `docs/durable.md`, [ADR 0011](adr/0011-durable-executor-contract.md) |
-| 7 | Developer experience, hardening, and release | in progress | work package 1 (surface audit and freeze) complete: `src/xyberos/deprecation.py`, `tests/test_public_surface.py`, `tests/test_compatibility.py`, `tests/test_deprecation.py`, `docs/stability.md`, [ADR 0013](adr/0013-stable-surface-and-versioning.md); see the release decision gate below |
+| 7 | Developer experience, hardening, and release | in progress | work package 1 (surface audit and freeze) complete: `src/xyberos/deprecation.py`, `tests/test_public_surface.py`, `tests/test_compatibility.py`, `tests/test_deprecation.py`, `docs/stability.md`, [ADR 0013](adr/0013-stable-surface-and-versioning.md); work packages 2 and 4 partly complete: `docs/getting-started.md`, `docs/testing.md`, `docs/troubleshooting.md`, `docs/security.md`, `examples/hello_app/`, `tests/integration/test_hello_app.py`; see the release decision gate below |
 
 ### Phase 7 entry checklist
 
@@ -288,7 +288,7 @@ exit-criteria tests live in [`tests/runtime/`](../tests/runtime/) and
 provider; tests live in `tests/http/`, `tests/database/`, and `tests/integration/`, with the
 import-boundary check in `tests/test_import_boundary.py`; the example is `examples/sqlite_crud/`;
 guides are [HTTP](http.md) and [database](database.md). The Phase 1 follow-up on a configurable
-shutdown drain landed as `app.shutdown_timeout`.
+shutdown drain landed as `settings.app.shutdown_timeout`.
 
 **Objective:** prove that the runtime supports a conventional production-style web application before adding Workflow or AI complexity.
 
@@ -497,9 +497,9 @@ not represent durability as exactly-once, multi-host, or highly available.
 **Work packages**
 
 1. Audit the public API and freeze the stable surface. Add deprecation mechanics, semantic-versioning rules, supported-version policy, and compatibility tests for public imports, configuration fields, plugin protocol, and serialized Workflow definition metadata. **Done:** `docs/stability.md` states the tiers to users, [ADR 0013](adr/0013-stable-surface-and-versioning.md) records the rules, `src/xyberos/deprecation.py` provides the mechanics, and `tests/test_public_surface.py`, `tests/test_compatibility.py`, and `tests/test_deprecation.py` pin it. The audit's finding was the argument for doing it: five documented modules leaked their imports (`Mapping`, `json`, `sys`) as public surface because they declared no `__all__`.
-2. Complete documentation: getting started, runtime/DI, configuration, lifecycle, HTTP, SQLite, plugins, Workflow, AI, testing, migrations, error troubleshooting, security considerations, and a separate durable-execution limitations/operator guide.
+2. Complete documentation: getting started, runtime/DI, configuration, lifecycle, HTTP, SQLite, plugins, Workflow, AI, testing, migrations, error troubleshooting, security considerations, and a separate durable-execution limitations/operator guide. **Done:** each subsystem already had a guide, and this package added the four cross-cutting ones — [getting started](getting-started.md), [testing](testing.md), [troubleshooting](troubleshooting.md), and [security](security.md). Writing them found two documentation defects in `docs/runtime.md` that had survived five phases: `App.resolve` was documented as synchronous when it is a coroutine, and the settings were named as attributes of `App` when they live on `app.settings.app`. Both are corrected, because a guide that names an API that does not exist is worse than no guide.
 3. Finish minimal CLI commands only where they wrap proven APIs: project scaffold, development server, configuration validation/diagnostics, and migrations. Avoid making the CLI a second runtime implementation.
-4. Publish tested examples: hello app, SQLite CRUD, custom plugin, Workflow with retry/branch, AI assistant using fake provider, and durable workflow with its limitations displayed prominently.
+4. Publish tested examples: hello app, SQLite CRUD, custom plugin, Workflow with retry/branch, AI assistant using fake provider, and durable workflow with its limitations displayed prominently. **Done:** `examples/hello_app/` completes the set, and every example is exercised by `tests/integration/`, so an example that stops working fails the suite rather than being discovered by a reader.
 5. Add release engineering: changelog, release notes, signed/tagged artifacts as appropriate, SBOM/dependency license audit, vulnerability response policy, wheel/sdist checks, clean-install smoke test, and rollback/release instructions.
 6. Run performance and resource smoke tests. Establish only modest, reproducible baselines for app startup, simple route latency, Workflow overhead, SQLite contention behavior, and durable journal throughput. Treat regressions as signals for investigation, not premature optimization targets.
 7. Conduct a final threat/abuse review covering secret handling, configuration diagnostics, provider/plugin trust, tool allowlists, SQL/path input handling, journal payload retention, and logging redaction.

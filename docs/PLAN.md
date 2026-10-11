@@ -506,6 +506,7 @@ src/xyberos/
     ├── contracts.py, migrations.py, sqlite.py, testing.py
 
 examples/
+├── hello_app/           # the smallest complete application, walked through in getting-started
 ├── sqlite_crud/         # worked CRUD slice with Alembic migrations
 ├── custom_plugin/       # plugin authoring example
 ├── workflow/            # workflow example with retries, branching, and events
@@ -528,7 +529,9 @@ tests/
 ├── test_public_api.py
 ├── test_public_surface.py   # the frozen per-module surface
 ├── test_compatibility.py    # pinned configuration, plugin, and workflow metadata
-└── test_deprecation.py
+├── test_deprecation.py
+├── test_optional_dependencies.py  # a missing extra names the extra to install
+└── test_package.py              # the built artefact, checked from outside
 ```
 
 The target layout is:
@@ -541,6 +544,8 @@ xyberos3/
 ├── docs/
 │   ├── PLAN.md              # architecture baseline (this file)
 │   ├── implementation.md    # phase plan and status
+│   ├── getting-started.md   # from an empty directory to a running application
+│   ├── stability.md         # what is promised, and how it changes
 │   ├── runtime.md           # implemented runtime surface
 │   ├── http.md              # HTTP adapter guide
 │   ├── database.md          # database provider guide
@@ -548,7 +553,9 @@ xyberos3/
 │   ├── workflow.md          # workflow engine guide
 │   ├── ai.md                # AI facade guide
 │   ├── durable.md           # durable executor operator guide
-│   ├── stability.md         # what is promised, and how it changes
+│   ├── testing.md           # deterministic doubles and test habits
+│   ├── troubleshooting.md   # error to cause to fix
+│   ├── security.md          # trust model, secrets, and limits
 │   └── adr/                 # decision records
 ├── examples/
 │   ├── hello_app/

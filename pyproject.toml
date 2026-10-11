@@ -74,6 +74,7 @@ select = ["E", "F", "I", "UP", "B"]
 files = [
   "src",
   "examples/durable_workflow/app.py",
+  "examples/hello_app/app.py",
   "tests/contracts/examples/phase1_minimal_app.py",
   "tests/contracts/examples/phase4_workflow.py",
 ]

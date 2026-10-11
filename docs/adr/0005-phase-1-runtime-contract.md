@@ -67,5 +67,5 @@ graph and its recovery semantics are proven.
   stays in the Phase 7 backlog ([ADR 0009](./0009-workflow-engine-contract.md)).
 - A configurable shutdown drain bound and provider source attribution are deliberately left to
   Phase 2 and Phase 3, where HTTP lifespan and plugin diagnostics make them actionable.
-  *Satisfied: `app.shutdown_timeout` shipped in Phase 2, and automatic `plugin:<name>` provider
-  sources shipped in Phase 3 ([ADR 0007](./0007-trusted-plugins.md)).*
+  *Satisfied: `settings.app.shutdown_timeout` shipped in Phase 2, and automatic `plugin:<name>`
+  provider sources shipped in Phase 3 ([ADR 0007](./0007-trusted-plugins.md)).*

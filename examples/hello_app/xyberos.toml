@@ -1,0 +1,3 @@
+[app]
+name = "hello_app"
+environment = "development"

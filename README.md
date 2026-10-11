@@ -46,7 +46,8 @@ async def main() -> None:
 ```
 
 See [the runtime guide](docs/runtime.md) for scopes, lifecycle, configuration, and the error
-taxonomy.
+taxonomy, or start from [the getting started guide](docs/getting-started.md) and
+[the hello app example](examples/hello_app/README.md).
 
 ## HTTP and database
 
@@ -222,7 +223,7 @@ python -m pip install -e ".[ollama]"
 python -m pip install -e ".[durable]"
 ```
 
-See [the architecture plan](docs/PLAN.md), [the phase-by-phase implementation plan](docs/implementation.md), [the runtime guide](docs/runtime.md), [the HTTP guide](docs/http.md), [the database operations guide](docs/database.md), [the plugin guide](docs/plugins.md), [the workflow guide](docs/workflow.md), [the AI guide](docs/ai.md), [the durable execution guide](docs/durable.md), [the stability guide](docs/stability.md), and [the architecture decisions](docs/adr/).
+See [the architecture plan](docs/PLAN.md), [the phase-by-phase implementation plan](docs/implementation.md), [the getting started guide](docs/getting-started.md), [the runtime guide](docs/runtime.md), [the HTTP guide](docs/http.md), [the database operations guide](docs/database.md), [the plugin guide](docs/plugins.md), [the workflow guide](docs/workflow.md), [the AI guide](docs/ai.md), [the durable execution guide](docs/durable.md), [the testing guide](docs/testing.md), [the troubleshooting guide](docs/troubleshooting.md), [the security guide](docs/security.md), [the stability guide](docs/stability.md), and [the architecture decisions](docs/adr/).
 
 ## Status and compatibility
 

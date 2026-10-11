@@ -104,7 +104,8 @@ register -> validate -> start -> ready -> stop
 - `App.stop()` waits for in-flight request contexts, then closes app-owned resources in
   reverse dependency order. Every hook is given a chance to run; failures are collected and
   raised together as `ShutdownError` after cleanup completes, and `ShutdownError.resources`
-  names the resources that failed. Set `app.shutdown_timeout` to bound how long the drain waits;
+  names the resources that failed. Set `settings.app.shutdown_timeout` to bound how long the drain
+  waits;
   a timeout is reported as a shutdown problem instead of hanging the process.
 - `App.lifespan()` is an async context manager that starts and stops the application.
 - `App.request_context()` is an async context manager that owns a `RequestContext`. Resolve
@@ -118,8 +119,8 @@ register -> validate -> start -> ready -> stop
 
 ## Resolution
 
-`App.resolve(contract)` returns the app- or active-request-scoped instance for a class
-contract with its concrete type. `RequestContext.resolve(contract)` resolves within a request
+`await App.resolve(contract)` returns the app- or active-request-scoped instance for a class
+contract with its concrete type. `await RequestContext.resolve(contract)` resolves within a request
 boundary. Transient providers are constructed per call.
 
 Errors preserve the root cause and the resolution path:
@@ -141,8 +142,10 @@ precedence, from highest to lowest, is explicit arguments, then environment vari
 the configuration file, then defaults.
 
 - `Settings.load(config_path=..., environ=..., overrides=..., cwd=...)`.
-- `app.name`, `app.environment`, and `app.debug` identify the application; `app.shutdown_timeout`
-  optionally bounds the shutdown drain in seconds.
+- `settings.app.name`, `settings.app.environment`, and `settings.app.debug` identify the
+  application, and `settings.app.shutdown_timeout` optionally bounds the shutdown drain in seconds.
+  Read them from the composed application as `app.settings`; there is no global settings object and
+  no attribute shortcut on `App`.
 - `XYBEROS_CONFIG` selects an explicit file path; a file passed as `config_path` must exist.
 - `XYBEROS_` variables map to nested settings with `__`: `XYBEROS_APP__DEBUG=true`.
 - Unknown settings, incompatible types, conflicting environment names, and an unsupported
