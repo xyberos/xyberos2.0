@@ -174,7 +174,7 @@ Deprecation policy: mark a stable API deprecated in documentation and runtime wa
 ## Phase status
 
 The detailed work packages live in the phase-by-phase plan below; this table is the at-a-glance
-state. Phases 0–6 are complete; Phase 7 is next.
+state. Phases 0–6 are complete; Phase 7 is in progress.
 
 | Phase | Scope | Status | Exit-gate evidence |
 | --- | --- | --- | --- |
@@ -185,22 +185,26 @@ state. Phases 0–6 are complete; Phase 7 is next.
 | 4 | Stable, in-process Workflow engine | complete | `src/xyberos/execution/`, `tests/workflow/` (107 tests), `tests/integration/test_workflow_example.py`, `tests/contracts/examples/phase4_workflow.py`, `examples/workflow/`, `docs/workflow.md`, [ADR 0009](adr/0009-workflow-engine-contract.md) |
 | 5 | Optional AI facade | complete | `src/xyberos/ai/`, `tests/ai/` (125 tests), `tests/integration/test_ai_assistant.py` (11 tests), `examples/ai_assistant/`, `docs/ai.md`, [ADR 0010](adr/0010-ai-facade-contract.md) |
 | 6 | Experimental single-host durable executor | complete | `src/xyberos/durable/` (10 modules), `tests/durable/` (100 tests), `tests/crash_recovery/` (17 process-kill tests), `tests/integration/test_durable_example.py`, `examples/durable_workflow/`, `docs/durable.md`, [ADR 0011](adr/0011-durable-executor-contract.md) |
-| 7 | Developer experience, hardening, and release | next | see the Phase 7 entry checklist below |
+| 7 | Developer experience, hardening, and release | in progress | work package 1 (surface audit and freeze) complete: `src/xyberos/deprecation.py`, `tests/test_public_surface.py`, `tests/test_compatibility.py`, `tests/test_deprecation.py`, `docs/stability.md`, [ADR 0013](adr/0013-stable-surface-and-versioning.md); see the release decision gate below |
 
 ### Phase 7 entry checklist
 
-Confirm these before starting Phase 7:
+Confirmed when Phase 7 opened; the rows below record how, and the release decision gate in the Phase 7
+work package section is now the live gate.
 
 1. Phases 0–6 are complete and every public contract is frozen in an ADR: runtime
    ([0005](adr/0005-phase-1-runtime-contract.md)), HTTP/database
    ([0006](adr/0006-http-and-database-adapters.md)), plugins
    ([0007](adr/0007-trusted-plugins.md)), Workflow
    ([0009](adr/0009-workflow-engine-contract.md)), AI
-   ([0010](adr/0010-ai-facade-contract.md)), and durability
-   ([0011](adr/0011-durable-executor-contract.md)).
+   ([0010](adr/0010-ai-facade-contract.md)), durability
+   ([0011](adr/0011-durable-executor-contract.md)), and now the surface itself
+   ([0013](adr/0013-stable-surface-and-versioning.md)).
 2. Durable execution is explicitly experimental *and* its exit gate is met, so Phase 7 has to choose
    between promoting it and omitting it from the release; either way it must not block the stable
-   runtime. Its promotion criteria are `PLAN.md` section 5.4.
+   runtime. Its promotion criteria are `PLAN.md` section 5.4. **Not promoted by this phase's default:
+   the release decision gate carries "durable (experimental)" as a row, so the release can ship with
+   durability present and labelled, or omitted.**
 3. Both optional surfaces are complete enough to document as preview: the AI facade ships in core
    with only adapters behind extras, and the durable package is behind the `durable` extra with a
    separate journal.
@@ -492,7 +496,7 @@ not represent durability as exactly-once, multi-host, or highly available.
 
 **Work packages**
 
-1. Audit the public API and freeze the stable surface. Add deprecation mechanics, semantic-versioning rules, supported-version policy, and compatibility tests for public imports, configuration fields, plugin protocol, and serialized Workflow definition metadata.
+1. Audit the public API and freeze the stable surface. Add deprecation mechanics, semantic-versioning rules, supported-version policy, and compatibility tests for public imports, configuration fields, plugin protocol, and serialized Workflow definition metadata. **Done:** `docs/stability.md` states the tiers to users, [ADR 0013](adr/0013-stable-surface-and-versioning.md) records the rules, `src/xyberos/deprecation.py` provides the mechanics, and `tests/test_public_surface.py`, `tests/test_compatibility.py`, and `tests/test_deprecation.py` pin it. The audit's finding was the argument for doing it: five documented modules leaked their imports (`Mapping`, `json`, `sys`) as public surface because they declared no `__all__`.
 2. Complete documentation: getting started, runtime/DI, configuration, lifecycle, HTTP, SQLite, plugins, Workflow, AI, testing, migrations, error troubleshooting, security considerations, and a separate durable-execution limitations/operator guide.
 3. Finish minimal CLI commands only where they wrap proven APIs: project scaffold, development server, configuration validation/diagnostics, and migrations. Avoid making the CLI a second runtime implementation.
 4. Publish tested examples: hello app, SQLite CRUD, custom plugin, Workflow with retry/branch, AI assistant using fake provider, and durable workflow with its limitations displayed prominently.
@@ -674,7 +678,11 @@ is either enforced in code or stated as a policy:
 | **AI telemetry retention** | no AI content is persisted by the framework; usage metadata is retained only for as long as the execution that produced it | `LoggingPolicy.metadata_only()` by default; journal retention in [`docs/durable.md`](durable.md) |
 
 **Still open, and owned by the project owner.** Contributor terms: whether to adopt a DCO, a CLA, or
-copyright assignment. This is the only remaining decision with a deadline, because relicensing
-becomes impossible once outside contributions exist without one
-([ADR 0012](adr/0012-project-licence.md)). Also still owner-owned: any future promotion of durable
-execution beyond experimental status, whose criteria are `PLAN.md` section 5.4.
+copyright assignment. Nothing is due today, and the choice is easy to add later: a DCO is a
+`CONTRIBUTING.md` line plus a `Signed-off-by:` trailer, and its enforcement is a CI check on the pull
+request. A CLA is different in kind — it exists to keep the *option* to relicense, and that option
+expires with the first outside contribution, so it cannot be added after the fact. The trigger to
+decide is therefore one event, not a date: **settle it before merging the first pull request from
+anyone other than the copyright holder** ([ADR 0012](adr/0012-project-licence.md)). Also still
+owner-owned: any future promotion of durable execution beyond experimental status, whose criteria are
+`PLAN.md` section 5.4.

@@ -10,6 +10,7 @@ structure, roadmap, and risk analysis. It is not the task tracker.
 | `PLAN.md` (this file) | Architecture baseline, subsystem contracts, roadmap rationale, risks, definition of done |
 | [`implementation.md`](./implementation.md) | Authoritative phase-by-phase work packages, exit gates, status, and cross-phase controls |
 | [`runtime.md`](./runtime.md) | The implemented Phase 1 public runtime surface |
+| [`stability.md`](./stability.md) | The frozen public surface: what is promised, in which tier, and how it changes |
 | [`adr/`](./adr/) | Immutable decisions that affect public behavior |
 
 ## 1. Final architecture decisions
@@ -455,7 +456,7 @@ Use a modular monolith, with optional subsystems separated by import and depende
 
 The tree below is the **target** layout. It is not a description of the current tree, and it is
 not a requirement to create empty modules: implement a module only when its responsibilities and
-contracts are understood. Phases 1–5 currently implement:
+contracts are understood. Phases 1–6 currently implement:
 
 ```text
 src/xyberos/
@@ -463,6 +464,7 @@ src/xyberos/
 ├── _extras.py           # missing-extra guidance for optional imports
 ├── app.py               # App, RequestContext, lifecycle, plugins
 ├── config.py            # typed settings, including plugin and ai sections
+├── deprecation.py       # the deprecation warning and decorator
 ├── diagnostics.py       # provider and plugin diagnostics
 ├── errors.py            # error taxonomy, including the workflow and AI families
 ├── routing.py           # dependency-free route records
@@ -519,12 +521,14 @@ tests/
 ├── ai/                  # Phase 5 exit-criteria tests, including the Ollama adapter
 ├── durable/             # Phase 6 exit-criteria tests for the journal, store, and worker
 ├── crash_recovery/      # Phase 6 process-kill harness and its shared definition
-├── durable/             # Phase 6 exit-criteria tests for the journal and store
 ├── integration/         # end-to-end example, migration, plugin-package, workflow, and AI tests
 ├── fixtures/            # separately packaged plugin used as a test fixture
 ├── contracts/           # executable public-API examples
 ├── test_import_boundary.py
-└── test_public_api.py
+├── test_public_api.py
+├── test_public_surface.py   # the frozen per-module surface
+├── test_compatibility.py    # pinned configuration, plugin, and workflow metadata
+└── test_deprecation.py
 ```
 
 The target layout is:
@@ -542,6 +546,9 @@ xyberos3/
 │   ├── database.md          # database provider guide
 │   ├── plugins.md           # plugin guide
 │   ├── workflow.md          # workflow engine guide
+│   ├── ai.md                # AI facade guide
+│   ├── durable.md           # durable executor operator guide
+│   ├── stability.md         # what is promised, and how it changes
 │   └── adr/                 # decision records
 ├── examples/
 │   ├── hello_app/
@@ -628,7 +635,7 @@ is the summary.
 | 4 | Stable in-process Workflow | A tested, inspectable workflow engine without durability promises | 2–3 weeks | complete |
 | 5 | AI facade and integration | An AI application built on the same runtime and Workflow APIs | 1–2 weeks | complete |
 | 6 | Experimental durable execution | An experimental single-instance executor with documented limits | 3–6+ weeks | complete |
-| 7 | DX, hardening, and release | A stable runtime and Workflow release; durability remains experimental | 1–2 weeks | planned |
+| 7 | DX, hardening, and release | A stable runtime and Workflow release; durability remains experimental | 1–2 weeks | in progress |
 
 Estimated initial implementation: approximately 10–18+ working weeks for one experienced developer, including a limited experimental durable executor. The work can take longer if building and validating recovery semantics reveals additional requirements.
 

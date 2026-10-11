@@ -37,5 +37,14 @@ compatibility/release-note entry when applicable.
 ## Compatibility
 
 The package starts at `0.0.0`; breaking changes may occur in a `0.x` minor release only
-with upgrade notes. Do not describe a preview API as stable. Follow the versioning policy
-in `docs/implementation.md`.
+with upgrade notes. Do not describe a preview API as stable. The tiers and the rules are in
+[`docs/stability.md`](docs/stability.md) and [ADR 0013](docs/adr/0013-stable-surface-and-versioning.md).
+
+Adding or removing a public name is a visible change to `tests/test_public_surface.py`, and a change
+to configuration fields, the plugin protocol, or serialized Workflow metadata is a visible change to
+`tests/test_compatibility.py`. If you meant it, edit those tests in the same change; if you did not,
+the test is telling you that you have altered the public API by accident.
+
+Prefer deprecating over removing. Use `xyberos.deprecation.warn_deprecated` or the `deprecated`
+decorator, name the replacement, and state the release that will remove it. A deprecated path keeps
+working for at least one minor release after the announcement.

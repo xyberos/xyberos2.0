@@ -17,6 +17,8 @@ from collections.abc import Mapping, Sequence
 
 from xyberos.errors import AIRequestError, AISchemaError
 
+__all__ = ["check_schema", "describe_schema", "validate_payload"]
+
 _SCHEMA_KEYWORDS = frozenset(
     {
         "type",

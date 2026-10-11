@@ -40,3 +40,4 @@ backlog. Annotate anything newly satisfied, and give an owner to anything that h
 | [0010](0010-ai-facade-contract.md) | Freeze the AI facade contract | accepted |
 | [0011](0011-durable-executor-contract.md) | Freeze the durable executor contract | accepted |
 | [0012](0012-project-licence.md) | License the project under Apache-2.0 | accepted |
+| [0013](0013-stable-surface-and-versioning.md) | Freeze the stable surface and its versioning rules | accepted |

@@ -17,6 +17,26 @@ from typing import Protocol, runtime_checkable
 from xyberos.ai.schema import check_schema
 from xyberos.errors import AIRequestError
 
+__all__ = [
+    "ChatChunk",
+    "ChatModel",
+    "ChatRequest",
+    "ChatResponse",
+    "EmbeddingModel",
+    "EmbeddingRequest",
+    "EmbeddingResponse",
+    "FinishReason",
+    "Message",
+    "ModelCapabilities",
+    "ModelHealth",
+    "ModelProvider",
+    "ModelStatus",
+    "Role",
+    "ToolCall",
+    "ToolSpec",
+    "Usage",
+]
+
 
 def _freeze(values: Mapping[str, object], *, location: str) -> Mapping[str, object]:
     if not isinstance(values, Mapping):

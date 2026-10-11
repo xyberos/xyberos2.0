@@ -7,9 +7,11 @@ and explicit in-process Workflow execution. Durable execution and AI adapters ar
 The project is currently at version `0.0.0`. Phases 0–6 are complete: the architecture baseline, the
 application runtime, the Starlette HTTP adapter with the SQLite database provider, the trusted
 plugin/capability model, the in-process workflow engine, the provider-neutral AI facade with Ollama
-as the first adapter, and the experimental durable executor. Release engineering is what remains.
-Breaking changes are expected before `1.0.0`. **Durable execution is experimental** and is never
-represented as exactly-once, multi-host, or highly available.
+as the first adapter, and the experimental durable executor. Phase 7 (developer experience,
+hardening, and release) is in progress: the public surface and its versioning rules are now frozen in
+[the stability guide](docs/stability.md) and [ADR 0013](docs/adr/0013-stable-surface-and-versioning.md),
+and release engineering is what remains. Breaking changes are expected before `1.0.0`. **Durable
+execution is experimental** and is never represented as exactly-once, multi-host, or highly available.
 
 ## Runtime
 
@@ -220,12 +222,16 @@ python -m pip install -e ".[ollama]"
 python -m pip install -e ".[durable]"
 ```
 
-See [the architecture plan](docs/PLAN.md), [the phase-by-phase implementation plan](docs/implementation.md), [the runtime guide](docs/runtime.md), [the HTTP guide](docs/http.md), [the database operations guide](docs/database.md), [the plugin guide](docs/plugins.md), [the workflow guide](docs/workflow.md), [the AI guide](docs/ai.md), [the durable execution guide](docs/durable.md), and [the architecture decisions](docs/adr/).
+See [the architecture plan](docs/PLAN.md), [the phase-by-phase implementation plan](docs/implementation.md), [the runtime guide](docs/runtime.md), [the HTTP guide](docs/http.md), [the database operations guide](docs/database.md), [the plugin guide](docs/plugins.md), [the workflow guide](docs/workflow.md), [the AI guide](docs/ai.md), [the durable execution guide](docs/durable.md), [the stability guide](docs/stability.md), and [the architecture decisions](docs/adr/).
 
 ## Status and compatibility
 
 `0.x` releases are preview releases. The first release intended to provide the stable
 runtime and Workflow guarantees described in the implementation plan will be `1.0.0`.
+
+[The stability guide](docs/stability.md) lists which surface is stable, preview, or experimental, and
+how each one changes; [ADR 0013](docs/adr/0013-stable-surface-and-versioning.md) records the rules
+behind it. A `0.x` minor release may break a stable name with upgrade notes; a patch release does not.
 
 The project is licensed under the [Apache License 2.0](LICENSE), including its express patent
 grant. See [ADR 0012](docs/adr/0012-project-licence.md) for why that licence was chosen, and

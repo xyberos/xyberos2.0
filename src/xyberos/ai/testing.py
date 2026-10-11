@@ -34,6 +34,8 @@ from xyberos.errors import (
     AIUnsupportedCapabilityError,
 )
 
+__all__ = ["DEFAULT_FAKE_MODEL", "FakeModelProvider", "ModelReply"]
+
 DEFAULT_FAKE_MODEL = "fake-model"
 
 

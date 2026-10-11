@@ -8,6 +8,67 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from xyberos.execution.models import Attempt, StepOutcome
 
+# Every module that documents a public surface declares it, so the surface cannot drift by accident
+# when an internal import changes. Importing a name from here still works either way; `__all__` is
+# what `import *` and the surface audit use.
+__all__ = [
+    "AIConfigurationError",
+    "AIError",
+    "AIInvalidPayloadError",
+    "AIModelNotFoundError",
+    "AIRateLimitError",
+    "AIRefusalError",
+    "AIRequestError",
+    "AISchemaError",
+    "AITimeoutError",
+    "AIToolError",
+    "AITransportError",
+    "AIUnsupportedCapabilityError",
+    "ConfigurationError",
+    "DatabaseConfigurationError",
+    "DatabaseConnectionError",
+    "DatabaseError",
+    "DependencyCycleError",
+    "DependencyError",
+    "DependencyResolutionError",
+    "DurableConfigurationError",
+    "DurableConflictError",
+    "DurableError",
+    "DurableLeaseError",
+    "DurableOutcomeUnknownError",
+    "DurablePayloadError",
+    "DurableSchemaError",
+    "DurableStateError",
+    "DurableVersionError",
+    "ExperimentalWarning",
+    "HttpError",
+    "LifecycleError",
+    "LifecycleStateError",
+    "MissingProviderError",
+    "PluginCompatibilityError",
+    "PluginConfigurationError",
+    "PluginDependencyError",
+    "PluginError",
+    "PluginLifecycleError",
+    "PluginValidationError",
+    "RegistrationError",
+    "RequestValidationError",
+    "RetryExhaustedError",
+    "RouteRegistrationError",
+    "ScopeViolationError",
+    "ShutdownError",
+    "StepTimeoutError",
+    "TransactionError",
+    "TransientDatabaseError",
+    "TransientError",
+    "WorkflowCancelledError",
+    "WorkflowError",
+    "WorkflowExecutionError",
+    "WorkflowTimeoutError",
+    "WorkflowValidationError",
+    "XyberosError",
+]
+
 
 class XyberosError(Exception):
     """Base class for errors raised by Xyberos."""

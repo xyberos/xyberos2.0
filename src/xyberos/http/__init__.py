@@ -2,38 +2,23 @@
 
 from xyberos.http.adapter import HttpAdapter
 from xyberos.http.middleware import (
-    CORRELATION_ID_HEADER,
     CorrelationIdMiddleware,
     ErrorMappingMiddleware,
     RequestScopeMiddleware,
-    error_payload,
-    internal_error_payload,
 )
 from xyberos.http.requests import read_json_object
-from xyberos.http.routing import (
-    INJECT,
-    PATH,
-    REQUEST,
-    CompiledRoute,
-    HandlerParameter,
-    build_endpoint,
-    compile_route,
-)
+from xyberos.http.routing import CompiledRoute, build_endpoint, compile_route
 
+# The handler-compilation internals (parameter kinds, HandlerParameter, the error payload helpers,
+# the correlation-id header constant) are deliberately absent: they are implementation details of
+# this package, and `docs/http.md` states the header name in prose rather than as an API.
 __all__ = [
-    "CORRELATION_ID_HEADER",
-    "INJECT",
-    "PATH",
-    "REQUEST",
     "CompiledRoute",
     "CorrelationIdMiddleware",
     "ErrorMappingMiddleware",
-    "HandlerParameter",
     "HttpAdapter",
     "RequestScopeMiddleware",
     "build_endpoint",
     "compile_route",
-    "error_payload",
-    "internal_error_payload",
     "read_json_object",
 ]

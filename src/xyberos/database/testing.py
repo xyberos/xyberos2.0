@@ -9,6 +9,8 @@ from pathlib import Path
 
 from xyberos.database.sqlite import SqliteDatabase, SqliteSettings, open_database
 
+__all__ = ["temporary_database"]
+
 
 @asynccontextmanager
 async def temporary_database(

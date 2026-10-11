@@ -6,7 +6,7 @@ import pytest
 from starlette.requests import Request
 
 from xyberos import Inject, Route, RouteRegistrationError
-from xyberos.http import INJECT, PATH, REQUEST, compile_route
+from xyberos.http.routing import INJECT, PATH, REQUEST, compile_route
 
 
 class Service:

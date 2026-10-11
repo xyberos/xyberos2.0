@@ -21,8 +21,12 @@ execution.
 
 ## Consequences
 
-- Public contracts require explicit compatibility/versioning decisions before `1.0.0`. *Owned by
-  Phase 7, which audits and freezes the stable surface.*
+- Public contracts require explicit compatibility/versioning decisions before `1.0.0`. *Satisfied in
+  Phase 7: the tiers, the versioning rules, the deprecation process, and the support range are frozen
+  in [ADR 0013](./0013-stable-surface-and-versioning.md) and stated for users in
+  [`docs/stability.md`](../stability.md), with public imports, configuration fields, the plugin
+  protocol, and serialized Workflow metadata pinned by tests. `1.0.0` now means "the release that
+  starts promising the stable tier".*
 - Experimental APIs must be clearly named and documented, and should emit warnings where
   practical. *Satisfied in Phase 5 for the AI surface: `xyberos.ai` is documented as a stable,
   dependency-free facade in `docs/ai.md`, and each adapter states its own prerequisite. Satisfied in

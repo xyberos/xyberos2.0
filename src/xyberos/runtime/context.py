@@ -17,6 +17,20 @@ _context_values: ContextVar[Mapping[str, object] | None] = ContextVar(
 )
 T = TypeVar("T")
 
+# The documented helpers, and nothing else. The two context keys and the generic type variable above
+# stay module-level because this module uses them, but they are not public surface.
+__all__ = [
+    "ContextLogFilter",
+    "bind_context",
+    "bind_correlation_id",
+    "bind_deadline",
+    "capture_context_runner",
+    "create_task_in_context",
+    "get_context",
+    "get_correlation_id",
+    "get_deadline",
+]
+
 
 def get_context() -> dict[str, object]:
     """Return a copy of the current diagnostic context."""

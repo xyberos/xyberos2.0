@@ -22,6 +22,17 @@ from xyberos.ai.schema import validate_payload
 from xyberos.errors import AISchemaError, AITimeoutError, AIToolError
 from xyberos.runtime.context import get_correlation_id, get_deadline
 
+__all__ = [
+    "Tool",
+    "ToolContext",
+    "ToolEvent",
+    "ToolEventSink",
+    "ToolEventType",
+    "ToolHandler",
+    "ToolResult",
+    "ToolSet",
+]
+
 ToolHandler: TypeAlias = Callable[[Mapping[str, object], "ToolContext"], Awaitable[object]]
 """A tool handler: validated arguments plus an execution context, and nothing else."""
 

@@ -15,6 +15,8 @@ except ModuleNotFoundError as error:
 
 from xyberos.http.adapter import HttpAdapter
 
+__all__ = ["create_test_client"]
+
 
 def create_test_client(target: HttpAdapter | ASGIApp) -> TestClient:
     """Return a Starlette test client for an adapter or a bare ASGI application.

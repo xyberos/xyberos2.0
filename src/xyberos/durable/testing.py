@@ -18,6 +18,8 @@ from xyberos.durable.contracts import utc_now
 from xyberos.durable.journal import Journal, to_iso
 from xyberos.durable.models import ActivityPolicy
 
+__all__ = ["ManualWallClock", "expire_leases", "idempotent_activity"]
+
 
 async def expire_leases(journal: Journal) -> int:
     """Backdate every live lease so recovery sees it as expired; return how many were changed.
