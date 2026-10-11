@@ -561,6 +561,7 @@ xyberos3/
 │   ├── security.md          # trust model, secrets, and limits
 │   ├── cli.md               # the four commands
 │   ├── release.md           # release procedure, artefact checks, dependency audit
+│   ├── performance.md       # the recorded resource baselines and what they mean
 │   └── adr/                 # decision records
 ├── examples/
 │   ├── hello_app/
@@ -623,6 +624,7 @@ xyberos3/
     ├── durable/          # implemented (Phase 6)
     ├── crash_recovery/   # implemented (Phase 6, process-kill harness)
     ├── cli/              # implemented (Phase 7)
+    ├── perf/             # implemented (Phase 7, resource baselines)
     ├── fixtures/         # implemented (separately packaged plugin)
     ├── contracts/        # implemented (executable API examples)
     ├── integration/      # implemented
