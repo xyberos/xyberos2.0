@@ -13,6 +13,7 @@ the same two files.
 from __future__ import annotations
 
 import email
+import re
 import subprocess
 import sys
 import tarfile
@@ -118,7 +119,11 @@ def test_the_wheel_declares_its_metadata(
     assert (
         description.strip() == (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8").strip()
     )
-    assert "[Apache License 2.0](LICENSE)" in description
+    assert "[Apache License 2.0](" in description
+    # The description is what the project page renders, where a relative target resolves against the
+    # index rather than the repository and 404s. Every link in it has to be absolute.
+    relative = re.findall(r"\]\((?!https?://|#|mailto:)[^)\s]*\)", description)
+    assert not relative, f"the long description links relative paths: {relative[:5]}"
 
 
 def test_the_wheel_ships_the_licence(artefacts: tuple[Path, Path], project_version: str) -> None:

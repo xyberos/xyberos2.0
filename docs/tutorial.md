@@ -31,8 +31,8 @@
 - **A terminal.** The examples use PowerShell on Windows; the same commands work in any shell.
 
 ```powershell
-git clone <repository> xyberos3
-cd xyberos3
+git clone <repository> <directory>
+cd <directory>
 python -m venv .venv
 .venv\Scripts\python -m pip install -e ".[http,database]" uvicorn
 ```

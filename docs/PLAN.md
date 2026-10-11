@@ -545,7 +545,7 @@ The target layout is:
 
 ```
 
-xyberos3/
+xyberos/
 ├── pyproject.toml
 ├── README.md
 ├── CHANGELOG.md             # Keep a Changelog; Unreleased, then one section per release

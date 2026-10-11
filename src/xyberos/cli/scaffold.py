@@ -28,7 +28,7 @@ description = "{name}, built on Xyberos"
 requires-python = ">=3.10"
 dependencies = [
   # Xyberos is not published yet. Install your checkout into this environment first:
-  #   python -m pip install -e /path/to/xyberos3[http]
+  #   python -m pip install -e /path/to/<checkout>[http]
   "xyberos",
 ]
 

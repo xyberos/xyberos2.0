@@ -8,8 +8,8 @@ Xyberos is not published to PyPI yet, so install it from a checkout of this repo
 or newer is required.
 
 ```powershell
-git clone <repository> xyberos3
-cd xyberos3
+git clone <repository> <directory>
+cd <directory>
 python -m pip install -e ".[http]" uvicorn
 ```
 
