@@ -19,6 +19,43 @@ its extra fails with the command that fixes it, not a bare `ModuleNotFoundError`
 ModuleNotFoundError: the 'ollama' extra cannot be imported: install it with 'pip install "xyberos[ollama]"' (No module named 'httpx')
 ```
 
+## Supported Ollama releases and models
+
+**Supported: Ollama 0.5.0 or newer.** The floor is set by the newest feature the adapter depends on,
+not by the oldest one it can reach:
+
+| What the adapter uses | First available in |
+| --- | --- |
+| `/api/chat`, `/api/version` | 0.1.14 |
+| `done_reason` | 0.1.35 |
+| `/api/embed` (batch embeddings) | 0.2.6 |
+| Tool calling (`tools`, `tool_calls`) | 0.3.0 |
+| **JSON-schema `format` (structured output)** | **0.5.0** |
+
+A floor that is only documented is not a floor, so the adapter enforces it. A health check compares
+the service's reported release and reports `unhealthy` with the reason; once the version is known, a
+later `chat`, `stream`, or `embed` call is refused with `AIConfigurationError` instead of failing
+confusingly inside Ollama. A service the adapter has not measured is never refused, and a version it
+cannot compare — a pre-release such as `0.5.9-rc2`, or a development build reporting `dev` — is
+treated as unknown rather than as too old, because refusing work you cannot measure is worse than
+the risk it guards. To run deliberately below the floor, set `minimum_version` (`[ai.ollama]
+minimum_version = "0.4.0"`) and accept that Xyberos does not test against it.
+
+**Models are yours to choose.** The adapter has no default model: production configuration must name
+one, and Xyberos never pulls, starts, stops, or upgrades a model or a service. A missing model is a
+configuration error that names the fix (`ollama pull <model>`), and capabilities are claims you
+declare rather than something the framework infers.
+
+For local smoke runs the opt-in live tests default to `llama3.2:3b` (about 1.9 GB), which is small
+enough for a laptop and genuinely reports tool support. `llama3.2:1b` (about 1.3 GB) also reports
+tool support and is the minimal alternative, though it is noticeably less reliable at tool calling,
+which makes the tool test flaky rather than fast. Embeddings are configured separately
+(`embedding_model`, for example `nomic-embed-text` at 768 dimensions) because one Ollama model does
+not serve both, and the embedding smoke test has no default at all.
+
+Tool-specific live tests have their own gate (`XYBEROS_OLLAMA_LIVE_TOOLS=1`) so that pointing the
+suite at a model without tool support skips them rather than failing a suite that is otherwise fine.
+
 ## Using a model provider
 
 A provider is an ordinary service, so it is registered the same way as anything else:
@@ -224,12 +261,24 @@ The facade itself never retries, so retry behavior stays in one place: the calle
 - **Model output is untrusted input.** Validate structured output against a schema, validate tool
   arguments, and treat text destined for a shell, a query, or a template as data to escape.
 - **Provider data handling is your decision.** Ollama is local by default, but any provider sees the
-  prompts you send it. Do not send data your deployment policy does not allow, and keep the
-  data-retention policy for optional AI telemetry on your own side of the boundary.
+  prompts you send it. Do not send data your deployment policy does not allow.
+- **Retention, stated precisely.** The framework persists no AI content anywhere: not in logs, not in
+  events, and not in the durable journal by construction. AI *usage metadata* (provider, model,
+  counts, timings) is the only thing that may be retained, and it is retained only for as long as the
+  execution that produced it — deleting a terminal execution deletes its records
+  ([journal retention](durable.md#growth-and-retention)). Log retention belongs to your logging
+  stack. Nothing here needs your own policy to be written down first, which is why the default is the
+  conservative one.
+- **The one place prompt text can land in the journal.** A durable step's *output* is persisted
+  verbatim, so a step that returns a model completion stores that completion. Redaction is therefore
+  the step's job: filter the payload before returning it. This is the only intersection of the two
+  policies, and it is worth knowing before you persist a step that returns raw model output.
 - **Xyberos never downloads models.** The adapter calls documented endpoints only: it does not pull,
   start, stop, or upgrade a model, and a missing model fails with an actionable error. The model is
-  required configuration in production; `llama3.2` appears only in examples and in the opt-in smoke
-  tests.
+  required configuration in production; `llama3.2:3b` appears only in the opt-in smoke tests, and
+  `examples/ai_assistant` names a model for convenience rather than as a recommendation. Running the
+  service — container, port, GPU, image, and any model distribution policy — is entirely the
+  operator's.
 
 ## The Ollama adapter
 

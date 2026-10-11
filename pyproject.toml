@@ -8,6 +8,8 @@ version = "0.0.0"
 description = "Composable Python application runtime"
 readme = "README.md"
 requires-python = ">=3.10"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 authors = [{ name = "Xyberos contributors" }]
 classifiers = [
   "Development Status :: 2 - Pre-Alpha",

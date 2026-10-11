@@ -57,6 +57,11 @@ CHAT_PATH = "/api/chat"
 EMBED_PATH = "/api/embed"
 SHOW_PATH = "/api/show"
 VERSION_PATH = "/api/version"
+
+# The newest Ollama feature this adapter depends on decides the floor: JSON-schema ``format``
+# (structured output) shipped in 0.5.0, after batch ``/api/embed`` (0.2.6) and tool calling (0.3.0).
+# A floor that is only documented is not a floor, so the adapter refuses a service below it.
+MINIMUM_SUPPORTED_VERSION = "0.5.0"
 _RESERVED_OPTION_KEYS = frozenset(
     {"model", "messages", "stream", "format", "tools", "keep_alive", "options", "input"}
 )
@@ -71,6 +76,7 @@ _SETTINGS_KEYS = frozenset(
         "tools",
         "structured_output",
         "streaming",
+        "minimum_version",
         "options",
     }
 )
@@ -93,6 +99,7 @@ class OllamaSettings:
     tools: bool = False
     structured_output: bool = False
     streaming: bool = True
+    minimum_version: str = MINIMUM_SUPPORTED_VERSION
     options: Mapping[str, object] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -103,6 +110,9 @@ class OllamaSettings:
             )
         _validate_base_url(self.base_url)
         object.__setattr__(self, "base_url", self.base_url.rstrip("/"))
+        object.__setattr__(
+            self, "minimum_version", _validate_version(self.minimum_version, "minimum_version")
+        )
         for label, value in (("timeout", self.timeout), ("connect_timeout", self.connect_timeout)):
             if value is not None and value <= 0:
                 raise AIConfigurationError(f"{label} must be greater than zero, got {value!r}")
@@ -157,6 +167,10 @@ class OllamaSettings:
                 values.get("structured_output"), f"{location}.structured_output", default=False
             ),
             streaming=_flag(values.get("streaming"), f"{location}.streaming", default=True),
+            minimum_version=_text(
+                values.get("minimum_version", MINIMUM_SUPPORTED_VERSION),
+                f"{location}.minimum_version",
+            ),
             options={str(key): value for key, value in options.items()},
         )
 
@@ -173,6 +187,43 @@ def _validate_base_url(base_url: object) -> None:
         raise AIConfigurationError(
             "base_url must not embed credentials, because they would reach logs and error messages"
         )
+
+
+def _validate_version(value: object, label: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise AIConfigurationError(
+            f"{label} must be a non-empty version such as {MINIMUM_SUPPORTED_VERSION}"
+        )
+    if _version_tuple(value.strip()) is None:
+        raise AIConfigurationError(
+            f"{label} must be a dotted numeric version such as {MINIMUM_SUPPORTED_VERSION}, "
+            f"got {value!r}"
+        )
+    return value.strip()
+
+
+def _version_tuple(value: str) -> tuple[int, ...] | None:
+    """Return the numeric release part of a version, or ``None`` when it is not comparable.
+
+    Ollama reports plain releases (``0.5.0``) but also pre-releases (``0.5.0-rc1``) and, in
+    development builds, an opaque string. Only the leading dotted numbers are compared, and an
+    unparseable version is treated as unknown rather than as too old: refusing to work against a
+    service you cannot measure would be worse than the risk it guards.
+    """
+    head = value.split("-", 1)[0].split("+", 1)[0].strip()
+    parts = head.split(".")
+    if not parts or not all(part.isdigit() for part in parts):
+        return None
+    return tuple(int(part) for part in parts)
+
+
+def _version_is_below(reported: str, floor: str) -> bool:
+    """Whether ``reported`` is an older release than ``floor``; ``False`` when incomparable."""
+    left = _version_tuple(reported)
+    right = _version_tuple(floor)
+    if left is None or right is None:
+        return False
+    return left < right
 
 
 def _freeze_options(options: object) -> Mapping[str, object]:
@@ -210,6 +261,9 @@ class OllamaProvider:
         self._http = client
         self._owns_client = client is None
         self._logger = logger or getLogger(_LOGGER_NAME)
+        # Filled by whichever call learns the service's release, so the floor costs one request per
+        # adapter rather than one per call, and so an unmeasured service is never refused.
+        self._reported_version: str | None = None
 
     @property
     def name(self) -> str:
@@ -238,9 +292,29 @@ class OllamaProvider:
         client, self._http = self._http, None
         await client.aclose()
 
+    def _floor_message(self, reported: str) -> str:
+        return (
+            f"Ollama {reported} is older than the supported minimum "
+            f"{self._settings.minimum_version}: structured output, tool calling, and batch "
+            "embeddings are only verified against that floor or newer. Upgrade Ollama, or lower "
+            "minimum_version deliberately and accept that Xyberos does not test against it"
+        )
+
+    def _refuse_unsupported_service(self) -> None:
+        """Refuse a request when the service is known to be below the supported floor.
+
+        The version comes from a previous probe, so this never adds a round trip: an unmeasured
+        service proceeds and lets Ollama answer for itself, while a service already known to be too
+        old is refused with a reason instead of a confusing 4xx from inside the API.
+        """
+        reported = self._reported_version
+        if reported is not None and _version_is_below(reported, self._settings.minimum_version):
+            raise AIConfigurationError(self._floor_message(reported))
+
     async def chat(self, request: ChatRequest) -> ChatResponse:
         """Return one completed chat response."""
         self._require_supported(request)
+        self._refuse_unsupported_service()
         data = await self._post(CHAT_PATH, self._chat_payload(request, stream=False))
         return self._chat_response(data)
 
@@ -258,6 +332,7 @@ class OllamaProvider:
                 capability="streaming",
                 model=self._settings.model,
             )
+        self._refuse_unsupported_service()
         if request.tools:
             raise AIRequestError("an Ollama streaming request cannot offer tools")
         if request.response_schema is not None:
@@ -272,6 +347,7 @@ class OllamaProvider:
                 "no embedding model is configured; set embedding_model on the Ollama settings, for "
                 "example XYBEROS_AI__OLLAMA__EMBEDDING_MODEL=nomic-embed-text"
             )
+        self._refuse_unsupported_service()
         data = await self._post(EMBED_PATH, {"model": model, "input": list(request.inputs)})
         return self._embedding_response(data, inputs=len(request.inputs), model=model)
 
@@ -279,7 +355,9 @@ class OllamaProvider:
         """Report whether the service is reachable and the configured model is usable.
 
         A health check reports problems rather than raising them, and it validates declared
-        capability claims against what the model itself reports.
+        capability claims against what the model itself reports. It also compares the service's
+        reported release against the supported floor and remembers it, so a later request can be
+        refused with a reason instead of failing inside Ollama.
         """
         client = self._client()
         version = await self._service_version(client)
@@ -290,6 +368,14 @@ class OllamaProvider:
                 detail=(
                     f"the Ollama service at {self._settings.base_url} did not answer {VERSION_PATH}"
                 ),
+            )
+        self._reported_version = version
+        if _version_is_below(version, self._settings.minimum_version):
+            return ModelHealth(
+                status=ModelStatus.UNHEALTHY,
+                model=self._settings.model,
+                detail=self._floor_message(version),
+                provider_version=version,
             )
         try:
             response = await client.post(SHOW_PATH, json={"model": self._settings.model})

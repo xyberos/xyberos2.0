@@ -226,5 +226,7 @@ See [the architecture plan](docs/PLAN.md), [the phase-by-phase implementation pl
 
 `0.x` releases are preview releases. The first release intended to provide the stable
 runtime and Workflow guarantees described in the implementation plan will be `1.0.0`.
-The project license is intentionally undecided; do not redistribute it until a license is
-selected.
+
+The project is licensed under the [Apache License 2.0](LICENSE), including its express patent
+grant. See [ADR 0012](docs/adr/0012-project-licence.md) for why that licence was chosen, and
+`CONTRIBUTING.md` for the contributor terms that are still open.

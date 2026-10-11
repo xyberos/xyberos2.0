@@ -1,5 +1,22 @@
 # Contributing to Xyberos
 
+## Licensing of contributions
+
+Xyberos is licensed under the [Apache License 2.0](LICENSE). By contributing, you agree that your
+contribution is licensed under the same terms (inbound equals outbound), which is the minimum needed
+for the project to distribute it.
+
+**No Contributor License Agreement or copyright assignment is in place yet.** That has a consequence
+worth knowing before you contribute: without one, the project cannot change its license later without
+the consent of every copyright holder. If you are contributing on behalf of an employer, check that
+you may, and tell us if your employer's policy requires a signed agreement — that is the signal that
+this decision needs revisiting. It is recorded as open in
+[ADR 0012](docs/adr/0012-project-licence.md).
+
+Do not copy code into this project that you cannot license under these terms. If you adapt code from
+another project, its license must be compatible and the provenance must be stated in the commit
+message and, where the license requires it, in the repository.
+
 ## Development rules
 
 - Target Python 3.10 or newer and keep the public package fully typed.

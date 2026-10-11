@@ -5,6 +5,19 @@ These tests never run in normal CI. Set ``XYBEROS_OLLAMA_LIVE=1`` to enable them
 ``XYBEROS_OLLAMA_LIVE_EMBEDDING_MODEL`` to point them at a service whose model has already been
 pulled. Xyberos never pulls, starts, or upgrades a model, so a missing one fails the test rather
 than downloading anything. Prompts and completions are never logged or asserted on.
+
+Two defaults are owner decisions rather than framework opinions:
+
+* ``XYBEROS_OLLAMA_LIVE_MODEL`` defaults to ``llama3.2:3b`` (about 1.9 GB) because it is small
+  enough for a laptop and genuinely reports tool support, which the tool tests need. ``llama3.2:1b``
+  (about 1.3 GB) also reports tool support and is the minimal alternative, but it is noticeably
+  less reliable at tool calling, so it makes the tool test flaky rather than fast.
+* ``XYBEROS_OLLAMA_LIVE_EMBEDDING_MODEL`` has **no** default: one Ollama model does not serve both
+  chat and embeddings, so the embedding tests stay skipped until an operator names one (for example
+  ``nomic-embed-text``, 768 dimensions).
+
+Capability-specific tests have their own gate, so a model without tool support skips them instead of
+failing a suite that is otherwise fine.
 """
 
 import asyncio
@@ -18,12 +31,18 @@ from xyberos.ai import ChatRequest, EmbeddingRequest, Message, ModelStatus  # no
 from xyberos.ai.ollama import OllamaProvider, OllamaSettings  # noqa: E402
 
 LIVE = os.environ.get("XYBEROS_OLLAMA_LIVE") == "1"
-MODEL = os.environ.get("XYBEROS_OLLAMA_LIVE_MODEL", "llama3.2")
+TOOLS = os.environ.get("XYBEROS_OLLAMA_LIVE_TOOLS") == "1"
+MODEL = os.environ.get("XYBEROS_OLLAMA_LIVE_MODEL", "llama3.2:3b")
 BASE_URL = os.environ.get("XYBEROS_OLLAMA_LIVE_BASE_URL", "http://127.0.0.1:11434")
 EMBEDDING_MODEL = os.environ.get("XYBEROS_OLLAMA_LIVE_EMBEDDING_MODEL")
 
 pytestmark = pytest.mark.skipif(
     not LIVE, reason="set XYBEROS_OLLAMA_LIVE=1 and a pulled model to run live Ollama tests"
+)
+
+requires_tools = pytest.mark.skipif(
+    not TOOLS,
+    reason="set XYBEROS_OLLAMA_LIVE_TOOLS=1 with a tool-capable model to run the tool tests",
 )
 
 
@@ -33,6 +52,7 @@ def live_provider(**settings: object) -> OllamaProvider:
     return OllamaProvider(OllamaSettings(**arguments))  # type: ignore[arg-type]
 
 
+@requires_tools
 def test_the_service_and_model_are_ready() -> None:
     async def scenario() -> None:
         provider = live_provider(tools=True)

@@ -19,10 +19,12 @@ from xyberos.ai import (
 from xyberos.ai.ollama import (
     CHAT_PATH,
     EMBED_PATH,
+    MINIMUM_SUPPORTED_VERSION,
     SHOW_PATH,
     VERSION_PATH,
     OllamaProvider,
     OllamaSettings,
+    _version_is_below,
     ollama_provider,
 )
 from xyberos.errors import (
@@ -87,6 +89,10 @@ def chat_route(handler: Callable[[httpx.Request], httpx.Response]) -> Routes:
     return Routes({CHAT_PATH: handler})
 
 
+def _chat_body(content: str) -> dict[str, object]:
+    return {"model": "llama3.2", "message": {"role": "assistant", "content": content}, "done": True}
+
+
 def test_settings_require_an_explicit_model() -> None:
     with pytest.raises(AIConfigurationError, match="never chooses a model"):
         OllamaSettings(model="")
@@ -121,6 +127,21 @@ def test_settings_validate_timeouts_and_options() -> None:
         OllamaSettings(model="m", options={"callback": object()})
     with pytest.raises(AIConfigurationError, match="options must be a table/object"):
         OllamaSettings(model="m", options=["num_ctx"])  # type: ignore[arg-type]
+
+
+def test_settings_validate_the_minimum_version() -> None:
+    assert OllamaSettings(model="m").minimum_version == MINIMUM_SUPPORTED_VERSION
+    assert OllamaSettings(model="m", minimum_version="0.4.7").minimum_version == "0.4.7"
+    with pytest.raises(AIConfigurationError, match="non-empty version"):
+        OllamaSettings(model="m", minimum_version="  ")
+    with pytest.raises(AIConfigurationError, match="dotted numeric version"):
+        OllamaSettings(model="m", minimum_version="latest")
+
+
+def test_the_minimum_version_comes_from_configuration() -> None:
+    settings = OllamaSettings.from_mapping({"model": "m", "minimum_version": "0.4.7"})
+
+    assert settings.minimum_version == "0.4.7"
 
 
 def test_settings_declare_capabilities_conservatively() -> None:
@@ -513,6 +534,87 @@ def test_embeddings_need_a_model_and_a_well_formed_answer() -> None:
             provider = make_provider(routes, embedding_model="nomic-embed-text")
             with pytest.raises(AIInvalidPayloadError):
                 await provider.embed(EmbeddingRequest(inputs=("a", "bb")))
+
+    asyncio.run(scenario())
+
+
+def test_health_refuses_a_service_below_the_supported_floor() -> None:
+    """The floor is only real if it is enforced, so it is enforced where the version is known."""
+
+    async def scenario() -> None:
+        old = make_provider(
+            Routes({VERSION_PATH: httpx.Response(200, json={"version": "0.4.7"})}),
+            embedding_model="nomic-embed-text",
+        )
+        health = await old.health()
+
+        assert health.status is ModelStatus.UNHEALTHY
+        assert health.provider_version == "0.4.7"
+        assert "older than the supported minimum 0.5.0" in health.detail
+        assert "structured output" in health.detail
+
+        # A later request is refused with the same reason rather than failing inside Ollama...
+        with pytest.raises(AIConfigurationError, match="older than the supported minimum"):
+            await old.chat(ChatRequest(messages=(Message.user("hi"),)))
+        with pytest.raises(AIConfigurationError, match="older than the supported minimum"):
+            await old.embed(EmbeddingRequest(inputs=("a",)))
+        # ...but only once the version is known, so an unprobed service is never refused.
+        unprobed = make_provider(Routes({CHAT_PATH: httpx.Response(200, json=_chat_body("fine"))}))
+        answer = await unprobed.chat(ChatRequest(messages=(Message.user("hi"),)))
+        assert answer.message.content == "fine"
+
+        # An operator can lower the floor deliberately.
+        lowered = make_provider(
+            Routes(
+                {
+                    VERSION_PATH: httpx.Response(200, json={"version": "0.4.7"}),
+                    SHOW_PATH: httpx.Response(200, json={"capabilities": ["completion"]}),
+                    CHAT_PATH: httpx.Response(200, json=_chat_body("older but working")),
+                }
+            ),
+            minimum_version="0.4.0",
+        )
+        assert (await lowered.health()).status is ModelStatus.READY
+        older = await lowered.chat(ChatRequest(messages=(Message.user("hi"),)))
+        assert older.message.content == "older but working"
+
+    asyncio.run(scenario())
+
+
+def test_a_version_that_cannot_be_compared_is_not_treated_as_too_old() -> None:
+    """A version that cannot be measured must not be treated as too old.
+
+    Refusing to work against a service you cannot measure would be worse than the risk it guards.
+    """
+
+    async def scenario() -> None:
+        development = make_provider(
+            Routes(
+                {
+                    VERSION_PATH: httpx.Response(200, json={"version": "0.5.9-rc2"}),
+                    SHOW_PATH: httpx.Response(200, json={"capabilities": ["completion"]}),
+                    CHAT_PATH: httpx.Response(200, json=_chat_body("prerelease")),
+                }
+            )
+        )
+
+        assert (await development.health()).status is ModelStatus.READY
+        prerelease = await development.chat(ChatRequest(messages=(Message.user("hi"),)))
+        assert prerelease.message.content == "prerelease"
+
+        odd = make_provider(
+            Routes(
+                {
+                    VERSION_PATH: httpx.Response(200, json={"version": "dev"}),
+                    SHOW_PATH: httpx.Response(200, json={"capabilities": ["completion"]}),
+                }
+            )
+        )
+        assert (await odd.health()).status is ModelStatus.READY
+        assert not _version_is_below("dev", MINIMUM_SUPPORTED_VERSION)
+        assert _version_is_below("0.5.0", "0.5.0") is False
+        assert _version_is_below("0.4.9", "0.5.0") is True
+        assert _version_is_below("0.10.0", "0.5.0") is False
 
     asyncio.run(scenario())
 

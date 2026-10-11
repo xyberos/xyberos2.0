@@ -223,6 +223,10 @@ Step inputs, outputs, and results are stored **verbatim** as JSON, because a res
 be replayable from its records alone. The journal therefore holds whatever a step produced.
 
 - Redaction is yours: filter a step's output before returning it.
+- **This is where the AI and durability policies meet.** If a step returns a model completion, the
+  journal stores that completion, because a step's output is persisted verbatim. The redaction
+  boundary is the step function, not the journal: filter the payload before returning it. See the
+  [AI guide's retention note](./ai.md#security-and-operations-policy).
 - `max_payload_bytes` is the only structural guard, and it prevents accidents rather than protecting
   data.
 - Events never carry step input, output, or exception messages, so the *event* table is safe to keep

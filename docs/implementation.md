@@ -207,8 +207,10 @@ Confirm these before starting Phase 7:
 4. Known backlog items are dispositioned rather than quietly carried: the decorator Workflow API,
    parallel steps, the step-executor boundary, richer schema keywords, streaming tool calls, and the
    AI/RAG subsystem are all recorded as deferred, and the ones needing a new ADR say so.
-5. The owner decisions in "Remaining owner decisions" are settled, because release engineering
-   (licence, SBOM, changelog, and supported-version policy) depends on them.
+5. The owner decisions in "Remaining owner decisions" are settled — the license and the AI
+   release/model/retention policies are decided; only the contributor terms (DCO versus CLA) and any
+   promotion of durable execution remain open, and both have a decision point rather than a
+   dependency.
 
 
 ## Detailed phase-by-phase execution plan
@@ -219,7 +221,7 @@ The phases are intentionally sequential at their public-contract boundaries. Wor
 
 **Objective:** make the first implementation decisions reviewable and make every later phase start from a reproducible development environment.
 
-**Prerequisites:** the adopted Python, configuration, database, Ollama, and versioning decisions above are recorded as accepted ADRs. The project owner selects the license before distribution; it does not block local architecture work.
+**Prerequisites:** the adopted Python, configuration, database, Ollama, and versioning decisions above are recorded as accepted ADRs. The project owner selects the license before distribution; it does not block local architecture work. **Resolved:** the license is Apache-2.0, declared in metadata from Phase 0's `pyproject.toml` ([ADR 0012](adr/0012-project-licence.md)).
 
 **Work packages**
 
@@ -653,15 +655,26 @@ the rejected reordering of the AI facade — is recorded in `PLAN.md` Appendix A
 
 ## Remaining owner decisions
 
-The license remains intentionally undecided and must be selected before any public distribution. The adopted Python, database, TOML, Ollama, and versioning decisions above remove the other Phase 0 blockers.
+The license was the last Phase 0 blocker. **Decided:** the project is licensed under **Apache-2.0**
+([ADR 0012](adr/0012-project-licence.md)), declared in `pyproject.toml` through PEP 639 metadata and
+shipped as `LICENSE`. The adopted Python, database, TOML, Ollama, and versioning decisions remove the
+rest.
 
-Before the relevant delivery phase begins, the project owner should also approve the Ollama model(s) used in examples and integration smoke tests, the supported Ollama release range, any model-download/container distribution policy, and the data-retention/privacy policy for optional AI telemetry. These are operational choices, not reasons to delay the provider-neutral facade or fake-provider tests.
+**Decided for the AI surface.** These were the "before the relevant delivery phase begins" items, and
+they are now settled rather than pending. Each is recorded where a reader will look for it, and each
+is either enforced in code or stated as a policy:
 
-**State after Phase 5.** None of these were decided, and Phase 5 deliberately did not decide them on
-the owner's behalf. What shipped instead is neutral to each answer: the adapter requires a model and
-has no default, so only `examples/ai_assistant` ships a convenient model name; nothing is ever pulled
-or upgraded for you; live smoke tests are opt-in behind `XYBEROS_OLLAMA_LIVE*` environment variables
-and are skipped by default; and logging records metadata only unless a caller opts into redacted
-content capture. [ADR 0010](adr/0010-ai-facade-contract.md) records the release range and
-smoke-test model names as still owner-owned, so approving them later changes operator configuration,
-not the contract.
+| Decision | Value | Enforced by |
+| --- | --- | --- |
+| Supported Ollama release range | **≥ 0.5.0** | `MINIMUM_SUPPORTED_VERSION` in `src/xyberos/ai/ollama.py`; the adapter reports an older service as unhealthy and refuses later requests with the reason. Lowering it requires an explicit `minimum_version` setting |
+| Smoke-test chat model | `llama3.2:3b` (~1.9 GB), tool-capable | `XYBEROS_OLLAMA_LIVE_MODEL` default in `tests/ai/test_live_ollama.py` |
+| Smoke-test embedding model | **none**; the operator names one | `XYBEROS_OLLAMA_LIVE_EMBEDDING_MODEL` has no default, so the embedding tests skip |
+| Capability-specific live tests | their own gate | `XYBEROS_OLLAMA_LIVE_TOOLS=1` for tool tests, so a model without tool support skips rather than fails |
+| Model download and container policy | never pull, start, stop, upgrade, or deploy anything | `AIModelNotFoundError` names the `ollama pull` command; CI installs no models |
+| **AI telemetry retention** | no AI content is persisted by the framework; usage metadata is retained only for as long as the execution that produced it | `LoggingPolicy.metadata_only()` by default; journal retention in [`docs/durable.md`](durable.md) |
+
+**Still open, and owned by the project owner.** Contributor terms: whether to adopt a DCO, a CLA, or
+copyright assignment. This is the only remaining decision with a deadline, because relicensing
+becomes impossible once outside contributions exist without one
+([ADR 0012](adr/0012-project-licence.md)). Also still owner-owned: any future promotion of durable
+execution beyond experimental status, whose criteria are `PLAN.md` section 5.4.
