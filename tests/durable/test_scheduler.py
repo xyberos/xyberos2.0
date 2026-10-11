@@ -126,6 +126,22 @@ def test_two_taken_branches_into_one_step_is_a_conflict() -> None:
     assert "more than one branch" in plan.reason
 
 
+def test_an_unresolved_attempt_is_never_handed_out_as_work() -> None:
+    """``OUTCOME_UNKNOWN`` exists because re-running the step is not known to be safe."""
+    workflow = branching_workflow()
+    states = {
+        "start": StepState.SUCCEEDED,
+        "left": StepState.OUTCOME_UNKNOWN,
+        "right": StepState.PENDING,
+    }
+
+    plan = plan_next(workflow, states, {"start": "left"})
+
+    assert plan.kind is PlanKind.NEEDS_DECISION
+    assert plan.step is not None and plan.step.id == "left"
+    assert "unresolved attempt" in plan.reason
+
+
 def test_a_predicate_selects_the_first_matching_edge() -> None:
     workflow = branching_workflow()
     outgoing = workflow.outgoing("start")

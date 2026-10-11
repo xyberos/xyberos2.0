@@ -25,12 +25,18 @@ execution.
   Phase 7, which audits and freezes the stable surface.*
 - Experimental APIs must be clearly named and documented, and should emit warnings where
   practical. *Satisfied in Phase 5 for the AI surface: `xyberos.ai` is documented as a stable,
-  dependency-free facade in `docs/ai.md`, and each adapter states its own prerequisite; `Phase 6`
-  remains the owner of the durable package as the experimental boundary and of
-  `ExperimentalWarning`.*
+  dependency-free facade in `docs/ai.md`, and each adapter states its own prerequisite. Satisfied in
+  Phase 6 for the durable surface: `open_journal` and `DurableWorker` emit `ExperimentalWarning`
+  once per process per entry point, the limits are stated in `docs/durable.md`, in the
+  [ADR 0011](./0011-durable-executor-contract.md) contract, and in the package docstring, and
+  `PLAN.md` section 5.4 keeps the promotion criteria. Phase 7 re-audits the labelling rather than
+  owning it.*
 - Plugin, configuration, Workflow-definition, and journal-schema compatibility are versioned
   independently from the package. *Plugin API and configuration schema versioning shipped with
   the plugin and configuration work; Workflow-definition versioning shipped in Phase 4, which made
   `version` a required definition attribute surfaced in events and inspection and required
   definition metadata to be JSON-serializable ([ADR 0009](./0009-workflow-engine-contract.md));
-  the stored journal schema and its migration path remain owned by Phase 6.*
+  the stored journal schema and its migration path shipped in Phase 6, which embeds a schema version
+  in `journal_metadata`, applies versioned DDL in one transaction, and refuses a journal written by a
+  newer package rather than interpreting rows it does not understand
+  ([ADR 0011](./0011-durable-executor-contract.md)).*

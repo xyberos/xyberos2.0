@@ -57,6 +57,9 @@ packages = ["src/xyberos"]
 addopts = "-ra"
 pythonpath = ["src", "examples", "tests/fixtures/metrics_plugin"]
 testpaths = ["tests"]
+# The durable package warns on purpose once per process, and the behavior is asserted explicitly in
+# tests/durable/test_journal.py, so the suite does not need to print it again.
+filterwarnings = ["ignore::xyberos.errors.ExperimentalWarning"]
 
 [tool.ruff]
 line-length = 100
@@ -68,6 +71,7 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.mypy]
 files = [
   "src",
+  "examples/durable_workflow/app.py",
   "tests/contracts/examples/phase1_minimal_app.py",
   "tests/contracts/examples/phase4_workflow.py",
 ]

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -10,6 +12,8 @@ from sqlalchemy import text
 
 from xyberos.durable import JOURNAL_SCHEMA_VERSION, JournalSettings, open_journal
 from xyberos.errors import DurableConfigurationError, DurableSchemaError
+
+SOURCE_ROOT = Path(__file__).resolve().parents[2] / "src"
 
 
 def test_opening_a_journal_creates_a_versioned_file(tmp_path: Path) -> None:
@@ -86,6 +90,55 @@ def test_the_journal_is_its_own_file_with_its_own_durability_defaults() -> None:
     assert sqlite.journal_mode == "WAL"
     assert sqlite.synchronous == "FULL"
     assert sqlite.retry_attempts >= 1
+
+
+def test_an_unstable_entry_point_warns_once_per_process() -> None:
+    """The warning is a feature, so it is pinned in a subprocess where filters cannot hide it.
+
+    Checking it here rather than in-process keeps the assertion independent of test order: the
+    warning is intentionally emitted once per process, so an in-process check would pass or fail
+    depending on which test ran first.
+    """
+    code = (
+        "import asyncio, tempfile, warnings\n"
+        "from pathlib import Path\n"
+        "from xyberos import Workflow\n"
+        "from xyberos.durable import JournalSettings, JournalStore, open_journal\n"
+        "from xyberos.durable.worker import DurableWorker\n"
+        "\n"
+        "async def step(value, context):\n"
+        "    return 'done'\n"
+        "\n"
+        "async def main():\n"
+        "    with tempfile.TemporaryDirectory() as temporary:\n"
+        "        with warnings.catch_warnings(record=True) as caught:\n"
+        "            warnings.simplefilter('always')\n"
+        "            journal = await open_journal(\n"
+        "                JournalSettings(path=Path(temporary) / 'journal.db')\n"
+        "            )\n"
+        "            store = JournalStore(journal)\n"
+        "            workflow = Workflow('w', version='1').step('s', step)\n"
+        "            await store.submit(workflow)\n"
+        "            DurableWorker(store, {'w:1': workflow})\n"
+        "            DurableWorker(store, {'w:1': workflow})\n"
+        "            await journal.aclose()\n"
+        "        assert len(caught) == 1, [str(w.message) for w in caught]\n"
+        "        message = str(caught[0].message)\n"
+        "        assert caught[0].category.__name__ == 'ExperimentalWarning', caught[0].category\n"
+        "        for phrase in ('experimental', 'single-host', 'at-least-once'):\n"
+        "            assert phrase in message, message\n"
+        "\n"
+        "asyncio.run(main())\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        capture_output=True,
+        text=True,
+        cwd=SOURCE_ROOT,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
 
 
 @pytest.mark.parametrize("path", [":memory:", "file::memory:?cache=shared"])

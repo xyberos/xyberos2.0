@@ -113,11 +113,22 @@ __all__ = [
 ]
 
 _LIMITS = (
-    "durable execution is experimental, single-host, and at-least-once: it does not guarantee "
-    "exactly-once external effects, multi-host ownership, or arbitrary Python checkpointing"
+    "single-host and at-least-once only, with no exactly-once external effects, no multi-host "
+    "ownership, and no arbitrary Python checkpointing"
 )
 
+_warned: set[str] = set()
 
-def warn_experimental(what: str, *, stacklevel: int = 3) -> None:
-    """Emit the experimental warning for an unstable entry point."""
-    warnings.warn(f"{what} is experimental. {_LIMITS}", ExperimentalWarning, stacklevel=stacklevel)
+
+def warn_experimental(what: str, *, stacklevel: int = 3, once: bool = True) -> None:
+    """Emit the experimental warning for an unstable entry point.
+
+    ``once`` keeps an application that opens one journal and starts three workers from printing the
+    same warning four times: the first mention is informative, the rest are noise. Pass
+    ``once=False`` when a caller needs an unconditional warning.
+    """
+    if once:
+        if what in _warned:
+            return
+        _warned.add(what)
+    warnings.warn(f"{what} is experimental: {_LIMITS}", ExperimentalWarning, stacklevel=stacklevel)

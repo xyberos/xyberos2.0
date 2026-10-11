@@ -83,6 +83,18 @@ documented operator responsibilities rather than hidden defaults.
 points, the package docstring, guide, and package metadata state the single-host and at-least-once
 limits, and the limits are repeated wherever a reader might assume more.
 
+**A parked execution is not claimable, and an unresolved attempt is never handed out as work.**
+`WAITING` is reachable from `RUNNING`, `PENDING`, and `RETRYING`, but no claim is eligible for it, so
+a parked execution waits for a person rather than for a worker. The scheduler reports
+``NEEDS_DECISION`` for a step in ``OUTCOME_UNKNOWN`` instead of treating it as ready, which closes the
+one dangerous window this design has: if an operator resumes a parked execution *before* reconciling
+it, the next worker parks it again with a reason instead of silently repeating an effect nobody can
+observe.
+
+**Events are appended, never rewritten.** Every decision recovery makes becomes an event, so an
+operator can reconstruct why an execution resumed, retried, parked, or stopped without reading a
+log line written by a process that no longer exists.
+
 ## Consequences
 
 - Phase 7 re-audits the labelling and decides promotion; promoting durable execution would require
@@ -101,3 +113,18 @@ limits, and the limits are repeated wherever a reader might assume more.
 - The in-process engine and the durable executor keep separate status vocabularies
   (`StepStatus` versus `StepState`) on purpose: they answer different questions, and one must not be
   read as the other.
+- **A reconciler must return the whole step output**, not the part it happens to know. Downstream
+  steps consume it, and the journal accepts a partial value without complaint, so a partial output
+  is accepted now and fails later inside an unrelated step. `examples/durable_workflow` builds the
+  output with the same function the step uses, which is the pattern to copy; a stricter check would
+  need its own decision because only the definition knows the output's shape.
+- **A spent lease outlives its claim**, because the lease row carries the monotonic fencing token, so
+  `expired_leases()` and the `expired_leases` statistic count only `running` executions. Deleting the
+  row on release would reset the token and break fencing, so the alternative — a nullable
+  "abandoned" marker — was rejected as more state for less safety.
+- **The experimental warning is emitted once per process per entry point.** `open_journal` and
+  `DurableWorker` both warn, which is what the exit criterion asks for, and the deduplication keeps a
+  long-lived application from repeating the same paragraph on every worker it starts.
+- **The process-kill harness deliberately does not share the parent's virtual clock**: a killed
+  subprocess cannot be given one. `xyberos.durable.testing.expire_leases` backdates a lease instead of
+  sleeping, which is deterministic and equivalent to time passing with no heartbeat.

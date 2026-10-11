@@ -174,7 +174,7 @@ Deprecation policy: mark a stable API deprecated in documentation and runtime wa
 ## Phase status
 
 The detailed work packages live in the phase-by-phase plan below; this table is the at-a-glance
-state. Phases 0–5 are complete and Phase 6 is under way.
+state. Phases 0–6 are complete; Phase 7 is next.
 
 | Phase | Scope | Status | Exit-gate evidence |
 | --- | --- | --- | --- |
@@ -184,32 +184,31 @@ state. Phases 0–5 are complete and Phase 6 is under way.
 | 3 | Trusted plugin and capability model | complete | `src/xyberos/plugins/`, `src/xyberos/diagnostics.py`, `tests/plugins/`, `tests/integration/test_plugin_packages.py`, `tests/fixtures/metrics_plugin/`, `examples/custom_plugin/`, [ADR 0007](adr/0007-trusted-plugins.md) |
 | 4 | Stable, in-process Workflow engine | complete | `src/xyberos/execution/`, `tests/workflow/` (107 tests), `tests/integration/test_workflow_example.py`, `tests/contracts/examples/phase4_workflow.py`, `examples/workflow/`, `docs/workflow.md`, [ADR 0009](adr/0009-workflow-engine-contract.md) |
 | 5 | Optional AI facade | complete | `src/xyberos/ai/`, `tests/ai/` (125 tests), `tests/integration/test_ai_assistant.py` (11 tests), `examples/ai_assistant/`, `docs/ai.md`, [ADR 0010](adr/0010-ai-facade-contract.md) |
-| 6 | Experimental single-host durable executor | in progress | journal, transition table, atomic claims, and inspection shipped in `src/xyberos/durable/` with `tests/durable/` (68 tests); [ADR 0011](adr/0011-durable-executor-contract.md); the worker loop, recovery pass, crash harness, example, and operator guide are next |
-| 7 | Developer experience, hardening, and release | planned | — |
+| 6 | Experimental single-host durable executor | complete | `src/xyberos/durable/` (10 modules), `tests/durable/` (100 tests), `tests/crash_recovery/` (17 process-kill tests), `tests/integration/test_durable_example.py`, `examples/durable_workflow/`, `docs/durable.md`, [ADR 0011](adr/0011-durable-executor-contract.md) |
+| 7 | Developer experience, hardening, and release | next | see the Phase 7 entry checklist below |
 
-### Phase 6 entry checklist
+### Phase 7 entry checklist
 
-Confirm these before starting Phase 6:
+Confirm these before starting Phase 7:
 
-1. The AI facade contract is frozen in [ADR 0010](adr/0010-ai-facade-contract.md): classification is
-   the retry interface, events are metadata-only, and no durable state depends on prompt content.
-2. Workflow definitions carry a required `version` and JSON-serializable metadata, so a stored
-   definition can be identified and migrated; the *journal* schema and its migration path are this
-   phase's work, not Phase 4's ([ADR 0009](adr/0009-workflow-engine-contract.md)).
-3. Durable execution is a separate package with a separate execution store: it must not extend the
-   application database provider's general-purpose API (see section 5 of
-   [the architecture plan](PLAN.md#5-native-durable-execution-detailed-design)), and it must not
-   require an AI SDK. Importing the dependency-free `xyberos.ai` contracts is allowed; importing
-   `xyberos.ai.ollama` is not. The runtime still imports neither.
-4. `Plugin`, configuration, and Workflow-definition versioning are versioned independently of the
-   package version ([ADR 0003](adr/0003-versions-and-experimental-scope.md)).
-5. The experimental boundary is named and warns where practical: this phase owns
-   `ExperimentalWarning` and the package that carries it.
-6. A process-kill and restart harness is planned for this phase (it is a prerequisite in the Phase 6
-   prerequisites list, and `tests/crash_recovery/` is reserved for it), and every timing assertion
-   runs on an injectable monotonic clock so leases and retry scheduling stay deterministic.
-7. The owner decisions in "Remaining owner decisions" that concern retention and redistribution are
-   settled for anything this phase persists.
+1. Phases 0–6 are complete and every public contract is frozen in an ADR: runtime
+   ([0005](adr/0005-phase-1-runtime-contract.md)), HTTP/database
+   ([0006](adr/0006-http-and-database-adapters.md)), plugins
+   ([0007](adr/0007-trusted-plugins.md)), Workflow
+   ([0009](adr/0009-workflow-engine-contract.md)), AI
+   ([0010](adr/0010-ai-facade-contract.md)), and durability
+   ([0011](adr/0011-durable-executor-contract.md)).
+2. Durable execution is explicitly experimental *and* its exit gate is met, so Phase 7 has to choose
+   between promoting it and omitting it from the release; either way it must not block the stable
+   runtime. Its promotion criteria are `PLAN.md` section 5.4.
+3. Both optional surfaces are complete enough to document as preview: the AI facade ships in core
+   with only adapters behind extras, and the durable package is behind the `durable` extra with a
+   separate journal.
+4. Known backlog items are dispositioned rather than quietly carried: the decorator Workflow API,
+   parallel steps, the step-executor boundary, richer schema keywords, streaming tool calls, and the
+   AI/RAG subsystem are all recorded as deferred, and the ones needing a new ADR say so.
+5. The owner decisions in "Remaining owner decisions" are settled, because release engineering
+   (licence, SBOM, changelog, and supported-version policy) depends on them.
 
 
 ## Detailed phase-by-phase execution plan
@@ -454,22 +453,34 @@ model names remain owner decisions.
 
 **Deliverables:** optional durable package, schema/migrations, store, scheduler/worker/recovery components, process-fault test harness, durable-workflow example, operator guide, and experimental API label with `ExperimentalWarning`.
 
-**Landed so far.** Work packages 1–4 are implemented and tested: the transition table is frozen in
-[ADR 0011](adr/0011-durable-executor-contract.md) and locked by a test that lists every row, the
-journal owns a versioned schema in a separate file and refuses a newer one, and
-`JournalStore` submits transactionally, claims atomically under a fencing token, guards every write
-with ownership and the token, schedules retries, persists cancellation requests, and exposes
-read-only inspection and queue statistics. `ExperimentalWarning` and the single-host/at-least-once
-limits ship with the package, and the import boundary tests prove core never imports
-`xyberos.durable` and that the durable package loads no HTTP or AI dependency.
+**Shipped.** All ten work packages are implemented. The transition table and invariants are frozen in
+[ADR 0011](adr/0011-durable-executor-contract.md) and locked by a test that lists every row; the
+journal owns a versioned schema in a separate file and refuses one written by a newer package; the
+store submits transactionally, claims atomically under a monotonic fencing token, and guards every
+write with ownership and the token; a pure scheduler re-derives the next step from persisted state
+alone; a worker advances one step per claim, heartbeats its lease, and turns a persisted cancellation
+request into cooperative cancellation; recovery resumes what it can prove, retries only what a step
+declares idempotent, asks a reconciler when one exists, and parks everything else as
+`outcome_unknown`. `docs/durable.md` is the operator guide and `examples/durable_workflow/` shows both
+crash cases.
 
-Two decisions taken while implementing are worth naming, because they shape the remaining work: a
-ready execution belongs to nobody (a live lease protects `RUNNING` work only, so a worker can
-advance one step per claim and yield), and a worker upgrades feedback into a reason — a refused write
-is re-read and reported as a lease, cancellation, or state problem rather than "no rows matched".
+The exit gate is met: `tests/durable/` covers every transition-table row, atomic claims, contention,
+stale-fence rejection, retry scheduling, lease expiry, cancellation races, and schema/version
+rejection against a real SQLite file; `tests/crash_recovery/` kills a real subprocess at each of the
+five documented boundaries and asserts the documented policy in the parent; a side-effect log proves
+at-least-once behavior and shows reconciliation resolving an uncertain attempt without a repeat; and
+the experimental labelling is verified by emitting `ExperimentalWarning` from `open_journal` and
+`DurableWorker`.
 
-Remaining: the worker loop and scheduler, the startup recovery pass, activity idempotency wiring, the
-process-kill harness, the example, and the operator guide. The exit gate is not met until those land.
+Two decisions taken while implementing are worth naming, because they define the contract's edges: a
+ready execution belongs to nobody (a live lease protects `RUNNING` work only, so one worker advances
+one step per claim and yields), and an unresolved attempt is never handed out as work (the scheduler
+reports `NEEDS_DECISION`, so a resumed-but-unreconciled execution parks again instead of silently
+repeating an effect).
+
+**Deliberate non-guarantee:** the single-host, at-least-once limits are stated in the guide, the ADR,
+the package docstring, and the emitted warning. Phase 7 decides whether to promote or omit, and must
+not represent durability as exactly-once, multi-host, or highly available.
 
 ### Phase 7 - developer experience, hardening, and release
 
@@ -521,8 +532,12 @@ core runtime/config/registry
 Dependencies point downward in this diagram, and optional pieces hang off the core rather than off
 each other. The runtime cannot import HTTP, AI, or durable modules; `xyberos.ai` imports neither a
 vendor adapter nor `xyberos.execution`, so an AI call is usable with or without a workflow around it;
-Workflow cannot import a particular AI SDK; the durable executor consumes stable Workflow definition
-contracts but does not replace the in-process executor for ordinary work.
+Workflow cannot import a particular AI SDK; and the durable executor consumes stable Workflow
+definition contracts without replacing the in-process executor for ordinary work. The one dependency
+between optional packages is deliberate and narrow: `xyberos.durable` imports the SQLite connection
+plumbing in `xyberos.database.sqlite` for PRAGMAs, WAL, and the bounded retry on write contention,
+while keeping its own file, schema, and tables. Building a second copy of that plumbing was rejected
+as the larger risk.
 
 ### Definition of phase completion
 
@@ -620,6 +635,14 @@ Use a monotonic clock abstraction for Workflow and durability tests. Avoid sleep
   validate more loosely than it reads.
 - Pairing an embedding model with a chat model in a single provider contract; Phase 5 configures
   them separately (`model`, `embedding_model`) because one Ollama model does not serve both.
+- Structural validation of a reconciler's returned output. The journal checks that a result is
+  JSON-serializable and bounded, not that it matches the shape downstream steps expect; Phase 6
+  documents the trap and shows the pattern to copy, and a real check would need the definition to
+  declare a step's output type.
+- Journal retention tooling: Phase 6 documents how to bound the file (delete terminal executions,
+  which cascades) and deliberately ships no scheduler or command for it.
+- Promoting durable execution beyond experimental status. `PLAN.md` section 5.4 lists what has to be
+  demonstrated; until then the API keeps warning.
 
 **Non-goals, not deferred work.** Xyberos does not infer a refusal, a provider capability, or
 structured-output support from response text. Only a provider-reported signal is trusted, because a

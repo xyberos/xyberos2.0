@@ -368,6 +368,20 @@ Use a separate execution-store interface. Do not put workflow history into the a
 
 Initial limitation: single-instance execution only. Do not claim safe multi-host execution or Temporal-equivalent guarantees.
 
+**Shipped in Phase 6.** The executor lives in `src/xyberos/durable/` behind the `durable` extra:
+`models.py` holds the statuses and the transition table, `journal.py` owns a versioned SQLite schema
+in its own file, `store.py` does transactional submission, atomic fenced claims, guarded writes, and
+inspection, `scheduler.py` re-derives the next step from persisted state alone, `worker.py` runs one
+step per claim with a lease heartbeat, `recovery.py` decides what an interrupted attempt means, and
+`definitions.py` refuses to resume against a definition that no longer matches. The contract is
+[ADR 0011](./adr/0011-durable-executor-contract.md), the operator guide is [`docs/durable.md`](./durable.md),
+and the failure table in section 5.3 above is verified by a process-kill harness that kills a real
+subprocess at each documented boundary.
+
+Two properties are worth reading before the design: state is recovered per *step*, never per
+bytecode, because workflow code is never persisted; and an attempt whose outcome cannot be
+established is recorded as `outcome_unknown` and parked, never retried on a guess.
+
 ## 5. Native durable execution: detailed design
 
 This subsystem is the highest-risk part of the architecture. Its design should be narrow enough to implement, but its persistence semantics must be correct.
@@ -479,7 +493,11 @@ src/xyberos/
 │   ├── models.py        # statuses, the transition table, and inspection records
 │   ├── journal.py       # versioned journal schema and settings
 │   ├── store.py         # submission, atomic claims, guarded writes, inspection
-│   └── testing.py       # ManualWallClock for lease and retry tests
+│   ├── definitions.py   # definition lookup and fingerprint matching
+│   ├── scheduler.py     # the next action, derived from persisted state alone
+│   ├── recovery.py      # what an interrupted attempt means
+│   ├── worker.py        # claim, run one step, commit, yield
+│   └── testing.py       # ManualWallClock and deterministic lease expiry
 ├── http/                # optional "http" extra (Starlette)
 │   ├── adapter.py, middleware.py, routing.py, requests.py, testing.py
 └── database/            # optional "database" extra (SQLAlchemy Core, aiosqlite, Alembic)
@@ -489,7 +507,8 @@ examples/
 ├── sqlite_crud/         # worked CRUD slice with Alembic migrations
 ├── custom_plugin/       # plugin authoring example
 ├── workflow/            # workflow example with retries, branching, and events
-└── ai_assistant/        # AI facade wired through a plugin, DI, routes, and a workflow
+├── ai_assistant/        # AI facade wired through a plugin, DI, routes, and a workflow
+└── durable_workflow/    # durable example: a worker dies between steps, and mid-step
 
 tests/
 ├── runtime/             # Phase 1 exit-criteria tests
@@ -498,6 +517,8 @@ tests/
 ├── plugins/             # plugin contract, configuration, and lifecycle tests
 ├── workflow/            # Phase 4 exit-criteria tests
 ├── ai/                  # Phase 5 exit-criteria tests, including the Ollama adapter
+├── durable/             # Phase 6 exit-criteria tests for the journal, store, and worker
+├── crash_recovery/      # Phase 6 process-kill harness and its shared definition
 ├── durable/             # Phase 6 exit-criteria tests for the journal and store
 ├── integration/         # end-to-end example, migration, plugin-package, workflow, and AI tests
 ├── fixtures/            # separately packaged plugin used as a test fixture
@@ -580,17 +601,17 @@ xyberos3/
     ├── plugins/          # implemented (Phase 3)
     ├── workflow/         # implemented (Phase 4)
     ├── ai/               # implemented (Phase 5)
+    ├── durable/          # implemented (Phase 6)
+    ├── crash_recovery/   # implemented (Phase 6, process-kill harness)
     ├── fixtures/         # implemented (separately packaged plugin)
     ├── contracts/        # implemented (executable API examples)
     ├── integration/      # implemented
-    ├── durable/          # planned
-    └── crash_recovery/   # planned
 
 ```
 
-The directory layout is a target, not a requirement to create empty modules upfront. Implement a module only when its responsibilities and contracts are understood. A target module may be split once its real responsibilities are clear, as `execution/` was: `models`, `policies`, `validation`, `executor`, `events`, `direct`, and `testing` are separate because they are separately testable, not because the plan predicted those exact names.
+The directory layout is a target, not a requirement to create empty modules upfront. Implement a module only when its responsibilities and contracts are understood. A target module may be split once its real responsibilities are clear, as `execution/` and `durable/` both were: `execution`'s seven modules and `durable`'s nine are separate because they are separately testable — the scheduler is a pure function, the store is the only writer, recovery is the only place that decides what an interrupted attempt means — not because the plan predicted those exact names.
 
-Keep `durable/` importable independently of the core. An installation that does not use experimental durability should not need its dependencies or initialize its database tables.
+Keep `durable/` importable independently of the core. An installation that does not use experimental durability does not need its dependencies, and its journal is created only when something opens it.
 
 ## 7. Development roadmap
 
@@ -606,7 +627,7 @@ is the summary.
 | 3 | Plugins and capabilities | An independently developed plugin | 1–2 weeks | complete |
 | 4 | Stable in-process Workflow | A tested, inspectable workflow engine without durability promises | 2–3 weeks | complete |
 | 5 | AI facade and integration | An AI application built on the same runtime and Workflow APIs | 1–2 weeks | complete |
-| 6 | Experimental durable execution | An experimental single-instance executor with documented limits | 3–6+ weeks | next |
+| 6 | Experimental durable execution | An experimental single-instance executor with documented limits | 3–6+ weeks | complete |
 | 7 | DX, hardening, and release | A stable runtime and Workflow release; durability remains experimental | 1–2 weeks | planned |
 
 Estimated initial implementation: approximately 10–18+ working weeks for one experienced developer, including a limited experimental durable executor. The work can take longer if building and validating recovery semantics reveals additional requirements.

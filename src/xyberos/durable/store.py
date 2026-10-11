@@ -1638,7 +1638,14 @@ class JournalStore:
         return tuple([await self.inspect(identifier) for identifier in identifiers])
 
     async def expired_leases(self) -> tuple[str, ...]:
-        """Return executions whose owner stopped heartbeating before finishing."""
+        """Return executions a worker abandoned mid-step: their owner stopped heartbeating.
+
+        Only ``running`` executions count. A lease row outlives the claim that created it — it has
+        to, because it carries the monotonic fencing token — so a ready, retrying, or parked
+        execution still has a spent lease whose ``expires_at`` is in the past. That is not an
+        orphaned lease: nobody needs to take the execution over, it is already in the ready queue or
+        waiting for a decision. Reporting it would make every yield look like a crash.
+        """
         now = to_iso(self._now())
 
         async def operation(connection: AsyncConnection) -> tuple[str, ...]:
@@ -1647,8 +1654,7 @@ class JournalStore:
                     text(
                         "SELECT l.execution_id FROM worker_leases AS l"
                         " JOIN executions AS e ON e.execution_id = l.execution_id"
-                        " WHERE l.expires_at <= :now"
-                        " AND e.status NOT IN ('completed', 'failed', 'cancelled', 'timed_out')"
+                        " WHERE l.expires_at <= :now AND e.status = 'running'"
                         " ORDER BY l.expires_at"
                     ),
                     {"now": now},
@@ -1676,8 +1682,7 @@ class JournalStore:
                     text(
                         "SELECT COUNT(*) FROM worker_leases AS l"
                         " JOIN executions AS e ON e.execution_id = l.execution_id"
-                        " WHERE l.expires_at <= :now"
-                        " AND e.status NOT IN ('completed', 'failed', 'cancelled', 'timed_out')"
+                        " WHERE l.expires_at <= :now AND e.status = 'running'"
                     ),
                     {"now": to_iso(now)},
                 )

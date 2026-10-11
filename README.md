@@ -4,11 +4,12 @@ Xyberos is an experimental, composable Python application runtime. Its planned s
 surface is application composition, typed dependencies, Starlette-backed HTTP, SQLite,
 and explicit in-process Workflow execution. Durable execution and AI adapters are optional.
 
-The project is currently at version `0.0.0`. Phases 0–5 are complete: the architecture baseline,
-the application runtime, the Starlette HTTP adapter with the SQLite database provider, the trusted
-plugin/capability model, the in-process workflow engine, and the provider-neutral AI facade with
-Ollama as the first adapter. Experimental durable execution is still in progress. Breaking changes
-are expected before `1.0.0`.
+The project is currently at version `0.0.0`. Phases 0–6 are complete: the architecture baseline, the
+application runtime, the Starlette HTTP adapter with the SQLite database provider, the trusted
+plugin/capability model, the in-process workflow engine, the provider-neutral AI facade with Ollama
+as the first adapter, and the experimental durable executor. Release engineering is what remains.
+Breaking changes are expected before `1.0.0`. **Durable execution is experimental** and is never
+represented as exactly-once, multi-host, or highly available.
 
 ## Runtime
 
@@ -166,6 +167,36 @@ started, stopped, or downloaded by the framework: a missing model is a configura
 something the framework fixes. See the [AI guide](docs/ai.md) and the
 [`ai_assistant` example](examples/ai_assistant/README.md).
 
+## Durable execution (experimental)
+
+Multi-step work can outlive the process that was running it. Progress is persisted in a separate
+SQLite journal, so a new worker resumes from the record instead of from memory:
+
+```python
+from xyberos.durable import ActivityPolicy, JournalSettings, JournalStore, open_journal
+from xyberos.durable.worker import DurableWorker, WorkerSettings
+
+journal = await open_journal(JournalSettings(path="var/journal.db"))
+store = JournalStore(journal)
+
+await store.submit(workflow, input={"invoice": "INV-1001"}, execution_id="invoice-1001")
+
+worker = DurableWorker(
+    store,
+    {"invoice:1": workflow},
+    activities={"charge": ActivityPolicy()},
+    settings=WorkerSettings(owner="worker-1"),
+)
+await worker.serve()
+```
+
+The limits are part of the contract, not a disclaimer: **single host, one journal file, at-least-once
+effects**. A persisted step result proves a step completed, not that its external effect happened
+exactly once. An attempt whose outcome cannot be established is recorded as `outcome_unknown` and
+parked for a decision rather than retried on a guess. See the
+[durable execution guide](docs/durable.md), [ADR 0011](docs/adr/0011-durable-executor-contract.md),
+and the [`durable_workflow` example](examples/durable_workflow/README.md).
+
 ## Development
 
 Use Python 3.10 or newer. Install the project with development tools and run the quality
@@ -189,7 +220,7 @@ python -m pip install -e ".[ollama]"
 python -m pip install -e ".[durable]"
 ```
 
-See [the architecture plan](docs/PLAN.md), [the phase-by-phase implementation plan](docs/implementation.md), [the runtime guide](docs/runtime.md), [the HTTP guide](docs/http.md), [the database operations guide](docs/database.md), [the plugin guide](docs/plugins.md), [the workflow guide](docs/workflow.md), [the AI guide](docs/ai.md), and [the architecture decisions](docs/adr/).
+See [the architecture plan](docs/PLAN.md), [the phase-by-phase implementation plan](docs/implementation.md), [the runtime guide](docs/runtime.md), [the HTTP guide](docs/http.md), [the database operations guide](docs/database.md), [the plugin guide](docs/plugins.md), [the workflow guide](docs/workflow.md), [the AI guide](docs/ai.md), [the durable execution guide](docs/durable.md), and [the architecture decisions](docs/adr/).
 
 ## Status and compatibility
 

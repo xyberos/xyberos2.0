@@ -1,6 +1,6 @@
 # Runtime guide
 
-> Status: Phases 1–5. This guide documents the preview runtime surface reached through the
+> Status: Phases 1–6. This guide documents the preview runtime surface reached through the
 > stable `xyberos` import root. Preview APIs may change in a `0.x` minor release with upgrade
 > notes. The frozen contract is recorded in
 > [ADR 0005](./adr/0005-phase-1-runtime-contract.md); see
@@ -238,5 +238,6 @@ HTTP support is provided by the optional `http` extra ([guide](./http.md)) and t
 provider by the optional `database` extra ([operations guide](./database.md)); plugins, the
 in-process workflow engine, and the provider-neutral AI facade are part of core
 ([plugin guide](./plugins.md), [workflow guide](./workflow.md), [AI guide](./ai.md)). Only vendor
-adapters sit behind extras — `ollama` today — and durable execution arrives in a later phase. See
+adapters sit behind extras — `ollama` today — and experimental durable execution lives behind the
+`durable` extra ([durable execution guide](./durable.md)). See
 [the implementation plan](./implementation.md#detailed-phase-by-phase-execution-plan).

@@ -269,6 +269,9 @@ class Journal:
 
 async def open_journal(settings: JournalSettings | None = None) -> Journal:
     """Create, start, migrate, and return a journal the caller owns and closes."""
+    from xyberos.durable import warn_experimental
+
+    warn_experimental("xyberos.durable")
     journal = Journal(settings)
     await journal.start()
     return journal

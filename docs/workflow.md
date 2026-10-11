@@ -11,7 +11,7 @@ Xyberos keeps the distinction explicit, because the promises differ:
 | --- | --- | --- | --- |
 | Direct call (`await direct(...)`) | one function is the whole task | context, deadline, cooperative cancellation; the callable's own exception propagates unchanged | retries, inspection, branching |
 | Workflow (`await workflow.run(...)`) | multi-step work you want to inspect, retry, branch, and observe | validated graph, bounded retries, per-step and whole-run deadlines, structured events, no orphan tasks | persistence, recovery, parallel steps |
-| Durable execution (`xyberos.durable`) | Phase 6, experimental | persisted progress on a single host | production recovery guarantees |
+| Durable execution (`xyberos.durable`) | multi-step work that must outlive the process, on one host | persisted progress, fenced single-owner claims, recovery, cancellation, inspection; **experimental** | exactly-once effects, multi-host ownership, arbitrary Python checkpointing |
 
 An ordinary HTTP handler does not need a workflow. Reach for one when the work is multi-step and
 you want the steps to be visible, bounded, and testable without a live provider.
@@ -271,7 +271,8 @@ assert clock.sleeps == (0.5,)   # exactly one backoff delay was requested
 ## Deliberate limitations
 
 - **No persistence or recovery.** State is lost when the process exits, and execution events are not
-  a durable journal. Durability is the separate, experimental Phase 6 executor.
+  a durable journal. Durability is the separate [durable executor](./durable.md), which is
+  experimental and keeps its own journal.
 - **No parallel step execution.** Execution is sequential and conditional; arbitrary DAG scheduling
   is not claimed.
 - **No loops.** Cycles are rejected at validation time.

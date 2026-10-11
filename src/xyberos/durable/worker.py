@@ -95,6 +95,9 @@ class DurableWorker:
         random: Random | None = None,
         logger: Logger | None = None,
     ) -> None:
+        from xyberos.durable import warn_experimental
+
+        warn_experimental("xyberos.durable")
         self._store = store
         self._definitions = definitions
         self._activities = dict(activities or {})
@@ -197,6 +200,14 @@ class DurableWorker:
                     "failed",
                     step_id=plan.step.id if plan.step else None,
                     detail="definition conflict",
+                )
+            if plan.kind is PlanKind.NEEDS_DECISION:
+                await self._store.mark_waiting(claim, reason=plan.reason)
+                return WorkOutcome(
+                    claim.execution_id,
+                    "parked",
+                    step_id=plan.step.id if plan.step else None,
+                    detail="needs_decision",
                 )
             step = plan.step
             if step is None:  # pragma: no cover - a plan always names a step

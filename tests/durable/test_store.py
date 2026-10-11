@@ -669,6 +669,50 @@ def test_expired_leases_are_listed_for_recovery(tmp_path: Path) -> None:
     asyncio.run(scenario())
 
 
+def test_a_spent_lease_on_a_ready_execution_is_not_an_orphaned_lease(tmp_path: Path) -> None:
+    """A lease row outlives its claim, because it carries the fencing token.
+
+    Only a ``running`` execution can be abandoned mid-step. Once a worker yields, the execution is
+    ready and its spent lease means nothing, so reporting it would make every yield look like a
+    crash — and the operator counter would climb forever.
+    """
+
+    async def scenario() -> None:
+        async with Harness(tmp_path) as store:
+            handle = await store.submit(two_step_workflow(), input=None)
+            claim = await store.claim_next("worker-a")
+            assert claim is not None
+            await store.start_step(claim, "one")
+            await store.complete_step(claim, "one", "one-out")
+            await store.yield_execution(claim)
+
+            view = await store.inspect(handle.execution_id)
+            assert view.status is ExecutionStatus.PENDING
+            assert await store.expired_leases() == ()
+
+            stats = await store.stats()
+            assert stats.expired_leases == 0
+            assert stats.queued == 1
+            assert stats.running == 0
+
+            # The same holds for a retrying execution.
+            retry = await store.claim_next("worker-b")
+            assert retry is not None
+            await store.start_step(retry, "two")
+            await store.fail_step(
+                retry,
+                "two",
+                error_type="TransientServiceError",
+                error_message="again",
+                retry_at=store.clock.now() + timedelta(seconds=60),
+            )
+            stats_after_retry = await store.stats()
+            assert stats_after_retry.expired_leases == 0
+            assert stats_after_retry.retrying == 1
+
+    asyncio.run(scenario())
+
+
 def test_a_released_lease_hands_the_work_over_immediately(tmp_path: Path) -> None:
     async def scenario() -> None:
         async with Harness(tmp_path, lease_ttl_seconds=300.0) as store:

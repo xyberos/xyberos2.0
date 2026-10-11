@@ -12,7 +12,31 @@ import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
+from sqlalchemy import text
+
+from xyberos.durable.contracts import utc_now
+from xyberos.durable.journal import Journal, to_iso
 from xyberos.durable.models import ActivityPolicy
+
+
+async def expire_leases(journal: Journal) -> int:
+    """Backdate every live lease so recovery sees it as expired; return how many were changed.
+
+    This is a virtual clock for a *separate* process. A subprocess that is killed cannot be given a
+    test clock, so a test that has to prove what happens after its lease runs out backdates the
+    lease row instead of sleeping. The effect is identical to the passage of time with no
+    heartbeat, and it makes the assertion deterministic rather than timing-dependent.
+
+    Deleting the row would be a different test: expiry is the case where the previous owner is
+    unknown rather than absent, and the fencing token must still be honoured.
+    """
+    past = to_iso(utc_now() - timedelta(days=1))
+    async with journal.database.transaction() as connection:
+        result = await connection.execute(
+            text("UPDATE worker_leases SET expires_at = :past WHERE expires_at > :past"),
+            {"past": past},
+        )
+        return int(result.rowcount)
 
 
 @dataclass

@@ -131,3 +131,57 @@ jobs:
           asyncio.run(main())
           print("ollama adapter importable and drivable without a service")
           PY
+      - if: matrix.extra == 'durable'
+        run: |
+          python - <<'PY'
+          import asyncio
+          import tempfile
+          import warnings
+          from pathlib import Path
+
+          from xyberos import Workflow
+          from xyberos.durable import (
+              ActivityPolicy,
+              ExecutionStatus,
+              JournalSettings,
+              JournalStore,
+              open_journal,
+          )
+          from xyberos.durable.worker import DurableWorker, WorkerSettings
+
+
+          async def step(value, context):
+              return "done"
+
+
+          async def main() -> None:
+              with tempfile.TemporaryDirectory() as temporary:
+                  with warnings.catch_warnings(record=True) as caught:
+                      warnings.simplefilter("always")
+                      journal = await open_journal(
+                          JournalSettings(path=Path(temporary) / "journal.db")
+                      )
+                  assert any(w.category.__name__ == "ExperimentalWarning" for w in caught), caught
+
+                  store = JournalStore(journal)
+                  workflow = Workflow("smoke", version="1").step("run", step)
+                  await store.submit(workflow, input=None)
+
+                  worker = DurableWorker(
+                      store,
+                      {"smoke:1": workflow},
+                      activities={"run": ActivityPolicy()},
+                      settings=WorkerSettings(owner="ci"),
+                  )
+                  while await worker.run_once() is not None:
+                      pass
+
+                  view = await store.inspect((await store.list_executions())[0].execution_id)
+                  assert view.status is ExecutionStatus.COMPLETED, view.status
+                  assert view.result == {"run": "done"}, view.result
+                  await journal.aclose()
+              print("durable executor usable with the durable extra")
+
+
+          asyncio.run(main())
+          PY

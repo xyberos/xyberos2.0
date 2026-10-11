@@ -705,6 +705,59 @@ def test_the_idempotency_key_is_stable_across_attempts(tmp_path: Path) -> None:
     asyncio.run(scenario())
 
 
+def test_a_parked_execution_is_not_re_run_when_it_is_woken_up(tmp_path: Path) -> None:
+    """Resuming a parked execution must not silently repeat an effect of unknown status.
+
+    This is the dangerous window: an operator resumes an execution whose step is ``OUTCOME_UNKNOWN``
+    before reconciling it. The worker must park it again with a reason, never run the step.
+    """
+    attempts: list[str] = []
+
+    async def charge(value: object, context: Any) -> str:
+        attempts.append("charge")
+        return "charged"
+
+    def charge_workflow() -> Workflow:
+        return Workflow("charge", version="1").step("charge", charge)
+
+    async def scenario() -> None:
+        async with Rig(tmp_path, charge_workflow(), lease_ttl_seconds=30.0) as rig:
+            handle = await rig.store.submit(charge_workflow())
+            dead = await rig.store.claim_next("dead-worker")
+            assert dead is not None
+            await rig.store.start_step(dead, "charge")
+            attempts.append("charge")  # the effect happened before the crash
+            rig.clock.advance(31.0)
+            assert (await rig.worker.recover()).parked == (handle.execution_id,)
+
+            await rig.store.resume_waiting(handle.execution_id, reason="operator woke it up")
+            outcome = await rig.worker.run_once()
+
+            assert outcome is not None and outcome.action == "parked"
+            assert outcome.detail == "needs_decision"
+            # The only recorded attempt is the one the dead worker made before it crashed.
+            assert attempts == ["charge"]
+            view = await rig.store.inspect(handle.execution_id)
+            assert view.status is ExecutionStatus.WAITING
+            assert view.steps[0].state is StepState.OUTCOME_UNKNOWN
+            assert view.steps[0].attempts == 1
+
+            # Once an operator resolves it, the run continues normally. Resolving needs a claim, and
+            # a parked execution has none, so the operator resumes it and then records the decision.
+            await rig.store.resume_waiting(handle.execution_id, reason="operator decided")
+            claim = await rig.store.claim_next("operator-session")
+            assert claim is not None
+            await rig.store.resolve_step(
+                claim, "charge", state=StepState.SUCCEEDED, output="charged"
+            )
+            final = await rig.worker.run_once()
+            assert final is not None and final.action == "completed"
+            # Resolving is not re-running: the effect happened once, in the dead worker's attempt.
+            assert attempts == ["charge"]
+
+    asyncio.run(scenario())
+
+
 def test_a_step_that_stops_the_run_is_honored(tmp_path: Path) -> None:
     async def stop(value: object, context: object) -> str:
         raise WorkflowCancelledError("the operator stopped this run")

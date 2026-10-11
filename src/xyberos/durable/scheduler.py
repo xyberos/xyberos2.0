@@ -31,6 +31,7 @@ class PlanKind(str, Enum):
     SKIP_STEP = "skip_step"
     COMPLETE = "complete"
     CONFLICT = "conflict"
+    NEEDS_DECISION = "needs_decision"
 
 
 @dataclass(frozen=True)
@@ -54,6 +55,10 @@ def plan_next(
 
     ``outputs`` maps a *succeeded* step id to its persisted output, which is what branch predicates
     are evaluated against.
+
+    A step left ``OUTCOME_UNKNOWN`` stops the decision immediately. That state exists precisely
+    because re-running the step is not known to be safe, so the scheduler must never hand it out as
+    work: it reports ``NEEDS_DECISION`` and lets a person or a reconciler say what happened.
     """
     taken = _taken_edges(workflow, states, outputs)
     undecided = False
@@ -61,6 +66,16 @@ def plan_next(
         state = states.get(step.id, StepState.PENDING)
         if step_is_terminal(state):
             continue
+        if state is StepState.OUTCOME_UNKNOWN:
+            return Plan(
+                kind=PlanKind.NEEDS_DECISION,
+                step=step,
+                reason=(
+                    f"step {step.id!r} has an unresolved attempt: whether its effect happened is "
+                    "unknown, so it must be reconciled or explicitly repeated before the run "
+                    "continues"
+                ),
+            )
         incoming = workflow.incoming(step.id)
         reached = tuple(edge.source for edge in incoming if (edge.source, edge.target) in taken)
         if len(reached) > 1:
