@@ -3,7 +3,9 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    # The default branch. It is master, not main, and this filter is load-bearing: with a name that
+    # does not exist here, CI never runs on a push, which is how the first two pushes went untested.
+    branches: [master]
 
 jobs:
   quality:

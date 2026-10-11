@@ -133,10 +133,11 @@ The upload itself, and the checks that only make sense once a release is on the 
 
 ## Deploying to PyPI
 
-> Status: planned, never performed. The source changes and the repository are in place; what remains
-> before the first upload is an index credential and the one open row in the preconditions table.
-> Nothing here reopens the number: [ADR 0017](./adr/0017-release-identity-and-lineage.md) decides
-> that, and this section exists so the decision survives contact with the index.
+> Status: planned, never performed. The source changes, the repository, and the publishing workflow are
+> in place; what remains before the first upload is a trusted publisher registered on the index, which
+> only a project owner can do. Nothing here reopens the number:
+> [ADR 0017](./adr/0017-release-identity-and-lineage.md) decides that, and this section exists so the
+> decision survives contact with the index.
 
 ### Preconditions
 
@@ -147,10 +148,10 @@ an existing one, which is why these four things come first.
 
 | # | Precondition | Why it blocks | How to confirm |
 | --- | --- | --- | --- |
-| 1 | The uploading account owns or maintains the PyPI project `xyberos` | An upload from any other account is refused as "not allowed to upload to this project", and there is no second name to fall back to | Sign in to PyPI and read the project's *Collaborators* and *Publishing* settings; the account behind the credential must be listed |
+| 1 | An owner of the PyPI project `xyberos` registers the trusted publisher below | Only a project owner can add one, and without it the publish job fails on authentication with nothing to fall back on: there is no second name, and no token is kept | Sign in to PyPI, open the project's *Publishing* settings, and add the publisher with the exact values in [The publishing workflow](#the-publishing-workflow) |
 | 2 | The repository this line publishes from — **`https://github.com/xyberos/xyberos2.0`**, default branch `master` | The declared project URLs, the README's links, and a trusted publisher all bind to it, so the URL and the branch name have to be settled before the metadata is written | `git rev-parse master origin/master` matches, and every declared URL resolves — see [Preparing the repository](#preparing-the-repository) |
-| 3 | The upload mechanism and its credential exist | Publishing is manual by design, so the token or the index-side publisher has to be created before the first attempt rather than during it | See [Choosing the upload mechanism](#choosing-the-upload-mechanism) |
-| 4 | The fate of `https://docs.xyberos.com` — **still open** | The 1.x page publishes it as its Documentation link, and it documents the 1.x line; after the upload the project page is this line's while that link still points at the other one | A decision, not a check. Until it is made, the declared `Documentation` URL is the repository's own `docs/` directory |
+| 3 | The publication path — **decided: trusted publishing from `.github/workflows/publish.yml`**, started by hand | The workflow authenticates with an OIDC identity and keeps no secret, so the index-side publisher has to exist before the first attempt rather than during it | See [The publishing workflow](#the-publishing-workflow) |
+| 4 | The `Documentation` URL — **decided for now: the repository's own `docs/` directory** | `https://docs.xyberos.com` documents the 1.x line, so pointing this line's page at it would advertise the wrong codebase | The declared value in `[project.urls]`; it moves when the documentation site carries content for this line |
 
 ### Preparing the repository
 
@@ -191,8 +192,8 @@ readers see. The evidence is the wheel built in [Before the tag](#before-the-tag
   the newest release's metadata, so they are dropped by it.
 - **`Documentation` is the one interim value.** It points at the repository's `docs/` directory rather
   than at `https://docs.xyberos.com`, which documents the 1.x line. Advertising the other line's site
-  from this line's page is worse than linking the source tree, so the value moves when precondition 4
-  is settled.
+  from this line's page is worse than linking the source tree, so the value moves once that site has
+  content for this line.
 - **Absolute links in the long description.** `readme = "README.md"` ships as
   `Description-Content-Type: text/markdown`, and a relative target in it resolves against
   `https://pypi.org/project/xyberos/` rather than the repository, so each one becomes a dead link on
@@ -202,35 +203,56 @@ readers see. The evidence is the wheel built in [Before the tag](#before-the-tag
 - **`keywords`, which were also absent.** They are an indexed search field, and the same edit fills
   them.
 
-### Choosing the upload mechanism
+### The publishing workflow
 
-| Mechanism | What it needs | What it costs |
+Publication runs through [.github/workflows/publish.yml](../.github/workflows/publish.yml) and uses
+trusted publishing: the run authenticates with GitHub's OIDC token and stores no credential, so there
+is no token to rotate and none to leak. A project-scoped API token would work too and needs no
+index-side configuration, but it buys nothing this pipeline needs in exchange for a long-lived secret
+to protect.
+
+The workflow is started by hand and takes two inputs: the version that is already tagged `v<version>`,
+and the index. It checks out the tag, refuses to continue unless the request, the source, and the
+changelog all name the same version, verifies the metadata with `twine check --strict`, installs the
+built wheel and asks it its version, and only then uploads — with a signed provenance attestation for
+each file, which the publisher produces by default under trusted publishing. It does not repeat the
+test suite, because `ci.yml` already runs it on every push to the default branch; the gate this
+workflow adds is that the artefact agrees with what it claims to be.
+
+**The publisher registered on the index has to match this file exactly.** A mismatch is the failure
+that looks like a broken login rather than a configuration error:
+
+| Field | PyPI | TestPyPI |
 | --- | --- | --- |
-| Project-scoped API token, with `twine` | A token created on the project and stored outside the checkout; `python -m pip install twine`, which the `dev` extra does not include | Nothing configured on the index and no workflow to maintain; a long-lived secret to rotate and to keep out of the repository |
-| Trusted publishing, with `pypa/gh-action-pypi-publish` | A publisher on the project bound to the repository, the workflow file, and an environment, plus a `workflow_dispatch` job | No long-lived secret, and provenance attestations come with it; a workflow that exists to upload an artefact some other run built |
+| Project name | `xyberos` | `xyberos` |
+| Owner | `xyberos` | `xyberos` |
+| Repository | `xyberos2.0` | `xyberos2.0` |
+| Workflow | `publish.yml` | `publish.yml` |
+| Environment | `pypi` | `testpypi` |
 
-Both keep publishing a decision, which is what [What is deliberately not
-automated](#what-is-deliberately-not-automated) requires: a tag starts a build, never an upload. The
-first release is the one case where the token path is simpler, because there is no pipeline yet for an
-attestation to attach to.
+PyPI already has the project, so the publisher is added to it. TestPyPI does not, so it takes a
+*pending* publisher — the same form, which creates the project on the first successful upload.
+
+Two settings outside the repository are what make "publishing is a decision" something the pipeline
+enforces rather than something everyone has to remember:
+
+- **Required reviewers on the `pypi` environment.** The run pauses for a person, which is the release
+  gate expressed in the pipeline instead of in a document.
+- **`id-token: write` on the publishing job alone.** The build job holds `contents: read` and no token
+  permission, so a compromised build step cannot mint an upload identity for itself.
 
 ### The first upload
 
-1. **Rehearse on TestPyPI.** `xyberos` is unclaimed there, so it is free to use, and the rehearsal
-   covers the mechanics:
-
-   ```powershell
-   python -m build
-   python -m pip install --upgrade twine
-   python -m twine check dist/*
-   python -m twine upload --repository testpypi dist/*
-   ```
+1. **Rehearse on TestPyPI.** Start `Publish` with `version` set to the version and `index` set to
+   `testpypi`. `xyberos` is unclaimed there, so it is free to use, and the run covers the mechanics end
+   to end: build from the tag, the consistency checks, `twine check`, the wheel install, the upload, and
+   the attestation.
 
    It does not cover the thing that matters most here: TestPyPI has no `1.0.3`, so it cannot show that
    `2.0.0` outranks the published line. Only the real index can answer that.
-2. **Upload the sdist and the wheel together.** `python -m twine upload dist/*`, after the version is
-   bumped in all six places and the changelog is renamed. Uploading one without the other leaves the
-   index able to resolve a version for which only half an artefact exists.
+2. **Publish.** Start the workflow again with `index` set to `pypi`; this is the run the environment's
+   reviewer approves. The build job uploads the sdist and the wheel together, so no index state can
+   resolve a version for which only half an artefact exists.
 3. **Check resolution, not just installation.** From an empty environment:
 
    ```powershell
@@ -304,5 +326,7 @@ in place.
   the gate rows rather than a green build.
 - **No automatic version bump from commit messages.** The version number is a promise about
   compatibility, and this project's rules for it are not derivable from a commit prefix.
-- **No provenance attestation yet.** It is worth adding when the release actually happens and there is
-  a publishing pipeline to attach to; stating it here keeps it from being quietly assumed.
+- **No separate attestation step.** `pypa/gh-action-pypi-publish` signs an attestation for every file it
+  uploads, using the same OIDC identity it authenticates with, so provenance comes from the publish run
+  rather than from a job this repository has to maintain. What it does not replace is the human gate: an
+  attestation says where an artefact came from, not that anyone checked the release rows.

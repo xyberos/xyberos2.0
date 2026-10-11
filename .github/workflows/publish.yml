@@ -1,0 +1,125 @@
+name: Publish
+
+# Publishing is a decision, not a consequence of a push. This workflow runs only when a person starts
+# it by hand, so a tag still starts a build and never an upload: the release gate in docs/release.md
+# is signed off first, and the environment it targets is expected to require a reviewer, which is what
+# turns that sign-off into something the pipeline enforces rather than something everyone remembers.
+#
+# The trusted publisher registered on the index has to match this file exactly. A mismatch is the one
+# failure that looks like an authentication error:
+#
+#   PyPI project   xyberos        (TestPyPI: xyberos, registered separately as a pending publisher)
+#   Owner          xyberos
+#   Repository     xyberos2.0
+#   Workflow       publish.yml
+#   Environment    pypi           (TestPyPI: testpypi)
+#
+# No API token is used and none is stored: the upload authenticates with the OIDC token of this run.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "The version being published, without a leading v (for example 2.0.0). The tag v<version> must already exist."
+        required: true
+        type: string
+      index:
+        description: "Where the artefact goes. TestPyPI rehearses the mechanics only: it has no 1.0.3, so it cannot show that this version outranks the published line."
+        required: true
+        default: testpypi
+        type: choice
+        options:
+          - testpypi
+          - pypi
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build the artefact and check what it claims
+    runs-on: ubuntu-latest
+    steps:
+      # Checking out the tag rather than the branch is the first check: the artefacts published from a
+      # run have to be reproducible from the tag that names them, and a missing tag fails here.
+      - uses: actions/checkout@v4
+        with:
+          ref: v${{ inputs.version }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install build twine
+      - run: python -m build
+      # A release that disagrees with itself is not published, rather than published with a caveat.
+      # The four test pins in the suite catch a half-finished bump before this point; this catches a
+      # version that was never bumped at all, and a changelog that still calls the release unreleased.
+      - name: Refuse a version that disagrees with the tree or the changelog
+        env:
+          REQUESTED: ${{ inputs.version }}
+        run: |
+          python - <<'PY'
+          import os
+          import pathlib
+          import re
+          import tomllib
+
+          requested = os.environ["REQUESTED"]
+          project = tomllib.loads(pathlib.Path("pyproject.toml").read_text(encoding="utf-8"))
+          declared = project["project"]["version"]
+          module = pathlib.Path("src/xyberos/__init__.py").read_text(encoding="utf-8")
+          match = re.search(r'^__version__ = "([^"]+)"', module, re.MULTILINE)
+          assert match is not None, "src/xyberos/__init__.py declares no __version__"
+          changelog = pathlib.Path("CHANGELOG.md").read_text(encoding="utf-8")
+
+          problems = []
+          if requested == "0.0.0":
+              problems.append("0.0.0 is the working placeholder, not a release")
+          if declared != requested:
+              problems.append(f"pyproject.toml declares {declared}")
+          if match.group(1) != requested:
+              problems.append(f"src/xyberos/__init__.py declares {match.group(1)}")
+          if f"## [{requested}]" not in changelog:
+              problems.append(f"CHANGELOG.md has no '## [{requested}]' section")
+          if problems:
+              raise SystemExit(f"refusing to publish {requested}: " + "; ".join(problems))
+          print(f"the request, the tree, and the changelog all say {requested}")
+          PY
+      - run: python -m twine check --strict dist/*
+      # The artefact has to install on its own and report the version being published, because that is
+      # the claim a user's `pip install` resolves against.
+      - name: Install the built wheel and ask it its version
+        env:
+          REQUESTED: ${{ inputs.version }}
+        run: |
+          python -m venv .smoke
+          .smoke/bin/python -m pip install --upgrade pip
+          .smoke/bin/python -m pip install dist/*.whl
+          .smoke/bin/python -c "import os, xyberos; assert xyberos.__version__ == os.environ['REQUESTED'], xyberos.__version__"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ inputs.version }}
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    name: Publish to ${{ inputs.index == 'pypi' && 'PyPI' || 'TestPyPI' }}
+    needs: [build]
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.index }}
+      url: ${{ inputs.index == 'pypi' && 'https://pypi.org/p/xyberos' || 'https://test.pypi.org/p/xyberos' }}
+    permissions:
+      # Trusted publishing needs this and nothing else. It is granted to this job rather than to the
+      # one that builds, so a compromised build step cannot mint an upload token for itself.
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist-${{ inputs.version }}
+          path: dist/
+      # The action builds nothing; it uploads what the previous job produced, and signs provenance
+      # attestations for those files with the same OIDC identity it authenticates with.
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: ${{ inputs.index == 'pypi' && 'https://upload.pypi.org/legacy/' || 'https://test.pypi.org/legacy/' }}
