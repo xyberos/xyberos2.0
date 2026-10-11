@@ -18,11 +18,20 @@ from xyberos.execution import ManualClock
 def test_a_successful_run_emits_a_sequenced_event_stream() -> None:
     async def scenario() -> None:
         events: list[WorkflowEvent] = []
+        # A manual clock: a duration read from the system clock is quantised. Windows advances
+        # time.monotonic in 15.6 ms steps, so an instantaneous step measures 0.0 there and a small
+        # non-zero number on a Linux runner's clock. Injecting the clock makes the executor's
+        # arithmetic the subject of the assertion rather than the host's timer.
+        clock = ManualClock(start=100.0)
 
         async def only(value: object, context: object) -> object:
             return value
 
-        await Workflow("demo").step("only", only).run(input="x", on_event=events.append)
+        await (
+            Workflow("demo")
+            .step("only", only)
+            .run(input="x", on_event=events.append, executor=WorkflowExecutor(clock=clock))
+        )
 
         assert [event.type for event in events] == [
             EventType.WORKFLOW_STARTED,
