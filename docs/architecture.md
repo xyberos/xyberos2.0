@@ -221,22 +221,23 @@ testable, and the tests carry security and compatibility weight.
 | --- | --- | --- |
 | `tests/runtime/` | 77 | lifecycle ordering, scope enforcement, isolated instances, overrides |
 | `tests/http/` | 24 | handler compilation, middleware order, error bodies, lifespan refusal |
-| `tests/database/` | 27 | PRAGMAs, transactions, contention, migration configuration |
+| `tests/database/` | 31 | PRAGMAs, transactions, contention, migration configuration, the provider contract |
 | `tests/plugins/` | 29 | ordering, typed config, compatibility, lifecycle failure reporting |
 | `tests/workflow/` | 107 | retries, deadlines, cancellation, events, validation — on a virtual clock |
 | `tests/ai/` | 133 | facade behaviour, schema subset, tool allowlist, adapter contract, redaction |
 | `tests/durable/` | 103 | transitions, journal schema, guarded writes, recovery decisions |
 | `tests/crash_recovery/` | 17 | **a real subprocess killed at five boundaries**, then recovery |
-| `tests/integration/` | 42 | every example end to end, including the HTTP/DB/plugin/AI/durable paths |
+| `tests/integration/` | 67 | every example end to end, including the HTTP/DB/plugin/AI/durable paths and the tenancy and broker recipes |
 | `tests/cli/` | 37 | each command, its exit codes, and its refusal messages |
-| `tests/perf/` | 6 | startup, latency, workflow overhead, contention, journal throughput |
+| `tests/perf/` | 7 | startup, latency, workflow overhead, write throughput, contention, journal throughput |
+| `tests/tutorial/` | 4 | the tutorial's chapter 8, run as an ordinary test file |
 | `tests/test_public_surface.py` | 84 | the frozen `__all__` of every public module |
-| `tests/test_import_boundary.py` | 16 | the layering rules, in subprocesses |
+| `tests/test_import_boundary.py` | 21 | the layering rules, in subprocesses |
 | `tests/test_compatibility.py` | 14 | configuration fields, plugin protocol, golden definition fingerprint |
 | `tests/test_release_artefacts.py` | 7 | what the built wheel and sdist must contain |
 | `tests/contracts/` and four root modules | 33 | executed API examples, deprecation mechanics, optional-dependency messages, the public API, package import |
 
-756 tests total. Four techniques are worth copying from:
+790 tests total. Four techniques are worth copying from:
 
 - **Deterministic doubles instead of sleeping.** `ManualClock`, `FakeExternalService`, `Reply`,
   `FakeModelProvider`, `ModelReply`, `ManualWallClock`, `expire_leases`, `temporary_database`. Time and
@@ -267,6 +268,9 @@ testable, and the tests carry security and compatibility weight.
 | [0011](adr/0011-durable-executor-contract.md) | Freeze the durable contract | per-step recovery, fencing, `outcome_unknown` |
 | [0012](adr/0012-project-licence.md) | Apache-2.0 | the patent grant, and the relicensing option that expires with the first outside contribution |
 | [0013](adr/0013-stable-surface-and-versioning.md) | Freeze the surface and the versioning rules | what "stable" means before `1.0.0` |
+| [0014](adr/0014-no-identity-or-authorization-model.md) | No identity, tenancy, or authorization model | why a framework must not pick an authorization model, and the shape to build instead |
+| [0015](adr/0015-durability-is-single-host.md) | Durability is single-host | why multi-host is a different product, and how a queue plus the journal covers the middle ground |
+| [0016](adr/0016-database-providers-are-an-extension-point.md) | Database providers are an extension point | why one provider ships, and what a conformance suite makes that mean |
 
 ## 8. Trade-offs accepted, and what was rejected
 
@@ -284,6 +288,8 @@ testable, and the tests carry security and compatibility weight.
 | Park unresolved attempts | retry on a guess | a duplicated external effect is worse than a stalled execution |
 | `argparse` for the CLI | Click/Typer | a framework that refuses an HTTP dependency will not add a CLI framework |
 | No plugin discovery | `importlib.metadata` entry points | startup stays visible and reproducible; entry-point loading is a supply-chain surface |
+| No second database provider in core | shipping Postgres and MySQL alongside SQLite | the provider maintained by the people who need it beats three maintained by people who do not; the conformance suite makes that safe |
+| No identity or authorization model | a first-party auth layer | authorization is a product decision, and a partial implementation is the worst option |
 | Metadata-only AI logging | logging prompts by default | prompts are where secrets leak, and a default is a policy everyone inherits |
 
 ## 9. Limits, and honest gaps
@@ -304,6 +310,9 @@ These are stated so a reviewer does not have to discover them:
 - **The store is the largest module in the project** (`durable/store.py`, ~1 730 lines). Every guarded
   write shares one explanation path, which is why the invariants live together — but whether that
   stays true is a fair review question, not a settled decision.
+- **Two of the five poor fits are permanent, not pending.** "Batteries included" and host-spanning
+  durability are different products. [The positioning page](positioning.md) says which alternative to
+  reach for, and the ADRs record why; nothing here is waiting on a phase to finish.
 - **No authorization model, no sandbox, no secret manager, no TLS, no request size or rate limits.**
   Each is documented as belonging to the deployment; the [security guide](security.md) lists them under
   "what is not protected here".
@@ -335,7 +344,7 @@ Questions worth asking in review, in rough order of how much they would change t
 Read in this order to understand the system; the sizes indicate where the mass is.
 
 ```text
-src/xyberos/                                    10 686 lines over 62 modules
+src/xyberos/                                    10 783 lines over 62 modules
 ├── app.py                          529   composition root: App, RequestContext, plugins, diagnostics
 ├── config.py                       287   typed settings, precedence, opaque capability sections
 ├── errors.py                       435   the taxonomy, one root, eight families
@@ -357,14 +366,18 @@ src/xyberos/                                    10 686 lines over 62 modules
 │   └── scheduler.py / recovery.py  358   the next action, and what an interrupted attempt means
 ├── ai/                           2 601   facade, contracts, closed schema subset, tools, Ollama, testing
 ├── http/                           500   adapter, middleware, routing, requests, testing
-├── database/                       450   provider, contracts, migrations, testing
+├── database/                       572   provider, contracts, migrations, testing (the conformance suite)
 ├── plugins/                        414   protocol, config, registry
 └── cli/                            816   check, new, run, migrate, targets, scaffold
 
-tests/                            9 422 lines, 756 tests
-examples/                         1 064 lines, six worked examples
-docs/                             a guide per subsystem, plus cross-cutting pages and 13 ADRs
+tests/                            9 874 lines, 790 tests
+examples/                         1 845 lines, eight worked examples
+docs/                             a guide per subsystem, plus cross-cutting pages and 16 ADRs
 ```
+
+Measured at the Phase 8 close. The map is for orientation, not for arithmetic: what matters is that
+more than half the source is durable execution and AI, while the surface a newcomer meets first is
+the smallest part of it.
 
 ## 12. Verify it yourself
 
@@ -372,10 +385,10 @@ Everything claimed above is checkable in a few minutes:
 
 ```powershell
 python -m pip install -e ".[dev,http,database]"
-python -m pytest                                  # 756 tests, 5 skip without live Ollama
+python -m pytest                                  # 790 tests, 5 skip without live Ollama
 python -m pytest -s tests/perf                    # the resource baselines
 python -m pytest -q --collect-only tests/runtime # 77 tests for the runtime alone
-ruff check src tests examples; mypy               # lint and strict types, 66 sources
+ruff check src tests examples; mypy               # lint and strict types, 80 sources
 python -m build                                   # wheel + sdist, then
 python -m venv .smoke; .smoke\Scripts\pip install dist\*.whl
 .smoke\Scripts\xyberos check                      # the CLI from an installed artefact
