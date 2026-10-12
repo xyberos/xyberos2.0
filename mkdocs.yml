@@ -128,6 +128,16 @@ nav:
       - learn/ai/17-security.md
   - Hybrid Apps:
       - learn/hybrid/index.md
+      - learn/hybrid/01-tickets.md
+      - learn/hybrid/02-principal.md
+      - learn/hybrid/03-audit.md
+      - learn/hybrid/04-classification.md
+      - learn/hybrid/05-retrieval.md
+      - learn/hybrid/06-draft.md
+      - learn/hybrid/07-approval.md
+      - learn/hybrid/08-workflow.md
+      - learn/hybrid/09-background.md
+      - learn/hybrid/10-usage.md
       - The design: hybrid-design.md
   - Extend Xyberos:
       - extend/index.md

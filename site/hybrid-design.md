@@ -7,9 +7,11 @@ status: verified
 
 The hybrid path is the last one written and the first one that has to be right, because it consumes
 both of the others: the traditional path supplies its CRUD, templates, and verified principal, and the
-AI path supplies classification, retrieval, tools, and workflows. This page fixes that design before
-the path is written, so a decision about who may send an email is made once and not discovered in
-lesson seven.
+AI path supplies classification, retrieval, and workflows. This page fixed that design **before** the
+path was written, so a decision about who may send an email was made once rather than discovered in
+lesson seven. The path is written now — [the ten lessons](learn/hybrid/index.md) are the design,
+executed — and this page is what they are checked against: the lifecycle, the matrix, and the boundary
+below are the three things `tests/integration/test_hybrid_support_desk.py` asserts.
 
 Nothing here is framework behaviour. Xyberos provides routing, dependency injection, a database
 provider, an AI facade, and a workflow engine — the policy below is application code, which is the
@@ -20,7 +22,7 @@ point of the exercise.
 | State | Reached from | Who may cause the transition |
 | ----- | ------------ | ---------------------------- |
 | `new` | — | any verified principal in the tenant |
-| `classified` | `new` | application code, after a `structured` call returns a category |
+| `classified` | `new` | application code, after a call with a response schema returns a category |
 | `awaiting_approval` | `classified` | application code, once a draft reply exists |
 | `approved` | `awaiting_approval` | `support_agent` or `support_lead` |
 | `replied` | `approved` | application code, when it sends the reply |
@@ -38,6 +40,7 @@ shape [ADR 0014](reference/adr/0014-no-identity-or-authorization-model.md) sanct
 | ------ | ----------- | --------------- | -------------- |
 | Open a ticket | yes | yes | yes |
 | Read tickets in the tenant | own only | all | all |
+| Edit a ticket's text | own, while `new` | while `new` | while `new` |
 | Run classification | no | yes | yes |
 | Read a draft reply | no | yes | yes |
 | Approve a reply | no | yes | yes |
@@ -67,33 +70,36 @@ This is the rule the whole path exists to teach, so it is tested directly rather
 
 | Touch point | Label | How it is built |
 | ----------- | ----- | --------------- |
-| Classification into a category | Built-in | `AIFacade.structured` against the closed JSON Schema subset |
+| Classification into a category | Built-in | `AIFacade.chat` with a response schema, against the closed JSON Schema subset |
 | Reply drafting | Built-in | `AIFacade.chat`, stored as a suggestion and never sent |
 | Ticket summarisation | Built-in | `AIFacade.chat` or `structured`, one step in the workflow |
 | Knowledge retrieval | You build it | `AIFacade.embed` plus a SQLite table and a similarity query — no index ships |
 | Usage, cost, and outcome logging | You build it | ordinary rows written by the workflow's steps |
-| Every tool the model may call | Built-in | `ToolSet` with an allowlist: read-only lookups only, and no tool that sends |
+| Tool use | Not used | The desk calls no tools. The model receives the ticket's text and one retrieved passage, and nothing else: a tool that reads tickets would be a second permission boundary to define, and the path does not need one. The AI path's lesson 11 is where tools belong, and the code for them is the same code with an allowlist in front of it |
 
 Slow model calls run inside the workflow engine with a per-step timeout and a whole-run budget, and the
-classification step is the only one that gates a transition — retrieval and drafting are advisory.
+classification step is the only one that gates a transition — retrieval and drafting are advisory. The
+one call that is not inside the graph is the background triage job, which runs the graph itself.
 
 ## Lessons, and the example that proves each one
 
-Lessons 1–3 are written during the traditional path because they are the same material: CRUD, a
-verified principal, and an audit trail.
+Every lesson is written, and each one is a module the suite runs. The first three are the material the
+traditional path also teaches — CRUD, a verified principal, and an audit trail — applied to this
+application, which is why the path can spend its model-facing lessons on the boundary rather than on
+scaffolding.
 
-| Lesson | Example module | Phase |
+| Lesson | Example module | State |
 | ------ | -------------- | ----- |
-| 1 Tickets as ordinary CRUD | `examples/learn_hybrid/hybrid01_ticket_crud.py` | 3 |
-| 2 A verified principal, and what it may do | `examples/learn_hybrid/hybrid02_principal.py` | 3 |
-| 3 The audit log | `examples/learn_hybrid/hybrid03_audit.py` | 3 |
-| 4 Classification with structured output | `examples/learn_hybrid/hybrid04_classification.py` | 5 |
-| 5 Knowledge retrieval you build | `examples/learn_hybrid/hybrid05_retrieval.py` | 5 |
-| 6 Draft replies that are never sent | `examples/learn_hybrid/hybrid06_draft.py` | 5 |
-| 7 Human approval before sending | `examples/learn_hybrid/hybrid07_approval.py` | 5 |
-| 8 Coordinating the steps with a workflow | `examples/learn_hybrid/hybrid08_workflow.py` | 5 |
-| 9 Background processing for slow work | `examples/learn_hybrid/hybrid09_background.py` | 5 |
-| 10 Logging usage, cost, and outcomes | `examples/learn_hybrid/hybrid10_usage.py` | 5 |
+| 1 Tickets as ordinary CRUD | `examples/learn_hybrid/hybrid01_ticket_crud.py` | verified |
+| 2 A verified principal, and what it may do | `examples/learn_hybrid/hybrid02_principal.py` | verified |
+| 3 The audit log | `examples/learn_hybrid/hybrid03_audit.py` | verified |
+| 4 Classification with structured output | `examples/learn_hybrid/hybrid04_classification.py` | verified |
+| 5 Knowledge retrieval you build | `examples/learn_hybrid/hybrid05_retrieval.py` | verified |
+| 6 Draft replies that are never sent | `examples/learn_hybrid/hybrid06_draft.py` | verified |
+| 7 Human approval before sending | `examples/learn_hybrid/hybrid07_approval.py` | verified |
+| 8 Coordinating the steps with a workflow | `examples/learn_hybrid/hybrid08_workflow.py` | verified |
+| 9 Background processing for slow work | `examples/learn_hybrid/hybrid09_background.py` | verified |
+| 10 Logging usage, cost, and outcomes | `examples/learn_hybrid/hybrid10_usage.py` | verified |
 
 ## The test that holds it together
 

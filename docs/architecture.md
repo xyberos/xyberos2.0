@@ -230,14 +230,14 @@ testable, and the tests carry security and compatibility weight.
 | `tests/integration/` | 67 | every example end to end, including the HTTP/DB/plugin/AI/durable paths and the tenancy and broker recipes |
 | `tests/cli/` | 37 | each command, its exit codes, and its refusal messages |
 | `tests/perf/` | 7 | startup, latency, workflow overhead, write throughput, contention, journal throughput |
-| `tests/site/` | 168 | the documentation site: lesson output, transcripts and scaffolds, links, tier labels, the generated reference, the snippet hook, and the canonical URL one configuration resolves for a preview and for the release |
+| `tests/site/` | 198 | the documentation site: lesson output, transcripts and scaffolds, links, tier labels, the generated reference, the snippet hook, and the canonical URL one configuration resolves for a preview and for the release |
 | `tests/test_public_surface.py` | 84 | the frozen `__all__` of every public module |
 | `tests/test_import_boundary.py` | 21 | the layering rules, in subprocesses |
 | `tests/test_compatibility.py` | 14 | configuration fields, plugin protocol, golden definition fingerprint |
 | `tests/test_release_artefacts.py` | 7 | what the built wheel and sdist must contain |
 | `tests/contracts/` and four root modules | 33 | executed API examples, deprecation mechanics, optional-dependency messages, the public API, package import |
 
-945 tests total. Four techniques are worth copying from:
+980 tests total. Four techniques are worth copying from:
 
 - **Deterministic doubles instead of sleeping.** `ManualClock`, `FakeExternalService`, `Reply`,
   `FakeModelProvider`, `ModelReply`, `ManualWallClock`, `expire_leases`, `temporary_database`. Time and
@@ -375,9 +375,9 @@ src/xyberos/                                    10 783 lines over 62 modules
 ├── plugins/                        414   protocol, config, registry
 └── cli/                            816   check, new, run, migrate, targets, scaffold
 
-tests/                           14 062 lines, 945 tests
-examples/                         7 793 lines, twelve worked examples
-site/                             7 878 lines of scripts and pages, minus the generated reference
+tests/                           14 221 lines, 980 tests
+examples/                        10 720 lines, fifteen worked examples
+site/                             8 893 lines of scripts and pages, minus the generated reference
 docs/                             a guide per subsystem, plus cross-cutting pages and 17 ADRs
 ```
 
@@ -393,10 +393,10 @@ Everything claimed above is checkable in a few minutes:
 
 ```powershell
 python -m pip install -e ".[dev,http,database]"
-python -m pytest                                  # 945 tests, 7 skip without live Ollama
+python -m pytest                                  # 980 tests, 7 skip without live Ollama
 python -m pytest -s tests/perf                    # the resource baselines
 python -m pytest -q --collect-only tests/runtime # 77 tests for the runtime alone
-ruff check src tests examples site/scripts; mypy  # lint and strict types, 155 sources
+ruff check src tests examples site/scripts; mypy  # lint and strict types, 181 sources
 python site/scripts/build.py --check              # the documentation site builds strictly
 python -m build                                   # wheel + sdist, then
 python -m venv .smoke; .smoke\Scripts\pip install dist\*.whl
