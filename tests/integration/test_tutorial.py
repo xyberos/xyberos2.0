@@ -9,8 +9,11 @@ Two consequences worth knowing, because both are intended:
 
 - Changing a chapter's output means editing `docs/tutorial.md` in the same commit. That is the
   point: the page is a set of claims, not prose that happens to be nearby.
-- The `chapter8` transcript is a sample run with a machine-dependent timing, so it is not compared
-  here. Its code *is* the test file `tests/tutorial/test_chapter8_testing.py`, which the suite runs.
+- This page is part-retired: the chapters whose subject is the runtime itself — what Xyberos is, the
+  first application, configuration, dependency injection, scopes, the first test, and the command
+  line — are lessons under `site/learn/fundamentals/`, and the HTTP and database chapters are
+  lessons under `site/learn/traditional/`. Both are checked by `tests/site/`. They are not checked
+  twice and they do not live in two places: each chapter has exactly one home and one suite.
 """
 
 from __future__ import annotations
@@ -30,13 +33,6 @@ TUTORIAL_PATH = REPOSITORY_ROOT / "docs" / "tutorial.md"
 TUTORIAL_EXAMPLES = REPOSITORY_ROOT / "examples" / "tutorial"
 
 CHAPTERS = [
-    "chapter1_first_app",
-    "chapter2_injection",
-    "chapter3_scopes",
-    "chapter4_config",
-    "chapter5_http",
-    "chapter6_requests_and_errors",
-    "chapter7_database",
     "chapter9_plugins",
     "chapter10_workflow",
     "chapter11_ai",
@@ -69,11 +65,7 @@ def run_chapter(name: str) -> str:
 
 def test_every_chapter_module_has_a_documented_output() -> None:
     """A new chapter must be added to the page as well as to the directory."""
-    modules = sorted(
-        path.stem
-        for path in TUTORIAL_EXAMPLES.glob("chapter*.py")
-        if path.stem != "chapter8_testing"
-    )
+    modules = sorted(path.stem for path in TUTORIAL_EXAMPLES.glob("chapter*.py"))
 
     assert modules == sorted(CHAPTERS)
 
@@ -81,26 +73,6 @@ def test_every_chapter_module_has_a_documented_output() -> None:
 @pytest.mark.parametrize("name", CHAPTERS)
 def test_the_chapter_prints_what_the_tutorial_says(name: str) -> None:
     assert run_chapter(name) == documented_output(name)
-
-
-def test_the_cli_transcript_matches_the_documented_output(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The CLI chapter quotes real output, so it is checked like the rest.
-
-    The environment is emptied of `XYBEROS_` variables and the working directory is the repository
-    root, so the settings the command reports are the documented defaults rather than a developer's.
-    """
-    from xyberos.cli.main import main
-
-    for key in [key for key in __import__("os").environ if key.startswith("XYBEROS_")]:
-        monkeypatch.delenv(key)
-    monkeypatch.chdir(REPOSITORY_ROOT)
-
-    buffer = io.StringIO()
-    with contextlib.redirect_stdout(buffer):
-        code = main(["check"])
-
-    assert code == 0
-    assert buffer.getvalue().strip() == documented_output("cli-check")
 
 
 def test_the_tutorial_links_only_to_files_that_exist() -> None:
@@ -113,12 +85,3 @@ def test_the_tutorial_links_only_to_files_that_exist() -> None:
     )
 
     assert not missing, missing
-
-
-def test_the_server_command_in_the_tutorial_points_at_a_real_asgi_application() -> None:
-    """The chapter quotes a `uvicorn --factory` command, so the factory has to exist and work."""
-    from starlette.applications import Starlette
-
-    module = importlib.import_module("tutorial.chapter5_http")
-
-    assert isinstance(module.app_factory(), Starlette)
