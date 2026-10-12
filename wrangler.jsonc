@@ -5,7 +5,7 @@
 // here: the build and deploy commands live in the Workers dashboard, so a hosting change that is not
 // about the files being served does not need a commit.
 {
-  "name": "xyberos2-0",
+  "name": "xyberos2",
   // Set to the date this configuration was written.
   "compatibility_date": "2026-10-12",
   "assets": {
