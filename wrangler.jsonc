@@ -1,0 +1,17 @@
+// Hosting configuration for Cloudflare Workers Builds, which serves this documentation site.
+//
+// The build command in the Workers project runs `site/scripts/build.py`, and `mkdocs.yml` writes the
+// output to `build/site` — the assets directory below. Nothing else about the project is configured
+// here: the build and deploy commands live in the Workers dashboard, so a hosting change that is not
+// about the files being served does not need a commit.
+{
+  "name": "xyberos2-0",
+  // Set to the date this configuration was written.
+  "compatibility_date": "2026-10-12",
+  "assets": {
+    "directory": "./build/site",
+    // MkDocs Material writes a `404.html`, so a missing page gets the site's own not-found page
+    // rather than a bare status line.
+    "not_found_handling": "404-page"
+  }
+}
