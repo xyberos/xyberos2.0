@@ -8,6 +8,7 @@ Run it with:
 from __future__ import annotations
 
 import tempfile
+import time
 from pathlib import Path
 
 from support_desk.app import create_app
@@ -28,6 +29,11 @@ LEE = VERIFIER.headers("lee@desk", "acme", ["support_lead"])
 
 #: A slow provider on purpose: the reason this lesson exists is that a model call takes seconds.
 SLOW = 0.4
+
+#: How long a client waits for the job, and how often it asks. The budget is a deadline rather than
+#: a number of attempts: the work takes real time, so counting polls counts the wrong thing.
+POLL_BUDGET = 15.0
+POLL_INTERVAL = 0.01
 
 
 def provider() -> FakeModelProvider:
@@ -61,12 +67,15 @@ def main() -> None:
 
             job_id = accepted["job"]
             seen = [str(accepted["state"])]
-            for _ in range(400):
+            job = accepted
+            deadline = time.monotonic() + POLL_BUDGET
+            while time.monotonic() < deadline:
                 job = client.get(f"/jobs/{job_id}", headers=SAM).json()
                 if job["state"] not in seen:
                     seen.append(str(job["state"]))
                 if job["state"] in {DONE, FAILED}:
                     break
+                time.sleep(POLL_INTERVAL)
             print("the job went:", " -> ".join(seen))
             print("it finished as:", job["state"], "with", job["detail"])
             print("the ticket is:", client.get("/tickets/1", headers=SAM).json()["state"])
