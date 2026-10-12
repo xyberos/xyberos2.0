@@ -91,7 +91,8 @@ jobs:
             exit 0
           fi
           echo "::error::$GITHUB_REPOSITORY has no GitHub Pages site, so there is nowhere to deploy to."
-          echo "::error::Set Settings -> Pages -> Source: GitHub Actions, then re-run this workflow."
+          echo "::error::Set Settings -> Pages -> Source: GitHub Actions on $GITHUB_REPOSITORY and re-run."
+          echo "::error::A run that started before the setting was saved fails here too: re-run it."
           exit 1
       - uses: actions/deploy-pages@v4
         id: deployment
