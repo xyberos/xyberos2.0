@@ -568,7 +568,7 @@ site.
 | 2. Fundamentals | **Complete: 15 of 15 lessons.** Seven were migrated from `docs/tutorial.md` — 4, 7, 8, 9, 13, and 15, with their modules and output blocks — and eight are new material: 1, 2, 3, 5, 6, 10, 11, 12, and 14. Eight exercise answers are files the suite runs rather than blocks on a page | Every lesson `status: verified`; the roadmap reports 15 of 15; the moved chapters are deleted from `docs/tutorial.md` rather than duplicated | L — complete |
 | 3. Traditional apps | **Complete: 12 of 12 lessons.** Lessons 1–3 were migrated from `docs/tutorial.md` chapters 5, 6, and 7 with their output blocks and exercise answers. Lesson 4 begins the path's own application, `examples/user_management/`: one project the remaining lessons grow, driven by a script per lesson, as section 4.9 requires. Lessons 5–7 add query-parameter validation and paging, the rest of CRUD, and Alembic revisions that delete the stand-in schema. Lesson 8 builds the ADR 0014 identity shape — a verifier, a principal passed as an argument, and the `external_subject` column that links them — and lesson 9 adds roles, `403`, and the edge obligation. Lessons 10 and 11 render the interface (Jinja2, forms, HTMX partials, Tailwind) and lesson 12 documents the deploy step, including a readiness check that notices a schema behind the code | Every published lesson `status: verified`; the migrated chapters are deleted from `docs/tutorial.md`; the final application is an `examples/` directory under integration test; the roadmap reports 27 of 27 | L — complete |
 | 4. AI apps | **Complete: 17 of 17 lessons**, plus the fenced durable page in section 4.6. The path is one capability per lesson over `FakeModelProvider`, with every page labelling who provides the capability: the facade and its capability checks, the first call, provider switching, structured output, the error taxonomy, conversation history, memory, knowledge, retrieval over `embed`, tools behind an allowlist, intents, workflows, bounded agent behaviour, testing with no model service, evaluation against labelled cases, and security. Nine of the seventeen are labelled *you build it*, because there is no memory, retrieval, intent, agent, or evaluation layer in the package | No lesson needs a live model to run; the fenced page states the tier and the non-guarantees; the roadmap reports 17 of 17 in this path | L — complete |
-| 5. Hybrid apps | The Smart Support Desk, lessons 4–10: knowledge retrieval, draft replies, human approval, workflow coordination, background processing, usage logging, deployment. Lessons 1–3 landed in phase 3 | The boundary is stated and tested: a model recommends, application code authorizes; every transition, permission, and approval in the lessons appears in the phase 1 design page, and the integration test asserts the boundary | L — 8–12 days |
+| 5. Hybrid apps | **Complete: 10 of 10 lessons.** The Smart Support Desk lives in `examples/support_desk/`: ticket CRUD over the same project layout as the traditional path, a signed principal with a tenant and the permission matrix in the service, an audit row written in the transaction it describes, classification with a response schema, retrieval over `embed`, drafts stored as rows that have no send path, approval that records the principal and the body, a workflow that ends at a draft, background triage behind a job row, and usage rows settled by the outcome. Lessons 1–3 were written here rather than in phase 3, because the design page had already fixed what they needed | The boundary is stated and tested: a model recommends, application code authorizes; every transition, permission, and approval in the lessons appears in the phase 1 design page, and `tests/integration/test_hybrid_support_desk.py` asserts the four boundary rules plus one full workflow run against the fake provider | L — complete |
 | 6. Extensibility | Modules (composition) and plugins kept distinct; provider author guide; internals and extension design | A provider walkthrough passes `assert_provider_contract`; a plugin walkthrough loads as an installed package | M — 6–8 days |
 | 7. Production | Deployment, observability, troubleshooting, security hardening, internals | Each page names the shipped feature it relies on, or says it is application-side | M — 6–8 days |
 
@@ -585,23 +585,30 @@ Two sequencing constraints, both from this repository rather than from preferenc
 
 ### The critical path
 
-The longest chain is phase 1 → 2 → 3 → 4 → phase 5's lessons 4–10, because the hybrid path consumes CRUD
-and templates from phase 3 and tools and workflows from phase 4. The release date is set by the end of
-that chain, so two schedule decisions follow from it.
+The longest chain was phase 1 → 2 → 3 → 4 → phase 5, because the hybrid path consumes CRUD and templates
+from phase 3 and retrieval and workflows from phase 4. The release date is set by the end of that chain, so
+two schedule decisions followed from it. Both are now settled, and one of them was wrong in a way worth
+recording.
 
 - **Phase 5's design is fixed in phase 1**, not discovered in phase 5: the ticket states and their
   allowed transitions, the permission matrix, where human approval sits, which AI touch points are
   built-in and which are application code, the lesson list with its `examples/` modules, and the
   integration test that phase 5's exit criteria demand. Deciding this before phases 3 and 4 build the
-  contracts the hybrid path reuses is what stops phase 5 becoming a redesign — and because decision 5
-  puts all three paths in one release, a phase 5 redesign is a release slip rather than a deferred path.
-- **Phase 5's lessons 1–3 run during phase 3.** Ticket CRUD, a verified principal, and an audit log are
-  the same material as the traditional path's data and HTTP stages, so writing them together shortens
-  the chain; lessons 4–10 follow phase 4, which supplies the tools and workflow they consume.
+  contracts the hybrid path reuses is what kept phase 5 from becoming a redesign — and because decision 5
+  puts all three paths in one release, a phase 5 redesign would have been a release slip rather than a
+  deferred path. The design page needed two corrections when the path was written, both recorded there:
+  the matrix gained the row for editing a ticket, and the tool row became "not used" rather than a
+  `ToolSet`, because the desk gives the model a ticket body and one passage and nothing else.
+- **The plan to write phase 5's lessons 1–3 during phase 3 did not happen.** The reasoning was sound —
+  they are the traditional path's material — but the traditional path's own application was still moving
+  underneath it, and writing hybrid lessons against a moving `examples/user_management/` would have meant
+  rewriting them. They were written with the rest of the path instead, which cost nothing: the design page
+  had already fixed what they needed, and the shared conventions carried over as intended.
 
 The hybrid application also shares the traditional path's skeleton — the same project layout, the same
 `DatabaseProvider` usage, the same template approach, and the same `HttpError` shape — so phase 5 extends
-conventions that already exist instead of introducing a third codebase to review.
+conventions that already exist instead of introducing a third codebase to review. That is why the two
+applications read as one set of rules applied twice rather than two sets of rules.
 
 ### Publishing
 
@@ -611,7 +618,7 @@ precondition 4 records the same order.
 
 | # | Step | Where it happens |
 | --- | --- | --- |
-| 1 | **Publish the preview.** [`.github/workflows/site.yml`](../.github/workflows/site.yml) builds with the same command CI uses and deploys to `https://xyberos.github.io/xyberos2.0/` — **live**, 44 of 44 lessons, and the roadmap page reports the two sections that are still planned | This repository, on a push that touches the site or by hand |
+| 1 | **Publish the preview.** [`.github/workflows/site.yml`](../.github/workflows/site.yml) builds with the same command CI uses and deploys to `https://xyberos.github.io/xyberos2.0/` — **live**, 54 of 54 lessons, and the roadmap page reports the two sections that are still planned | This repository, on a push that touches the site or by hand |
 | 2 | **Move the domain off the 1.x site.** Its guides already live in `xyberos/xyberos` and are already served at `https://xyberos.github.io/xyberos/`, so what moves is the custom domain, not the documentation | That repository's Pages settings — out of scope here, and nothing in this repository can change them |
 | 3 | **Point the domain at this site**, then move `[project.urls] Documentation` to it | This repository's Pages settings and `pyproject.toml` |
 
@@ -712,6 +719,9 @@ The site is done when all of the following hold:
    [`pyproject.toml`](../pyproject.toml) once the site serves content, so the published metadata points
    at this line's documentation. The order is fixed: publish at the GitHub Pages address, then the 1.x
    line moves off `docs.xyberos.com`, then the domain and the metadata entry follow (section 11).
+   Publishing is done — the preview is live and the workflows are green — so what remains is the middle
+   step, which belongs to the other repository: remove the custom domain there, add it here, and move
+   the metadata entry after that.
 6. **Done.** `mkdocs.yml` with `docs_dir: site` and `site_dir: build/site`, with the navigation naming
    the two plan documents where they are readable rather than copying them in, and `exclude_docs`
    keeping their repository-relative links out of the strict build. `git status` lists `site/`, and the
@@ -721,16 +731,33 @@ The site is done when all of the following hold:
    modules, and the integration test. [`site/appendices/index.md`](appendices/index.md) states what an
    appendix is, and [`.github/workflows/site-live.yml`](../.github/workflows/site-live.yml) is the
    opt-in workflow that will exercise them.
+8. **Next: phase 6, Extend Xyberos.** Registry, modules, plugins, provider authoring, and the durable
+   executor, so `site/extend/index.md` stops being `planned` and the section the AI and hybrid paths
+   both point at exists. Phase 7 (production) follows it, and the release gate — `roadmap.py --check
+   --release` — refuses until both are written: that is the same gate that has been refusing since
+   phase 1, and the two sections it names are the only ones left.
 
-Phases 1–4 are complete: the Fundamentals path is fifteen verified lessons, the Traditional Apps path
-twelve, and the AI Apps path seventeen — 44 lessons in one pipeline, where every lesson's code is a file
-the suite runs, every documented output is compared with the real thing on every build, and the transcripts
-of earlier lessons survive the later ones changing the application underneath them. The AI path never needs
-a model service, the durable page states its experimental tier, and the roadmap reports 44 of 44 verified.
-Phase 5 (hybrid) is what remains: its lessons 1–3 — ticket CRUD, a verified principal, and the audit log —
-are still outstanding from phase 3's material, and its lessons 4–10 are the critical path's last stretch.
+Phases 1–5 are complete: the Fundamentals path is fifteen verified lessons, the Traditional Apps path
+twelve, the AI Apps path seventeen, and the Hybrid Apps path ten — 54 lessons in one pipeline, where every
+lesson's code is a file the suite runs, every documented output is compared with the real thing on every
+build, and the transcripts of earlier lessons survive the later ones changing the application underneath
+them. No path needs a model service, the durable page states its experimental tier, and the roadmap reports
+54 of 54 verified.
 
-One convention was settled while writing lesson 4, and phase 5 inherits it: the path's application lives
-in [`examples/user_management/`](../examples/user_management) as a package of small files, and each
-lesson's own module in `examples/learn_traditional/` drives it through its routes. A lesson that needs a
-different application says so on its page rather than quietly starting a second one.
+Phase 5 was written as ten lessons at once rather than three in phase 3 and seven later, because the
+design page had already fixed the shape they share: `examples/support_desk/` is one application — tables,
+a service with the matrix and the audit trail, a knowledge base, a transactional outbox, a workflow, and a
+job runner — and the ten modules in `examples/learn_hybrid/` drive it. `tests/integration/test_hybrid_support_desk.py`
+holds the boundary the path teaches: the four assertions the design page states, plus one full triage run
+against the fake provider.
+
+Two conventions were settled while writing the earlier paths, and phase 5 inherits both. The path's
+application lives in [`examples/user_management/`](../examples/user_management) as a package of small
+files, and each lesson's own module in `examples/learn_traditional/` drives it through its routes; the
+hybrid path mirrors that with [`examples/support_desk/`](../examples/support_desk) and
+`examples/learn_hybrid/`. A lesson that needs a different application says so on its page rather than
+quietly starting a second one.
+
+The other convention came out of the hybrid path itself, and it is worth recording because it cost an
+afternoon: a domain method named `close` on a provided instance is a lifecycle hook as far as the runtime
+is concerned, so `TicketService.close_ticket` keeps its name and the ticket service shuts down cleanly.

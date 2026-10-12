@@ -480,7 +480,10 @@ Phase 5 — Hybrid apps
 
 Build the Smart Support Desk using traditional business logic plus AI capabilities.
 
-**Next**, with lessons 1–3 still to write from phase 3's material and its [design](hybrid-design.md) fixed.
+**Complete:** ten lessons over one application in `examples/support_desk/`, from ticket CRUD to settled
+usage rows, all written to the [design](hybrid-design.md) that was fixed before the first line of it —
+and the boundary that design draws is asserted by `tests/integration/test_hybrid_support_desk.py` rather
+than described by it.
 
 Phase 6 — Extensibility
 
