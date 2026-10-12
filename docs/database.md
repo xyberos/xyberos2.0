@@ -119,7 +119,10 @@ bounded budget and linear backoff:
 ```python
 async def insert_item(connection: AsyncConnection) -> int:
     result = await connection.execute(insert(items).values(name="new"))
-    return int(result.inserted_primary_key[0])
+    inserted = result.inserted_primary_key
+    if inserted is None:  # typed as optional: an insert with a generated key reports one
+        raise AssertionError("the insert reported no primary key")
+    return int(inserted[0])
 
 
 item_id = await database.retrying(insert_item, attempts=5, base_delay=0.05)

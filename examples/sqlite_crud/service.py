@@ -40,7 +40,11 @@ class ItemService:
         validated = _validated_name(name)
         async with self._database.transaction() as connection:
             result = await connection.execute(insert(items).values(name=validated, completed=False))
-            item_id = int(result.inserted_primary_key[0])
+            inserted = result.inserted_primary_key
+            if inserted is None:
+                # SQLAlchemy types this as optional, and an insert with a generated key reports one.
+                raise AssertionError("the insert reported no primary key")
+            item_id = int(inserted[0])
             row = (
                 (await connection.execute(select(items).where(items.c.id == item_id)))
                 .mappings()

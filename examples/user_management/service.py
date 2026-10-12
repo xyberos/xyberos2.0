@@ -72,7 +72,11 @@ class UserService:
                     external_subject=external_subject,
                 )
             )
-            user_id = int(result.inserted_primary_key[0])
+            inserted = result.inserted_primary_key
+            if inserted is None:
+                # SQLAlchemy types this as optional, and an insert with a generated key reports one.
+                raise AssertionError("the insert reported no primary key")
+            user_id = int(inserted[0])
             row = (
                 (await connection.execute(select(users).where(users.c.id == user_id)))
                 .mappings()
