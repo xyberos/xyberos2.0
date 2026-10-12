@@ -5,7 +5,11 @@
 > runtime, the Starlette HTTP adapter with the SQLite provider, the trusted plugin/capability model,
 > the Workflow engine, the optional AI facade, the experimental durable executor, the frozen public
 > surface, and the release engineering. The phase table under "Phase status" is the at-a-glance state,
-> and nothing is released until the project owner signs the release gate.
+> and nothing is released until the project owner signs the release gate. Phases 9-11 — the extras and
+> conformance suites this line ships, the packages that stay in the package repository, and developer tooling —
+> are planned rather than started. They apply the capability-placement decision recorded under "Adopted
+> implementation decisions": they are the additive work the release after `2.0.0` carries, they introduce no
+> stable public name, and their exit gates are below.
 
 ## Purpose and release boundary
 
@@ -18,6 +22,11 @@ Ship a small, well-tested Python application framework whose stable surface is:
 - in-process, trusted plugins.
 
 The SQLite durable executor is an opt-in **experimental** package. It must not be imported, configured, or migrated by a normal application. It is single-host only, and must never be described as exactly-once execution.
+
+Capability beyond that surface arrives in one of two ways, and never by growing the stable surface: as an
+**extra** of this package when it is small and dependency-free, or as a **package** in the ecosystem
+repository when it needs a dependency this line will not adopt. Both are governed by the capability-placement
+decision below, and neither changes what a bare `pip install xyberos` imports.
 
 ## Review of `PLAN.md`
 
@@ -169,11 +178,44 @@ Compatibility is independently versioned where persisted or third-party contract
 
 Deprecation policy: mark a stable API deprecated in documentation and runtime warnings in one minor release, retain it for at least two subsequent minor releases or six months (whichever is longer), and remove it only in the next major release. Security or data-corruption fixes may bypass this period, with a release-note explanation. The changelog must include an "Upgrade notes" section for every minor and major release.
 
+### Capability placement: extendability first
+
+**Adopted.** Xyberos 2.0 already has every mechanism a capability needs: `register(app)` for providers and
+routes, `Plugin` for a distribution the runtime validates, orders, and attributes, the provider registry for
+scopes, dependencies, and test overrides, and extras for an implementation this package ships. This plan adds
+no mechanism, and a new protocol is justified only by a candidate that none of these fits — nothing currently
+on the list qualifies, so a phase that proposed one would be proposing work without a customer.
+
+What the mechanisms do not settle is *placement*, and one rule settles it:
+
+| Placement | Ships as | Applies when |
+| --- | --- | --- |
+| **Extra, here** | `xyberos[x]`, one working implementation, tested by this repository's suite | no new third-party dependency, no policy a recorded ADR refuses, and small enough that this suite can exercise it |
+| **Package, there** | a distribution in `xyberos/xyberos`, the repository the published 1.x metadata declares | it needs a dependency core will not adopt, it carries policy, or it has its own release cadence |
+| **Retire, with a pointer** | the published version stays; a metadata-only patch names the replacement | the capability landed in an extra, so a second distribution would be a second answer to one question |
+| **Refuse** | nothing | a recorded ADR refuses it, or the deferred backlog holds it |
+
+Two consequences of the rule are binding rather than stylistic, and each has an existing precedent:
+
+- **An extra is a promise the release makes.** It is released with this package, carries its own CI row, and
+  must ship one *working* implementation rather than a bare contract — which is what `[http]`, `[database]`,
+  `[ollama]`, and `[durable]` do, and why a storage extra ships local files instead of only a protocol.
+- **Middleware belongs to the application.** `HttpAdapter(app, middleware=(...))` is the only shape the adapter
+  offers, so a cross-cutting request concern is a class the application passes; it can never be a plugin, and
+  no phase may pretend otherwise. Metrics, tracing, and logging presets are therefore extras' classes or
+  application code, never self-installing plugins.
+
+Phase 9 records the rule and its reasons in **ADR 0018** when it opens; until then this subsection is the
+decision, and Phases 9 and 10 exist to apply it. The alternative that looks simpler — publishing a 1.x name as
+a thin package that re-exports an extra — is rejected here rather than in a phase, because the 1.x runtime and
+plugin APIs are unrelated to this line's, so the body is a rewrite either way, the import root changes, and a
+second distribution answering one question inherits this package's release cadence as a version constraint.
+
 ## Phase status
 
 The detailed work packages live in the phase-by-phase plan below; this table is the at-a-glance
-state. Phases 0–8 are complete. The release decision is the project owner's, and no artefact is
-published before it is made.
+state. Phases 0–8 are complete; Phases 9-11 are planned and not started. The release decision is the
+project owner's, and no artefact is published before it is made.
 
 | Phase | Scope | Status | Exit-gate evidence |
 | --- | --- | --- | --- |
@@ -186,6 +228,9 @@ published before it is made.
 | 6 | Experimental single-host durable executor | complete | `src/xyberos/durable/` (10 modules), `tests/durable/` (100 tests), `tests/crash_recovery/` (17 process-kill tests), `tests/integration/test_durable_example.py`, `examples/durable_workflow/`, `docs/durable.md`, [ADR 0011](adr/0011-durable-executor-contract.md) |
 | 7 | Developer experience, hardening, and release | complete (release decision pending owner sign-off) | all seven work packages: `docs/stability.md` + [ADR 0013](adr/0013-stable-surface-and-versioning.md) + `tests/test_public_surface.py` + `tests/test_compatibility.py` + `tests/test_deprecation.py` + `src/xyberos/deprecation.py`; `docs/getting-started.md`, `docs/testing.md`, `docs/troubleshooting.md`, `docs/security.md`, `examples/hello_app/`; `src/xyberos/cli/` + `docs/cli.md` + `tests/cli/`; `CHANGELOG.md`, `SECURITY.md`, `docs/release.md`, `tests/test_release_artefacts.py`; `tests/perf/` + `docs/performance.md`; the threat review with two credential-echo defects fixed |
 | 8 | Boundary legibility and extension points | complete | [ADR 0014](adr/0014-no-identity-or-authorization-model.md), [0015](adr/0015-durability-is-single-host.md), [0016](adr/0016-database-providers-are-an-extension-point.md); `docs/positioning.md`, `docs/database-providers.md`; `assert_provider_contract` in `xyberos.database.testing` + `tests/database/test_provider_contract.py`; `examples/tenancy/`, `examples/broker_worker/` and their integration tests; the write-throughput baseline |
+| 9 | Extras here, and the placement rule | planned (not started) | the exit gate below; no extra, suite, or retirement patch it names exists yet |
+| 10 | The packages that stay in the package repository | planned (not started) | the exit gate below; no port, catalogue row, or retirement notice exists yet |
+| 11 | Developer tooling and the contributor loop | planned (not started) | the exit gate below; no command, schema, or CI step exists yet |
 
 ### Phase 7 entry checklist
 
@@ -594,6 +639,272 @@ enough that a new document is a claim about something stable.
 **Deliverables:** three ADRs, three documents (positioning, database providers, and the capacity
 section), one reusable conformance suite, and two tested examples — all of it outside the runtime.
 
+### Phase 9 - extras here, and the placement rule
+
+**Status:** planned; not started. 2.0 already has every mechanism a package needs — `register(app)` for
+providers and routes, `Plugin` for a distribution the runtime validates, orders, and attributes, and the
+provider registry for scopes, dependencies, and test overrides — so this phase adds no mechanism. The
+capability-placement decision is recorded under "Adopted implementation decisions", so this phase applies it,
+records it as **ADR 0018** in full, and ships the extras it sends here. It also states the limit of the
+surface the rule has to respect: middleware is supplied by the application
+(`HttpAdapter(app, middleware=(...))`), not registered by a plugin, so a cross-cutting request concern is a
+class the application passes — never a plugin, and never something a module installs behind the application's
+back.
+
+**Objective:** ship the capability that belongs here, and stop shipping it anywhere else. A dependency-free
+capability small enough for this repository's suite becomes an extra with one working implementation — the
+shape `[http]`, `[database]`, `[ollama]`, and `[durable]` already have — and the 1.x name it replaces is
+retired with a pointer rather than shimmed.
+
+**Prerequisites:** Phases 0-8 complete, so the mechanisms are frozen, and the owner's decisions on the
+placement rule and the reused names ([ADR 0022](#remaining-owner-decisions)) recorded.
+
+**The rule, applied per candidate.** The placements are the adopted decision's; this table is where each
+candidate on the list lands, including the ones that are not packages at all. `here` is this repository,
+`there` is the package repository. The kinds are the three the docs already use: a **module** registers
+providers and routes inside an application, a **plugin**
+is a distribution the runtime validates and attributes, and a **provider** or **adapter** implements one
+extension-point contract.
+
+| Candidate | Placement | Why |
+| --- | --- | --- |
+| MCP tools (consume a server's tools) | **extra here**: `[mcp]`, client only | the 1.x client's own description says it speaks JSON-RPC over stdio and streamable HTTP using only the standard library — so no dependency, and the port must re-prove that rather than assume it. If it cannot, the rule sends it *there* as a package |
+| Request metrics | **extra here**: `[metrics]`, a middleware class | no dependency, and the smallest thing on this list; the application passes it to `HttpAdapter`, which is the only shape 2.0 offers for middleware |
+| Storage (files and blobs) | **extra here**: `[storage]` with local files, a double, and the provider suite | no dependency, and an extra has to ship one working implementation rather than a bare contract — which is what `[database]` and `[ollama]` do |
+| Storage (S3-compatible), PostgreSQL, MySQL | package there | each needs a client library core will not adopt; [ADR 0016](adr/0016-database-providers-are-an-extension-point.md) already places database engines there |
+| Templates, static files, forms | package there: `xyberos-templates` | it needs Jinja2, and `pyproject.toml` already records why Jinja2 is not an extra of this package |
+| A logging preset and tracing | package there: `xyberos-observability` | it needs OpenTelemetry, and the runtime configures no handler by decision |
+| Identity and authentication | package there: `xyberos-auth`, verification only | real assertions are asymmetric, so it needs `cryptography`; [ADR 0014](adr/0014-no-identity-or-authorization-model.md) still owns the policy half, and no flow, preset, session, or role returns |
+| LLM providers | package there: `xyberos-openai-compatible`; the suite stays here | the adapter is a second backend for a facade whose first is [ADR 0004](adr/0004-initial-ai-provider.md)'s Ollama; promoting it to an extra would amend that ADR |
+| Multi-tenancy | module, either home | it needs nothing new: `examples/tenancy/` already proves the pattern, so a package is a convenience rather than a capability |
+| Parallel fan-out | module, here, as an example | the backlog defers any runtime claim, so it needs ADR 0021 and the owner's sign-off before it exists at all |
+| A revived `xyberos-db` | **retire, with a pointer** | `xyberos[database]` and the provider seam already answer it |
+| `xyberos-metrics`, `xyberos-mcp` | **retire, with a pointer** | their capability lands in `[metrics]` and `[mcp]` here, so a 2.x release under the old name would be a second answer |
+| `check --json`, `--why`, `--schema`, the configuration schema | tooling here | nothing installs them; they are one binary's flags — ADR 0020 records the serialized documents as a contract |
+| Session inspection of the journal | tooling here | read-only, and retention, pruning, and scheduling stay deferred |
+| Sessions, CSRF, an admin UI, OpenAPI, RAG and vector stores, job queues, rate limiting, feature flags | refused, unchanged | reverse one and it needs its own ADR, which is what the backlog and the feature matrix record |
+
+**Why the rule beats a shim.** The tempting alternative is to publish `xyberos-mcp` 0.3.0 as a thin package
+that depends on `xyberos[mcp]` and re-exports it. It saves nothing and costs something: 2.0's `xyberos.runtime`
+and `xyberos.plugins` are unrelated to the 1.x ones, so the package's body is a rewrite either way; the import
+root changes (`xyberos_mcp` to `xyberos.mcp`), so the shim preserves no import a 1.x user could rely on; and a
+second distribution answering one question inherits this repository's release cadence as a version constraint.
+Retirement with a pointer is the honest form of the same move, and it is the move
+[ADR 0017](adr/0017-release-identity-and-lineage.md) already made for the core name.
+
+**Work packages**
+
+1. **Record the rule: ADR 0018.** A new ADR — **ADR 0018**, the next free number and a deliverable here rather
+   than a link that resolves today — states the three kinds, the four placements, the middleware limit above,
+   and the one rule that keeps the split safe: a package may depend on core, and core may never depend on a
+   package or on another package. **Evidence:** the ADR, linked from `CONTRIBUTING.md` and the Extend pages.
+2. **`[storage]`, with an implementation and a suite (ADR 0019).** `Storage` — put, get, delete, list, an
+   explicit key space, bounded sizes, and errors mapped onto the existing taxonomy — plus a local-filesystem
+   provider, an in-memory double, and `assert_storage_contract` for the providers that live elsewhere. The
+   extra ships one working implementation because an extra is a promise a release makes, and the suite exists
+   because a zero-dependency engine seam is exactly where a third party should be able to prove itself.
+   **Evidence:** the suite passing for two providers and failing for two deliberately broken ones — the bar
+   `tests/database/test_provider_contract.py` already sets.
+3. **`[mcp]`, the client.** One `Tool` per server tool, namespaced `{server}_{tool}` as the 1.x package already
+   does, with arguments *validated* against the declared schema through the closed subset rather than coerced,
+   a schema outside the subset refused at registration with the server and keyword named, servers named in
+   configuration with their tools opted into by name, a server's descriptions and results treated as data, and
+   a reachable-server failure reported rather than inferred. The stdlib-only claim is re-proved here; if the
+   port turns out to need the `mcp` SDK, the rule moves it to the package repository instead of bending the
+   dependency policy. **Evidence:** the package's suite against a stub MCP server, and the allowlist behaviour
+   asserted with the same tests the facade's own tools use.
+4. **`[metrics]`, the smallest extra.** Counters per route and status as a middleware the application passes to
+   `HttpAdapter`, with a readout a test can assert, and no sink, exporter, or background task. It is the one
+   candidate small enough that an example could replace it, so the work package's first decision is whether it
+   earns a release row. **Evidence:** `tests/http/test_metrics.py` and a line in the feature matrix.
+5. **The AI provider conformance suite.** `assert_model_provider_contract`, with the embedding half beside it,
+   in `xyberos.ai.testing` — where the fake provider already lives. Its customers are the adapter packages in
+   the other repository and any third party; a provider proves a refusal is reported rather than inferred, usage
+   is reported rather than guessed, the closed schema subset is honoured, tools are called, and cancellation is
+   obeyed. **Evidence:** the suite, and the shipped Ollama adapter running it in `tests/ai/`.
+6. **Retirement as a mechanism, not a sentiment.** For each name whose capability lands in an extra, the 1.x
+   line gets a metadata-only patch — `0.1.3`, `0.2.3`, and so on — whose description points at the extra and
+   which keeps the `xyberos>=1.0,<2` pin, so nothing moves under a 1.x user. No shim, no 2.x release under the
+   old name, and the pointer release is the same window the repin already used. **Evidence:** the patch
+   release, and the catalogue row that records the retirement.
+
+**Exit gate**
+
+| Criterion | Evidence |
+| --- | --- |
+| The rule is written once and applied per candidate | ADR 0018, and a catalogue row for every candidate in the table above |
+| Every new extra ships a working implementation | `[storage]` has a local provider, `[mcp]` a client that passes its suite, and the AI suite runs against the shipped Ollama adapter |
+| Every extension point that a package implements has a suite | storage and the AI providers, beside the database's |
+| A retired name points somewhere and moves nobody | the metadata-only patch keeps the `<2` pin, and its description names the extra |
+| The mechanism 2.0 already has is enough | no change to `src/xyberos/__init__.py`, the plugin protocol, the provider registry, or the routing API; `tests/test_public_surface.py` grows only by the new extras' own names |
+| The middleware limit is respected | metrics is a class the application passes, and nothing pretends a plugin can install middleware |
+
+**Deliverables:** two ADRs (0018 and 0019), three extras (two of them new capability here and one of them
+possibly an example instead), three conformance suites and their doubles, the retirement patches, and the
+catalogue, feature-matrix, stability, plugin, and release documentation each one changes.
+
+### Phase 10 - the packages that stay in the package repository
+
+**Status:** planned; not started. The placement rule leaves this phase with the candidates that need a
+dependency core will not adopt, carry policy, or have their own cadence. Almost all of it is work in
+`xyberos/xyberos`, so each work package names both halves: what happens *there*, and what has to change
+*here* — usually a catalogue row and a link, never a copied file.
+
+**Objective:** keep this repository's dependency graph and promise count small, and give the ecosystem one
+home. A capability that needs Jinja2, OpenTelemetry, `cryptography`, a database driver, or an object-store
+client is a package with its own release — not an extra that quietly makes this line depend on all of them.
+
+**Prerequisites:** Phase 9's ADR 0018, because the rule decides what lands here; and the conformance suites,
+because a provider package in this phase is proved against them.
+
+**Work packages**
+
+1. **The republish mechanics, decided once for every name.** *There:* one directory per distribution with its
+   own `pyproject.toml`, a CI matrix that installs the **published** core rather than a checkout, the
+   `project_urls` the satellites have never declared, and a changelog whose first line states the break.
+   *Here:* the catalogue rows, and the release guide's per-name repin wording. **Evidence:** the first release,
+   and the compatibility job passing against it.
+2. **`xyberos-mcp`, only if the rule sends it there.** *There:* the port as Phase 9 describes it, plus the
+   `expose()` direction. *Here:* a recipe rather than a shipped endpoint when `expose()` is wanted, because
+   [ADR 0014](adr/0014-no-identity-or-authorization-model.md) leaves the framework no authorization model to
+   put in front of an RPC surface. **Evidence:** the package's suite against a stub server, and the recipe.
+3. **`xyberos-templates`.** *There:* a module-shaped package — a request-scoped `Templates` contract over
+   Jinja2, a static mount, and form reading — declaring Jinja2 itself. *Here:* a catalogue row, and the
+   traditional path's lessons keep teaching the shape it packages. **Evidence:** the package's tests, and the
+   lesson cross-reference.
+4. **`xyberos-observability`.** *There:* one explicit call from the composition root that configures a handler,
+   a level, a format, and the runtime's own `ContextLogFilter`, plus OpenTelemetry spans for the request
+   pipeline and workflow steps, keyed by the correlation id the adapter already mints. *Here:* a catalogue row
+   and a link from [the observability page](../site/production/observability.md). **Evidence:** the package's
+   tests.
+5. **`xyberos-auth`.** *There:* keep the verification half — an assertion from a shared secret or a JWKS, a
+   `Principal`, and stop — and drop the OAuth2 flows, the OIDC machinery, and the Auth0/Okta/Entra presets its
+   published `0.1.2` bundles, with the changelog's first line saying what no longer happens. *Here:* the
+   catalogue row, and the feature matrix's identity row still reading "Not provided, and it will not be".
+   **Evidence:** the package's tests refusing an unsigned, an expired, and a wrong-audience assertion.
+6. **The engine and adapter packages: `xyberos-postgres`, `xyberos-storage-s3`, and the AI adapters.**
+   *There:* each runs the conformance suite that ships here, declares the extra or core it needs, and is proved
+   against the installed core. The PostgreSQL package also answers the two SQLite-specific promises the provider
+   guide names, or refuses loudly. *Here:* catalogue rows, and the provider guide's section on running a suite
+   from another repository. **Evidence:** each package's CI, the PostgreSQL job against a service container, and
+   the compatibility job below.
+7. **Catch drift with a job, not a hope.** A scheduled CI job here — and a required one before a core release is
+   tagged — installs the published core and the published packages into one environment and runs a smoke test:
+   import, register, one call. Version drift is the failure mode this arrangement invites, and this is the only
+   place it can be caught, because neither repository owns the other's code. **Evidence:** the job, and its
+   result recorded in [the release guide](release.md).
+
+**Exit gate**
+
+| Criterion | Evidence |
+| --- | --- |
+| Only the rule's cases land there | every package in this phase needs a dependency this line does not adopt; Jinja2, OpenTelemetry, and `cryptography` are named with the reason |
+| A ported name is a rewrite with an honest first line | it declares `xyberos>=2,<3`, the old version stays published and unedited, and the changelog says what changed |
+| Compatibility is proved against what a user can install | every package's CI installs the published core, and the compatibility job runs here |
+| A retired name points somewhere | `xyberos-db`, `xyberos-metrics`, and `xyberos-mcp` if the rule sends the client there, each with a pointer and an unchanged pin |
+| One repository publishes each name | no package release originates here, and the catalogue says where each one does |
+
+**Deliverables:** the packages, the ports, and the retirement patches in the package repository; here, the
+catalogue rows, the Extend-page links, the per-name repin wording in
+[the release guide](release.md#releasing-beside-the-published-1x-line), and ADR 0022 — which records the reused
+names, the five conditions, and supersedes that clause of
+[ADR 0017](adr/0017-release-identity-and-lineage.md).
+
+### Phase 11 - developer tooling and the contributor loop
+
+**Status:** planned; not started.
+
+**Objective:** make the framework legible to the tools a developer already has — an editor, a script, a CI
+job — and make this repository's own loop reproducible by somebody who is not its author.
+
+**Prerequisites:** none beyond Phases 0-8. Nothing here depends on Phases 9 and 10, which is why the three
+phases of this plan may be delivered in any order; the one hard ordering is inside Phase 9, where a
+conformance suite lands with its contract and before any implementation claims to pass it.
+
+**Work packages**
+
+1. **Introspection an editor and a script can consume.** `xyberos check` grows three outputs: `--json` emits
+   settings, the provider graph with scopes, the route table, and the diagnostics as one machine-readable
+   document; `--why Contract` prints the resolution path and scope for one contract, which is the sentence
+   `App.validate()` already builds for a failure; and `--schema` emits the JSON Schema generated from the
+   `Settings` dataclasses, which also ships in the wheel so an editor validates and completes `xyberos.toml`
+   with no extension to install. **ADR 0020** records the serialized documents as a versioned contract,
+   because a JSON key a tool reads is as public as a name, so `tests/test_compatibility.py` pins their keys
+   and a drift test fails when a `Settings` field changes without the schema. **Evidence:** the new cases in
+   `tests/cli/test_cli.py`, `tests/test_config_schema.py`, and the compatibility entry.
+2. **One read-only command for the experimental surface: `xyberos durable status`.** Counts by state, the
+   oldest non-terminal execution, the parked attempts with the reason each was parked, the journal's schema
+   version, and its file size — read through `JournalStats`, `list_executions`, and `inspect`, which
+   `xyberos.durable` already exposes, opening the journal read-only. It never writes, never prunes, and never
+   schedules, and its help says so rather than leaving that to the guide. **Evidence:**
+   `tests/cli/test_durable_status.py`, the operator section in [the durable guide](durable.md), and the
+   subcommand list in [the CLI guide](cli.md).
+3. **The contributor loop, reproducible.** `.devcontainer/devcontainer.json` installs the extras CI installs,
+   `.pre-commit-config.yaml` runs the two `ruff` commands, `pre-commit` joins the `dev` extra, and
+   CONTRIBUTING gains the ordered loop CI runs. `.vscode/` is in `.gitignore`, so editor settings arrive by
+   that negation or not at all.
+4. **A DX claim that is a test.** `tests/integration/test_first_five_minutes.py`: scaffold with
+   `xyberos new`, run the three commands the scaffold prints, and assert each one succeeds — which is how
+   "five minutes to a running application" becomes a suite entry instead of a sentence.
+
+**Exit gate**
+
+| Criterion | Evidence |
+| --- | --- |
+| What an editor validates is what the runtime reads | the schema ships in the wheel, `check --schema` emits it, and drift fails a test rather than a user |
+| The introspection documents are contracts | ADR 0020 plus pinned keys in `tests/test_compatibility.py` |
+| The experimental surface can be inspected without hand-written SQL | `durable status` reads only, opens the journal read-only, and never writes or prunes |
+| A stranger can reproduce the loop | the devcontainer installs what CI installs, pre-commit runs what CI runs, and CONTRIBUTING gives the order |
+| Five minutes is measured | `tests/integration/test_first_five_minutes.py` runs the scaffold's own printed commands |
+
+**Deliverables:** one ADR (0020), three new `check` outputs and one read-only command, the configuration
+schema, two repository files for the contributor loop, and the CLI and README documentation they change.
+
+**Consequences these three phases own.** The ripples are part of the work rather than something a failing
+build discovers: [the CLI guide](cli.md) and the README's command block gain the new flags and the `durable`
+command, while `PLAN.md` section 9's "four subcommands" note gains a pointer rather than being rewritten,
+because it records Phase 7; the `installed-artefact` CI job's `routes: 2 (handler signatures valid)` assertion
+moves with the route report it greps for; a new guide under `docs/` means three registrations, not one —
+`mkdocs.yml`'s Reference list, `site/scripts/reference.py`'s `_SUMMARIES`, and the file — with `tests/site`
+failing when one is missed; and the wheel gains one data file and no import, which
+`tests/test_release_artefacts.py` states rather than trusts. Three more follow from the placement rule. An
+extra is a promise the release makes, so [the release guide](release.md) gains a row per new extra and the
+version bump touches more than six files; [the release guide](release.md#releasing-beside-the-published-1x-line)'s
+repin instruction becomes per-name rather than blanket, since retiring a name costs a metadata-only patch; and
+the plugin guide's catalogue stops describing extensions as hypothetical and starts naming a repository that is
+not this one. The site's snippet harness still reads this repository only, so a page about a *package* is a
+link and a contract description rather than a page that runs its code — and the page says which it is, while a
+page about an extra keeps the stronger guarantee because the extra is tested here.
+
+**What these phases will not do**, each carried forward with its reason:
+
+- **No shim packages.** A 2.x release under a 1.x name exists only where the port is a rewrite with something
+  to keep; where the capability moved into an extra, the name is retired with a pointer instead.
+- **No new mechanism.** `register(app)`, `Plugin`, the provider registry, and extras already cover every
+  candidate; a new protocol needs a candidate that none of them fits, and nothing on the list qualifies.
+- **No plugin-registered middleware.** `HttpAdapter(app, middleware=(...))` is the application's call, so
+  metrics, tracing, and logging presets are classes the application passes — never something installed for it.
+- **No dependency added to core or to an existing extra.** Jinja2, OpenTelemetry, `cryptography`, database
+  drivers, and object-store clients each belong to the package that needs them.
+- **No discovery and no entry points.** [ADR 0007](adr/0007-trusted-plugins.md) is a supply-chain decision; a
+  hand-maintained catalogue is the visibility that was actually missing.
+- **No pytest plugin and no fixture library.** [The testing guide](testing.md) refuses it, and the doubles
+  stay ordinary functions.
+- **No template engine in the package.** The engine belongs to the application and to `xyberos-templates`,
+  which is what keeps the comment in `pyproject.toml` true.
+- **No identity, session, or authorization model in the framework.** `xyberos-auth` verifies an assertion and
+  stops; reversing [ADR 0014](adr/0014-no-identity-or-authorization-model.md) would take an owner decision and
+  its own ADR.
+- **No revived `xyberos-db`.** Its published version stays and gains a pointer, because two answers to "how do
+  I talk to a database" is one answer too many.
+- **No blanket reuse of the 1.x satellite names.** The rest stay on the 1.x line under the repin they already
+  shipped, until each passes the owner's five conditions.
+- **No DAG, no scheduler, and no parallel step execution in the engine.** The fan-out module is an example,
+  opt-in, signed off by the owner, and scoped to one step's attempt.
+- **No retention, pruning, or scheduling in the durable surface.** `durable status` reads and reports, and the
+  deferred backlog item stays deferred.
+- **No new stable name.** Everything here is preview, and promoting any of it needs its own ADR.
+
 ## Cross-phase controls
 
 ### Dependency and import boundaries
@@ -621,6 +932,16 @@ between optional packages is deliberate and narrow: `xyberos.durable` imports th
 plumbing in `xyberos.database.sqlite` for PRAGMAs, WAL, and the bounded retry on write contention,
 while keeping its own file, schema, and tables. Building a second copy of that plumbing was rejected
 as the larger risk.
+
+The boundary now has an outside, and the capability-placement decision gives it two shapes with different
+rules. An **extra** is this package's own surface: it lives under `src/xyberos/`, may import an optional
+dependency only inside its own module through `src/xyberos/_extras.py`, and is released, tested, and promised
+with everything else here. A **package** in the ecosystem repository is not: it may import documented
+`xyberos` names and nothing else, exactly as a plugin may, and this repository may never import it, list it in
+`[project.dependencies]` or in an extra, or prove it by running its code — the compatibility job in Phase 9 is
+where the published pair is proved instead. That asymmetry is the reason an extra must ship a working
+implementation while a package may ship only what its own suite can carry: the first is a promise made here,
+and the second is a promise made there and checked here.
 
 ### Definition of phase completion
 
@@ -704,7 +1025,8 @@ Use a monotonic clock abstraction for Workflow and durability tests. Avoid sleep
 - Static analysis that proves branches merging into one step are mutually exclusive; Phase 4 fails
   such a merge at runtime instead.
 - Parallel step execution and any claim of DAG scheduling; Phase 4 is sequential and conditional by
-  design.
+  design. The fan-out example in Phase 9 is the only thing that would revisit this, and it is written as
+  conditioned on ADR 0021 and the owner's sign-off rather than as work that proceeds.
 - Dynamic/imperative decorator Workflows until declarative Workflow semantics and introspection are stable.
 - Knowledge/RAG subsystem until it has a bounded, independently useful provider contract; Phase 5
   ships embeddings and a tool allowlist, which is what a retrieval layer would need, but no
@@ -723,7 +1045,8 @@ Use a monotonic clock abstraction for Workflow and durability tests. Avoid sleep
   documents the trap and shows the pattern to copy, and a real check would need the definition to
   declare a step's output type.
 - Journal retention tooling: Phase 6 documents how to bound the file (delete terminal executions,
-  which cascades) and deliberately ships no scheduler or command for it.
+  which cascades) and deliberately ships no scheduler or command for it. Phase 11's
+  `xyberos durable status` reads and reports and is not retention tooling.
 - Promoting durable execution beyond experimental status. `PLAN.md` section 5.4 lists what has to be
   demonstrated; until then the API keeps warning.
 
@@ -773,3 +1096,53 @@ owner-owned: any future promotion of durable execution beyond experimental statu
 `PLAN.md` section 5.4. The first upload adds its own owner decisions — index access and the fate of the
 documentation site — and they are listed as preconditions in
 [the release guide](release.md#preconditions).
+
+**Decided: two satellite names are reused, one is retired, and identity still stays out of the framework.**
+The 1.x line published 23 satellites ([ADR 0017](adr/0017-release-identity-and-lineage.md)), and the three the
+release guide names had already been repinned to `xyberos>=1.0,<2` — `xyberos-auth` `0.1.2`, `xyberos-db`
+`0.1.2`, and `xyberos-mcp` `0.2.2` — which is why an unpinned install of any of them still resolves the 1.x
+core today. The owner's decision for this line is:
+
+- **The placement rule decides the home.** A dependency-free capability small enough for this line's suite
+  ships here as an extra (`[storage]`, `[metrics]`, `[mcp]` if the port stays stdlib-only); anything needing
+  Jinja2, OpenTelemetry, `cryptography`, a database driver, or an object-store client is a package in
+  `xyberos/xyberos`, the repository the published 1.x metadata declares, and is released from there. One
+  publishing path per name either way, and a name whose capability moved into an extra is retired with a
+  metadata-only pointer rather than shimmed.
+- **`xyberos-mcp` is reused, as a rewrite** that declares `xyberos>=2,<3`, while `0.2.2` stays published and
+  unedited for the 1.x line. Its client is what Phase 10 ports; its `expose()` server direction becomes a
+  recipe, because [ADR 0014](adr/0014-no-identity-or-authorization-model.md) leaves the framework no
+  authorization model to put in front of an RPC surface.
+- **`xyberos-auth` is reused, carrying only the verification half.** The published `0.1.2` bundles OAuth2
+  flows, OIDC, and Auth0/Okta/Entra presets; none of that returns, and the changelog's first line says so.
+  The framework still owns no identity model, and the feature matrix's identity row is unchanged.
+- **`xyberos-db` is retired for this line.** Its `0.1.2` stays published and gains a README pointer to
+  `xyberos[database]` and the provider seam, because it duplicates an answer this line already has.
+- **The other twenty satellites stay on the 1.x line** under the repin they already shipped. Reusing a name
+  is not a sweep: it is a per-package decision that has to meet five conditions — the 2.x package is a
+  rewrite rather than a shim; it declares `xyberos>=2,<3`; the old version stays published with the break in
+  its README's first line; exactly one publishing path owns the name; and the subject is not already answered
+  by core or an extra.
+
+One consequence is a document change rather than a code change: [the release guide](release.md#releasing-beside-the-published-1x-line)'s
+blanket repin instruction becomes per-name, and **ADR 0022**, which records this decision and those five
+conditions, supersedes that clause of ADR 0017 for these two names. ADR numbers are taken when an ADR is
+written, so if this one lands before the four the phases propose, those become 0019-0022 and this one 0018.
+
+**Still open, and owned by the project owner.**
+
+1. **Whether the remaining new packages are published at all, and under whose names.** The reused names are
+   settled above; what is not is the set this line has no 1.x predecessor for — `xyberos-templates`,
+   `xyberos-observability`, `xyberos-auth`'s rewritten surface, `xyberos-postgres`, the S3 and AI adapter
+   packages, and whatever tenancy becomes. Building them does not depend on the answer — a package is proved by
+   its own suite against the installed core, and the compatibility job here proves the pair — but *listing* one
+   as installable does, so a catalogue row says which form it currently is.
+   [ADR 0007](adr/0007-trusted-plugins.md) already refuses discovery, so this is a naming and maintenance
+   decision rather than a loading one.
+2. **Whether parallel fan-out is un-deferred.** [The workflow guide](workflow.md#deliberate-limitations) and
+   the backlog both record sequential execution as a design decision. The fan-out example is written as
+   conditioned on ADR 0021 and the owner's sign-off, and it stays unbuilt until then.
+3. **Whether the MCP package may spawn a stdio server.** The standing policy is that the framework starts
+   nothing — no model pull, no container, no serving path of its own. A stdio transport spawns a process the
+   application names, so it is either a documented opt-in or a refusal; the work package is written so that
+   either answer is a policy line rather than a redesign.
