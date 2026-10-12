@@ -489,6 +489,12 @@ Phase 6 — Extensibility
 
 Document module creation, plugin creation, registration, configuration, testing, and distribution.
 
+**Complete:** four verified pages under `site/extend/` — the provider registry, modules, plugins, and
+database providers — each built on a walkthrough module in `examples/learn_extend/` that the site harness
+runs and compares with the page's own output block, plus the two integration tests that hold the claims a
+transcript cannot ([`tests/integration/test_extension_provider.py`](../tests/integration/test_extension_provider.py),
+[`tests/integration/test_extension_plugins.py`](../tests/integration/test_extension_plugins.py)).
+
 Phase 7 — Production
 
 Add deployment, security, observability, troubleshooting, and advanced architecture guides.
