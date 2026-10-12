@@ -422,6 +422,9 @@ in one place and the suite is its second reader:
 | `test_every_page_marker_becomes_a_directive` | every marker a page writes renders a directive that names that page's own snippet paths — a claim that is merely *named* is not a claim | `test_pages.py` |
 | `test_mkdocs_loads_the_snippet_hook` | `mkdocs.yml` wires the hook that performs that translation, and the file it names exists | `test_pages.py` |
 | `test_the_snippet_hook_renders_the_canonical_marker` | the hook translates the marker, including the spaced spelling, and leaves other text alone | `test_pages.py` |
+| `test_a_snippet_is_fenced_by_its_own_language` | the fence names the language and the file, so an include is highlighted and attributable | `test_pages.py` |
+| `test_an_included_file_renders_as_a_code_block` | the hook's own output, converted with the extensions the build declares, puts the file's code *inside* a code block — a bare directive splices it into the Markdown stream instead, which is how every snippet on the site once rendered as prose | `test_pages.py` |
+| `test_the_navigation_names_every_reference_guide` | the generated reference and the navigation agree in both directions, so a new guide cannot go missing from the Reference tab | `test_pages.py` |
 | `test_a_surviving_marker_is_found_in_the_built_output` | the build's post-build check finds a marker in a built page, and does not report a clean one — a gate that always passes is not a gate | `test_pages.py` |
 | `test_a_lesson_page_contains_no_hand_written_python` | Python on a lesson page arrives by include — this is what stops the drift in 4.9 | `test_lessons.py` |
 | `test_the_pages_satisfy_the_build_rules` | the same gate the build runs, called rather than restated | `test_pages.py` |
@@ -519,6 +522,24 @@ The nav is written explicitly. `site.md` and this file are **linked** from it ra
 the site: their links are repository-relative, which is what makes them correct where they are read,
 and a documentation build resolves links against its own source directory. They are excluded with
 `exclude_docs`, so the strict build does not report their links as broken.
+
+Three navigation decisions were settled by measuring the built site, and each replaced a guess:
+
+- **Areas are tabs, and that is what fixed the sidebar.** `navigation.tabs` splits the four learning
+  paths, the extension guides, the reference, and the project pages into eight top tabs, so the sidebar
+  holds one area rather than every page: without them all four paths and the reference rendered into one
+  sixty-entry list, which is the state a reader reported. `navigation.instant` then keeps that sidebar
+  and the search index across a click instead of re-fetching them per page.
+- **`navigation.prune` is deliberately not used.** It is the documented way to shrink a large
+  navigation, and it was tried: with it, a page under `reference/adr/` rendered *no* sidebar at all,
+  whether the reference was grouped into sections or listed flat. The evidence was the built HTML, not
+  the documentation for the flag.
+- **The reference is named in the nav, one entry per guide.** A Reference tab whose sidebar was a
+  single link to its index page is a dead end for a section a reader browses;
+  `test_the_navigation_names_every_reference_guide` now fails when the named set and the generated tree
+  disagree, so `docs/` gaining a file is a failing test rather than a page nobody can reach. The entry
+  for `implementation.md` is absent on purpose: it is excluded from the build, and the same test is what
+  keeps an excluded page out of the navigation.
 
 Two structural choices follow, and one of them was only discovered by building the site:
 

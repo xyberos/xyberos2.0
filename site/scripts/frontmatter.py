@@ -230,6 +230,15 @@ def _is_excluded(relative: str, patterns: tuple[str, ...]) -> bool:
     return False
 
 
+def is_excluded(relative: str, patterns: tuple[str, ...] | None = None) -> bool:
+    """Whether a page path is excluded from the build, by the rules ``mkdocs.yml`` declares.
+
+    Public because the navigation is written for the pages the build will actually contain, and a
+    reader of that list has to apply the same rules rather than a second copy of them.
+    """
+    return _is_excluded(relative, excluded_pages() if patterns is None else patterns)
+
+
 def iter_pages(root: Path | None = None) -> Iterator[Page]:
     """Yield every page under ``site/``, sorted by path, skipping generated and excluded pages.
 
@@ -237,9 +246,8 @@ def iter_pages(root: Path | None = None) -> Iterator[Page]:
     belongs to the repository rather than to the site, so it is not part of the site's own checks.
     """
     root = SITE_ROOT if root is None else root
-    patterns = excluded_pages()
     for source in sorted(root.rglob("*.md")):
         relative = source.relative_to(root).as_posix()
-        if relative.startswith("reference/") or _is_excluded(relative, patterns):
+        if relative.startswith("reference/") or is_excluded(relative):
             continue
         yield load_page(source)

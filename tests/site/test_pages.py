@@ -212,11 +212,65 @@ def test_mkdocs_loads_the_snippet_hook() -> None:
 
 
 def test_the_snippet_hook_renders_the_canonical_marker() -> None:
-    """One marker in, one directive out, including the spaced spelling."""
+    """One marker in, one *fenced* directive out, including the spaced spelling."""
     hook = site.snippets_hook.on_page_markdown
-    assert hook("<!-- snippet: examples/a.py -->") == '--8<-- "examples/a.py"'
-    assert hook("<!--snippet:examples/a.py-->") == '--8<-- "examples/a.py"'
+    expected = '```python title="examples/a.py"\n--8<-- "examples/a.py"\n```\n'
+    assert hook("<!-- snippet: examples/a.py -->\n") == expected
+    assert hook("<!--snippet:examples/a.py-->\n") == expected
     assert hook("no marker here") == "no marker here"
+    # Only a whole-line marker is rendered. A marker inside prose is left alone, and the build's
+    # post-build check is what refuses it rather than a hook that guesses at the author's intent.
+    inline = "prose <!-- snippet: examples/a.py --> more prose"
+    assert hook(inline) == inline
+
+
+def test_a_snippet_is_fenced_by_its_own_language() -> None:
+    """The fence names the language and the file, so an include is highlighted and attributable."""
+    assert site.snippets_hook.fenced("examples/learn_extend/sql_provider.py").startswith(
+        '```python title="examples/learn_extend/sql_provider.py"'
+    )
+    assert site.snippets_hook.fenced("examples/learn_traditional/templates/list.html").startswith(
+        "```html "
+    )
+    assert site.snippets_hook.fenced("notes.txt").startswith("```text ")
+
+
+def test_an_included_file_renders_as_a_code_block() -> None:
+    """The fence is the difference between a page that shows code and a page the code rewrote.
+
+    A bare `--8<--` line splices the file into the Markdown stream, where a docstring becomes a
+    paragraph, `from __future__ import annotations` renders with **future** in bold, and a `#:`
+    comment becomes a heading. Converting the hook's own output with the extensions the build
+    declares is what tells those two apart — the built site is the same conversion.
+    """
+    from html import unescape
+
+    from markdown import markdown  # type: ignore[import-untyped]  # Markdown ships no stubs
+
+    names: list[str] = []
+    configs: dict[str, dict[str, object]] = {}
+    for entry in site.frontmatter.load_config()["markdown_extensions"]:
+        if isinstance(entry, str):
+            names.append(entry)
+        else:
+            name, options = next(iter(entry.items()))
+            names.append(name)
+            configs[name] = options
+
+    marker = "<!-- snippet: examples/learn_extend/sql_provider.py -->\n"
+    converted = markdown(
+        site.snippets_hook.on_page_markdown(marker), extensions=names, extension_configs=configs
+    )
+    source = (REPOSITORY_ROOT / "examples/learn_extend/sql_provider.py").read_text(encoding="utf-8")
+
+    assert "<strong>" not in converted, "the file was parsed as Markdown rather than shown as code"
+    block = re.search(r"<code[^>]*>(?P<body>.*?)</code>", converted, re.DOTALL)
+    assert block is not None, "the include is not inside a code block"
+    # Highlighting wraps every token in a span, so compare the block's text with the file's.
+    shown = unescape(re.sub(r"<[^>]+>", "", block.group("body")))
+    for line in source.splitlines():
+        if line.startswith(("from ", "class ")):
+            assert line in shown, f"{line!r} is not inside the code block"
 
 
 def test_site_url_resolves_for_a_preview_and_the_release(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -267,3 +321,26 @@ def test_rendered_reference_matches_docs(tmp_path: Path) -> None:
     expected, actual = read(fresh), read(generated)
     assert actual.keys() == expected.keys()
     assert sorted(name for name in expected if expected[name] != actual[name]) == []
+
+
+def test_the_navigation_names_every_reference_guide() -> None:
+    """The reference tree is generated, so the navigation is what makes it browsable.
+
+    The list in `mkdocs.yml` is written rather than derived, because a reference is browsed and the
+    groups are a judgement about reading order. This is the check that keeps the list true: a guide
+    added to `docs/` is a page the Reference tab does not offer until it is named, and a name whose
+    page the build excludes — `implementation.md` is one — fails the build rather than the reader.
+    """
+    generated = SITE_ROOT / "reference"
+    if not generated.is_dir():
+        pytest.skip("run `python site/scripts/build.py` to generate site/reference/ first")
+
+    named = {path for path in site.navigation() if path.startswith("reference/")}
+    written = {
+        path.relative_to(SITE_ROOT).as_posix()
+        for path in generated.rglob("*.md")
+        if not site.frontmatter.is_excluded(path.relative_to(SITE_ROOT).as_posix())
+    }
+
+    assert sorted(written - named) == [], "a generated guide is not named by the navigation"
+    assert sorted(named - written) == [], "the navigation names a page the build does not contain"

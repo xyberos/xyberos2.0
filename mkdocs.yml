@@ -31,13 +31,28 @@ theme:
   name: material
   language: en
   features:
-    - navigation.sections
+    # Areas are tabs, so the sidebar holds one area's pages rather than every page on the site. That
+    # is what fixed the sidebar this replaced: without tabs, all four paths and the reference rendered
+    # their pages into one sixty-entry list. `navigation.prune` was tried for the same reason and is
+    # deliberately not used — with it, a page under `reference/adr/` rendered *no* sidebar at all,
+    # whether the reference was grouped or flat. `navigation.sections` is left off too: inside a tab
+    # it changes nothing, and it is the setting that produced the flat list in the first place.
+    - navigation.tabs
+    - navigation.tabs.sticky
     - navigation.indexes
+    # Instant loading keeps the sidebar and the search index across a click, so a reader walking a
+    # seventeen-lesson path is not re-downloading the navigation each time.
+    - navigation.instant
+    - navigation.instant.prefetch
+    - navigation.instant.progress
+    - navigation.tracking
+    - navigation.footer
     - navigation.top
     - toc.follow
     - content.code.copy
     - content.tabs.link
     - search.suggest
+    - search.highlight
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
@@ -148,14 +163,61 @@ nav:
       - Multi-step work that outlives the process (experimental): extend/durable.md
   - Reference:
       - reference/index.md
+      # `docs/` is rendered into `site/reference/` by the build, so the pages below exist only after
+      # `python site/scripts/build.py` has run — the same is true of `roadmap.md`. They are named here
+      # rather than left to the index table because a reference is something a reader browses: with
+      # these entries the Reference tab lists every guide instead of a single link to a page the
+      # reader then has to read. `tests/site` fails when this list and the generated tree disagree,
+      # so a new guide cannot quietly go missing from the navigation.
+      #
+      # The list is flat on purpose. `navigation.prune` replaces an expandable *section* with a link
+      # to its first page, so grouping these pages under headings removed them from the sidebar
+      # entirely; a flat list is what the other tabs use, and it is what pruning keeps.
+      - reference/ai.md
+      - reference/architecture.md
+      - reference/cli.md
+      - reference/database.md
+      - reference/database-providers.md
+      - reference/durable.md
+      - reference/getting-started.md
+      - reference/http.md
+      - reference/performance.md
+      - reference/PLAN.md
+      - reference/plugins.md
+      - reference/positioning.md
+      - reference/release.md
+      - reference/runtime.md
+      - reference/security.md
+      - reference/stability.md
+      - reference/testing.md
+      - reference/troubleshooting.md
+      - reference/tutorial.md
+      - reference/workflow.md
+      - reference/adr/README.md
+      - reference/adr/0001-runtime-boundaries.md
+      - reference/adr/0002-configuration-and-database-stack.md
+      - reference/adr/0003-versions-and-experimental-scope.md
+      - reference/adr/0004-initial-ai-provider.md
+      - reference/adr/0005-phase-1-runtime-contract.md
+      - reference/adr/0006-http-and-database-adapters.md
+      - reference/adr/0007-trusted-plugins.md
+      - reference/adr/0008-workflow-terminology.md
+      - reference/adr/0009-workflow-engine-contract.md
+      - reference/adr/0010-ai-facade-contract.md
+      - reference/adr/0011-durable-executor-contract.md
+      - reference/adr/0012-project-licence.md
+      - reference/adr/0013-stable-surface-and-versioning.md
+      - reference/adr/0014-no-identity-or-authorization-model.md
+      - reference/adr/0015-durability-is-single-host.md
+      - reference/adr/0016-database-providers-are-an-extension-point.md
+      - reference/adr/0017-release-identity-and-lineage.md
   - Project:
       - Feature support: feature-support.md
       - Terminology: terminology.md
       - Appendices: appendices/index.md
       - Roadmap: roadmap.md
-  # The plan documents are linked rather than copied in: their links are repository-relative, which
-  # is what makes them correct on GitHub, and a documentation build resolves links against its own
-  # source directory. Publishing a copy would mean maintaining a second set of links.
-  - About:
-      - The content plan: "https://github.com/xyberos/xyberos2.0/blob/master/site/site.md"
-      - The implementation plan: "https://github.com/xyberos/xyberos2.0/blob/master/site/implementation.md"
+      # The plan documents are linked rather than copied in: their links are repository-relative,
+      # which is what makes them correct on GitHub, and a documentation build resolves links against
+      # its own source directory. Publishing a copy would mean maintaining a second set of links.
+      - The content plan (GitHub): "https://github.com/xyberos/xyberos2.0/blob/master/site/site.md"
+      - The implementation plan (GitHub): "https://github.com/xyberos/xyberos2.0/blob/master/site/implementation.md"
