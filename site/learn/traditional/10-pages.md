@@ -24,19 +24,23 @@ person can use.
 
 ## What you need
 
-One dependency the framework does not bring, and does not want to:
+Two dependencies the framework does not bring, and does not want to:
 
 === "PowerShell"
 
     ```powershell
-    python -m pip install jinja2
+    python -m pip install jinja2 python-multipart
     ```
 
 === "POSIX"
 
     ```bash
-    python -m pip install jinja2
+    python -m pip install jinja2 python-multipart
     ```
+
+Jinja2 renders the page. `python-multipart` is what Starlette parses a submitted form with: without it
+`request.form()` raises instead of reading the body, because the parser is a separate library rather
+than part of Starlette.
 
 ## The templates
 

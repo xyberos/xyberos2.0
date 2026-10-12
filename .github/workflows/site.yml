@@ -62,10 +62,14 @@ jobs:
       # The site's own dependencies: mkdocs-material for the theme, and the extras the lessons import.
       - run: python -m pip install -e ".[dev,http,database]"
       - run: python -m pip install --no-deps -e tests/fixtures/metrics_plugin
-      # The lessons are the site's content, so the suite runs before the artifact is built.
-      - run: python -m pytest tests/site
+      # Generated pages first: the roadmap and the reference are not committed, and the suite checks the
+      # links into them and the rendered reference against `docs/`. `--check` also refuses a `draft`
+      # lesson in the navigation.
       - name: Build the site
         run: python site/scripts/build.py --check --site-url "${{ steps.pages.outputs.base_url }}/"
+      # The lessons are the site's content, so the suite runs before the artifact is uploaded: a page
+      # that fails its own claims is not published.
+      - run: python -m pytest tests/site
       - uses: actions/upload-pages-artifact@v3
         with:
           path: build/site
