@@ -620,9 +620,11 @@ release: `build.py --check` validates every page, and only `roadmap.py --check -
 section that is unfinished. The published preview is therefore honest about its own state through the
 roadmap page rather than through a note that would be wrong on the release.
 
-Step 1 needs one thing this repository cannot do for itself: a Pages site. `actions/configure-pages`
-creates it on the first run, and the repository owner can also set it at Settings → Pages → Source:
-GitHub Actions. Step 3's custom domain is the one part of this sequence that is not automated.
+Step 1 needs one thing this repository cannot do for itself: a Pages site, because a workflow token
+cannot create one. The build and the tests run whether or not it exists — the URL is derived rather
+than read from `actions/configure-pages`, which fails when the site is missing — and the deploy job's
+first step fails with the setting to change: Settings → Pages → Source: GitHub Actions. Step 3's custom
+domain is the only other part of this sequence that is not automated.
 
 The build takes its canonical URL from `site_url`, which reads `!ENV [SITE_URL, "https://docs.xyberos.com/"]`
 so one configuration serves both addresses: the workflow passes the Pages URL, and a local build takes

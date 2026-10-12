@@ -12,6 +12,9 @@
 # The build is the same one CI runs (`python site/scripts/build.py`): the generated pages first, then
 # `mkdocs build --strict`, then the check that no page kept an unrendered snippet marker. A publish that
 # cannot build strictly does not happen, so a broken page never reaches the URL.
+#
+# A publish needs one thing this workflow cannot grant itself: a Pages site. Until it exists the tests
+# and the build still run, and the check in the deploy job names the setting that is missing.
 
 name: site
 
@@ -48,16 +51,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      # First, because its outputs are what the build publishes under: `base_url` is the Pages URL for
-      # this repository. The one-time setup this needs — Settings → Pages → Source: GitHub Actions —
-      # belongs to the repository owner, and cannot be done by a token this workflow holds.
-      - uses: actions/configure-pages@v5
+      # The URL is derived rather than read from `actions/configure-pages`, because that action fails
+      # when the repository has no Pages site — and a publish that has not been switched on yet still
+      # owes everyone the tests and the strict build. Only the deploy below needs the setting.
+      - name: Work out the Pages URL
         id: pages
-        with:
-          # The repository has no Pages site yet, and the output the build publishes under comes from
-          # one. `enablement` creates it here rather than leaving a first run to fail on a setting only
-          # a repository owner can reach.
-          enablement: true
+        run: |
+          echo "base_url=https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}" >> "$GITHUB_OUTPUT"
       - run: python -m pip install --upgrade pip
       # The site's own dependencies: mkdocs-material for the theme, and the extras the lessons import.
       - run: python -m pip install -e ".[dev,http,database]"
@@ -77,5 +77,17 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      # The one thing this repository cannot do for itself. Without it `deploy-pages` fails on the API
+      # rather than on anything a reader can act on, so the check says which setting is missing.
+      - name: Check that Pages is enabled
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh api "repos/$GITHUB_REPOSITORY/pages" > /dev/null 2>&1; then
+            exit 0
+          fi
+          echo "::error::$GITHUB_REPOSITORY has no GitHub Pages site, so there is nowhere to deploy to."
+          echo "::error::Set Settings -> Pages -> Source: GitHub Actions, then re-run this workflow."
+          exit 1
       - uses: actions/deploy-pages@v4
         id: deployment
