@@ -595,7 +595,7 @@ site.
 | 4. AI apps | **Complete: 17 of 17 lessons**, plus the fenced durable page in section 4.6. The path is one capability per lesson over `FakeModelProvider`, with every page labelling who provides the capability: the facade and its capability checks, the first call, provider switching, structured output, the error taxonomy, conversation history, memory, knowledge, retrieval over `embed`, tools behind an allowlist, intents, workflows, bounded agent behaviour, testing with no model service, evaluation against labelled cases, and security. Nine of the seventeen are labelled *you build it*, because there is no memory, retrieval, intent, agent, or evaluation layer in the package | No lesson needs a live model to run; the fenced page states the tier and the non-guarantees; the roadmap reports 17 of 17 in this path | L — complete |
 | 5. Hybrid apps | **Complete: 10 of 10 lessons.** The Smart Support Desk lives in `examples/support_desk/`: ticket CRUD over the same project layout as the traditional path, a signed principal with a tenant and the permission matrix in the service, an audit row written in the transaction it describes, classification with a response schema, retrieval over `embed`, drafts stored as rows that have no send path, approval that records the principal and the body, a workflow that ends at a draft, background triage behind a job row, and usage rows settled by the outcome. Lessons 1–3 were written here rather than in phase 3, because the design page had already fixed what they needed | The boundary is stated and tested: a model recommends, application code authorizes; every transition, permission, and approval in the lessons appears in the phase 1 design page, and `tests/integration/test_hybrid_support_desk.py` asserts the four boundary rules plus one full workflow run against the fake provider | L — complete |
 | 6. Extensibility | **Complete: four pages plus the durable page.** [`site/extend/registry.md`](extend/registry.md) documents what a registration says, the three scopes, what is refused at registration, and `with_overrides` as a clone rather than a mutation; [`site/extend/modules.md`](extend/modules.md) the composable-unit convention, contract-versus-registration, and the argument-free factory the CLI needs; [`site/extend/plugins.md`](extend/plugins.md) the trust boundary, metadata, configuration precedence, requirement ordering, the eight refusals, and the packaging and testing pattern; [`site/extend/database-providers.md`](extend/database-providers.md) the three-member contract, the semantics behind each promise, error mapping, and the conformance suite that refuses a provider committing rolled-back work. Every page's code is a module under `examples/learn_extend/` that the suite runs | A provider walkthrough passes `assert_provider_contract` in [`tests/integration/test_extension_provider.py`](../tests/integration/test_extension_provider.py), and the one that commits rolled-back work is refused; the plugin walkthrough's ordering, configuration, refusals, and lifecycle are asserted in [`tests/integration/test_extension_plugins.py`](../tests/integration/test_extension_plugins.py); the plugin distribution pattern is the fixture CI installs and imports as an installed package ([`tests/integration/test_plugin_packages.py`](../tests/integration/test_plugin_packages.py)), whose manifest this suite also checks; `examples/learn_extend` is in mypy's `files`, so the example code is type-checked to the same standard as `src/` | M — complete |
-| 7. Production | Deployment, observability, troubleshooting, security hardening, internals | Each page names the shipped feature it relies on, or says it is application-side | M — 6–8 days |
+| 7. Production | **Complete: seven pages under `site/production/`** — [the section index](production/index.md), [deploying it](production/deploy.md), [observability](production/observability.md), [troubleshooting](production/troubleshooting.md), [security boundaries](production/security.md), [performance and concurrency](production/performance.md), and [internals](production/internals.md). Every page's code is a module under `examples/learn_production/` that the site harness runs and compares, and `site/extend/index.md` lost its `planned` status with each of its seven deferred topics given a real home | Each page names the shipped feature it relies on, or says it is application-side: the three transcripts that make the point are the failed start (`DependencyResolutionError`, state `failed`), the held lock (`TransientDatabaseError` after each attempt count), and the error that is replaced in the body while its message reaches the log. The claims a transcript cannot hold are asserted in [`tests/integration/test_production_deploy.py`](../tests/integration/test_production_deploy.py), [`test_production_shutdown.py`](../tests/integration/test_production_shutdown.py), and [`test_production_boundaries.py`](../tests/integration/test_production_boundaries.py); `examples/learn_production` is in mypy's `files` | M — complete |
 
 Roughly 58–81 working days for one contributor, with the release gated on the critical path below
 rather than on the sum.
@@ -643,7 +643,7 @@ precondition 4 records the same order.
 
 | # | Step | Where it happens |
 | --- | --- | --- |
-| 1 | **Publish the preview.** [`.github/workflows/site.yml`](../.github/workflows/site.yml) builds with the same command CI uses and deploys to `https://xyberos.github.io/xyberos2.0/` — **live**, 54 of 54 lessons, and the roadmap page reports the two sections that are still planned | This repository, on a push that touches the site or by hand |
+| 1 | **Publish the preview.** [`.github/workflows/site.yml`](../.github/workflows/site.yml) builds with the same command CI uses and deploys to `https://xyberos.github.io/xyberos2.0/` — **live**, 54 of 54 lessons. While phases 6 and 7 were unwritten the roadmap page reported two sections still `planned` | This repository, on a push that touches the site or by hand |
 | 2 | **Move the domain off the 1.x site.** Its guides already live in `xyberos/xyberos` and are already served at `https://xyberos.github.io/xyberos/`, so what moves is the domain, not the documentation — **done 2026-10-12**: the Cloudflare deployment that held `docs.xyberos.com` was deleted, and that repository now names its own address in the README, in `[project.urls]`, and in `site_url` | `xyberos/xyberos`, and the Cloudflare account that held the domain — out of scope here, and nothing in this repository can change them |
 | 3 | **Point the domain at this site**, then move `[project.urls] Documentation` to it — **done 2026-10-12**: the domain is attached to this line's Cloudflare Worker (`wrangler.jsonc`), and `Documentation` is `https://docs.xyberos.com/` | The Cloudflare Workers project, and `pyproject.toml` |
 
@@ -664,10 +664,11 @@ preview at `https://xyberos.github.io/xyberos2.0/`. The first reading of this st
 custom domain and a `docs` CNAME, and the site turned out to be hosted by Cloudflare instead — the record
 is Cloudflare's to manage, and no change to it was needed from here.
 
-Step 1 ships the two sections that are still `planned`, which is what makes it a preview rather than a
-release: `build.py --check` validates every page, and only `roadmap.py --check --release` refuses a
-section that is unfinished. The published preview is therefore honest about its own state through the
-roadmap page rather than through a note that would be wrong on the release.
+Step 1 shipped the two sections while they were still `planned`, which is what made it a preview rather
+than a release: `build.py --check` validates every page, and only `roadmap.py --check --release` refuses
+a section that is unfinished. The preview's honesty about its own state came from the roadmap page rather
+than from a note that would be wrong on the release — and now that phase 7 is written, that gate passes
+and reports no planned sections at all.
 
 Step 1 needs one thing this repository cannot do for itself: a Pages site, because a workflow token
 cannot create one. It exists now, and the setting is Settings → Pages → Source: GitHub Actions. The
@@ -770,20 +771,28 @@ The site is done when all of the following hold:
    registry, modules, plugins, and database providers — each built on walkthrough modules in
    `examples/learn_extend/` that the site harness runs and compares, with integration tests holding the
    two claims that matter (the conformance suite passes a real provider and refuses a broken one; plugin
-   ordering, configuration, and refusals behave as the page says). The section index stays `planned`
-   while phase 7 is unwritten, so the release gate still refuses.
-9. **Next: phase 7, Production.** Deployment, observability, troubleshooting, security hardening, and
-   internals — the last section, and the one that lets `site/extend/index.md` lose its `planned` status.
-   When it is written, `roadmap.py --check --release` is the gate that decides whether the release may
-   proceed; it has been refusing since phase 1 and names the same two things it always has.
+   ordering, configuration, and refusals behave as the page says). The section index stayed `planned`
+   while phase 7 was unwritten, so the release gate refused until item 9 below.
+9. **Done.** Phase 7, Production: seven pages under `site/production/` — deployment, observability,
+   troubleshooting, security boundaries, performance and concurrency, and internals, plus the section
+   index — each built on a module in `examples/learn_production/` that the harness runs and compares,
+   and each naming the shipped feature it relies on or the part that is application-side. The three
+   claims a transcript cannot hold are asserted in
+   [`tests/integration/test_production_deploy.py`](../tests/integration/test_production_deploy.py),
+   [`test_production_shutdown.py`](../tests/integration/test_production_shutdown.py), and
+   [`test_production_boundaries.py`](../tests/integration/test_production_boundaries.py). `site/extend/index.md`
+   lost its `planned` status, and every topic it had deferred is named with the page that now owns it.
+   The release gate that refused since phase 1 now passes.
 
-Phases 1–6 are complete: the Fundamentals path is fifteen verified lessons, the Traditional Apps path
+Phases 1–7 are complete: the Fundamentals path is fifteen verified lessons, the Traditional Apps path
 twelve, the AI Apps path seventeen, and the Hybrid Apps path ten — 54 lessons in one pipeline, where every
 lesson's code is a file the suite runs, every documented output is compared with the real thing on every
 build, and the transcripts of earlier lessons survive the later ones changing the application underneath
 them. No path needs a model service, the durable page states its experimental tier, and the roadmap reports
-54 of 54 verified. Alongside the paths, the Extend section now documents the four extension points with
-the same discipline: each page's code is an `examples/learn_extend/` module the suite runs.
+54 of 54 verified. Alongside the paths, the Extend section documents the four extension points with the
+same discipline: each page's code is an `examples/learn_extend/` module the suite runs. The Production
+section does the same for the operational surfaces, including the two it can only describe: what a
+deployment has to do in what order, and which security decisions are the application's.
 
 Phase 5 was written as ten lessons at once rather than three in phase 3 and seven later, because the
 design page had already fixed the shape they share: `examples/support_desk/` is one application — tables,

@@ -227,17 +227,17 @@ testable, and the tests carry security and compatibility weight.
 | `tests/ai/` | 133 | facade behaviour, schema subset, tool allowlist, adapter contract, redaction |
 | `tests/durable/` | 103 | transitions, journal schema, guarded writes, recovery decisions |
 | `tests/crash_recovery/` | 17 | **a real subprocess killed at five boundaries**, then recovery |
-| `tests/integration/` | 74 | every example end to end, including the HTTP/DB/plugin/AI/durable paths, the tenancy and broker recipes, and the extension examples the Extend pages walk through |
+| `tests/integration/` | 91 | every example end to end, including the HTTP/DB/plugin/AI/durable paths, the tenancy and broker recipes, the extension examples the Extend pages walk through, and the deployment, shutdown, and boundary claims the Production pages make |
 | `tests/cli/` | 37 | each command, its exit codes, and its refusal messages |
 | `tests/perf/` | 7 | startup, latency, workflow overhead, write throughput, contention, journal throughput |
-| `tests/site/` | 208 | the documentation site: lesson output, transcripts and scaffolds, links, tier labels, the generated reference and the navigation that names it, the snippet hook's fenced rendering, and the canonical URL one configuration resolves for a preview and for the release |
+| `tests/site/` | 218 | the documentation site: lesson output, transcripts and scaffolds, links, tier labels, the generated reference and the navigation that names it, the snippet hook's fenced rendering, and the canonical URL one configuration resolves for a preview and for the release |
 | `tests/test_public_surface.py` | 84 | the frozen `__all__` of every public module |
 | `tests/test_import_boundary.py` | 21 | the layering rules, in subprocesses |
 | `tests/test_compatibility.py` | 14 | configuration fields, plugin protocol, golden definition fingerprint |
 | `tests/test_release_artefacts.py` | 7 | what the built wheel and sdist must contain |
 | `tests/contracts/` and four root modules | 33 | executed API examples, deprecation mechanics, optional-dependency messages, the public API, package import |
 
-994 tests total. Four techniques are worth copying from:
+1028 tests total. Four techniques are worth copying from:
 
 - **Deterministic doubles instead of sleeping.** `ManualClock`, `FakeExternalService`, `Reply`,
   `FakeModelProvider`, `ModelReply`, `ManualWallClock`, `expire_leases`, `temporary_database`. Time and
@@ -375,9 +375,9 @@ src/xyberos/                                    10 783 lines over 62 modules
 ├── plugins/                        414   protocol, config, registry
 └── cli/                            816   check, new, run, migrate, targets, scaffold
 
-tests/                           14 507 lines, 994 tests
-examples/                        11 657 lines, sixteen worked examples
-site/                             9 539 lines of scripts and pages, minus the generated reference
+tests/                           14 926 lines, 1028 tests
+examples/                        12 868 lines, seventeen worked examples
+site/                            10 487 lines of scripts and pages, minus the generated reference
 docs/                             a guide per subsystem, plus cross-cutting pages and 17 ADRs
 ```
 
@@ -393,10 +393,10 @@ Everything claimed above is checkable in a few minutes:
 
 ```powershell
 python -m pip install -e ".[dev,http,database]"
-python -m pytest                                  # 994 tests, 7 skip without live Ollama
+python -m pytest                                  # 1028 tests, 7 skip without live Ollama
 python -m pytest -s tests/perf                    # the resource baselines
 python -m pytest -q --collect-only tests/runtime # 77 tests for the runtime alone
-ruff check src tests examples site/scripts; mypy  # lint and strict types, 193 sources
+ruff check src tests examples site/scripts; mypy  # lint and strict types, 208 sources
 python site/scripts/build.py --check              # the documentation site builds strictly
 python -m build                                   # wheel + sdist, then
 python -m venv .smoke; .smoke\Scripts\pip install dist\*.whl

@@ -499,6 +499,16 @@ Phase 7 — Production
 
 Add deployment, security, observability, troubleshooting, and advanced architecture guides.
 
+**Complete:** seven verified pages under `site/production/` — the section index, deploy, observability,
+troubleshooting, security boundaries, performance and concurrency, and internals — built on eleven
+walkthrough modules in `examples/learn_production/` that the harness runs and compares with each page's
+own output block. Three integration tests hold what a transcript cannot
+([`tests/integration/test_production_deploy.py`](../tests/integration/test_production_deploy.py),
+[`test_production_shutdown.py`](../tests/integration/test_production_shutdown.py),
+[`test_production_boundaries.py`](../tests/integration/test_production_boundaries.py)), and
+`site/extend/index.md` dropped its `planned` status with every deferred topic given a home, which is
+what opens the release gate.
+
 ## Final recommendation
 
 Organize the documentation around three learning paths and one extensibility reference:
