@@ -161,6 +161,14 @@ nav:
       - Writing a plugin: extend/plugins.md
       - Writing a database provider: extend/database-providers.md
       - Multi-step work that outlives the process (experimental): extend/durable.md
+  - Production:
+      - production/index.md
+      - Deploying it: production/deploy.md
+      - Observability: production/observability.md
+      - Troubleshooting: production/troubleshooting.md
+      - Security boundaries: production/security.md
+      - Performance and concurrency: production/performance.md
+      - Internals: production/internals.md
   - Reference:
       - reference/index.md
       # `docs/` is rendered into `site/reference/` by the build, so the pages below exist only after

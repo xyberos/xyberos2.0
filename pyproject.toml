@@ -109,6 +109,7 @@ files = [
   "examples/learn_extend",
   "examples/learn_fundamentals",
   "examples/learn_hybrid",
+  "examples/learn_production",
   "examples/learn_traditional",
   "examples/support_desk",
   "examples/tenancy/app.py",

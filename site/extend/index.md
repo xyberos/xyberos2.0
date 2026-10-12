@@ -1,6 +1,6 @@
 ---
 title: Extend Xyberos
-status: planned
+status: verified
 ---
 
 # Extend Xyberos
@@ -8,9 +8,9 @@ status: planned
 For experienced developers: the extension points, in the order you meet them — a capability of your own,
 a module, a package other people install, and a database behind the same contract the shipped one keeps.
 
-**Four pages are written and verified. The rest lands in phase 7**, so this section is still marked
-*planned* in [the plan](https://github.com/xyberos/xyberos2.0/blob/master/site/implementation.md) and is
-not yet counted as complete. Every page below runs the code it shows on this repository's own toolchain.
+**Every page below is written and verified.** Each one runs the code it shows on this repository's own
+toolchain, and the operational side of a deployment — logging, diagnostics, contention, shutdown,
+deployment order — lives in [Production](../production/index.md) rather than here.
 
 ## Written and verified
 
@@ -22,20 +22,20 @@ not yet counted as complete. Every page below runs the code it shows on this rep
 | [Writing a database provider](database-providers.md) | the three-member contract, the semantics behind each promise, error mapping, and the conformance suite that refuses a provider that breaks it even while passing one that does not |
 | [Multi-step work that outlives the process](durable.md) | the one experimental surface, and its contract terms rather than caveats |
 
-## Still planned
+## Where the topics that used to be planned went
 
-These are phase-7 topics, and each one is a page rather than a section because the subject is large
-enough to be wrong in detail:
+The seven topics this section used to defer are all published now, and each one went to the page whose
+subject it is rather than to a subsection here:
 
-| Topic | Availability |
-| ----- | ------------ |
-| Advanced configuration and lifecycle hooks | Built-in |
-| Custom handlers and middleware | Built-in (extra) |
-| Migrations and transaction boundaries | Built-in (extra) |
-| Custom tools and retrieval you write yourself | Built-in and application code |
-| Observability, cost tracking, and troubleshooting | Built-in and application code, labelled per page |
-| Performance and concurrency | Built-in |
-| Deployment, security hardening, and internals | Mixed, labelled per page |
+| Topic | Home |
+| ----- | ---- |
+| Advanced configuration and lifecycle hooks | [configuration](../reference/runtime.md#configuration) in the reference, and the state machine in [internals](../production/internals.md) |
+| Custom handlers and middleware | [the runtime reference](../reference/runtime.md#routes) for the handler contract, and the [middleware order](../production/internals.md#what-a-request-actually-does) for where yours runs |
+| Migrations and transaction boundaries | [deploying it](../production/deploy.md) for the deploy step, and [the database reference](../reference/database.md) for the transaction and retry semantics |
+| Custom tools and retrieval that you write | [the AI tools lesson](../learn/ai/11-tools.md), [retrieval over `embed`](../learn/ai/10-retrieval.md), and the [hybrid retrieval lesson](../learn/hybrid/05-retrieval.md) |
+| Observability, cost tracking, and troubleshooting | [observability](../production/observability.md), [troubleshooting](../production/troubleshooting.md), and the [usage and cost lesson](../learn/hybrid/10-usage.md) |
+| Performance and concurrency | [performance and concurrency](../production/performance.md), with the recorded baselines in [the performance reference](../reference/performance.md) |
+| Deployment, security hardening, and internals | [deploying it](../production/deploy.md), [security boundaries](../production/security.md), and [internals](../production/internals.md) |
 
 ## The experimental page
 

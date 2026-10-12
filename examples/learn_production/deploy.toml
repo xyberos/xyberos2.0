@@ -1,0 +1,8 @@
+# The configuration this application ships, read before the environment overrides it.
+#
+# `Settings.load` reads explicit values, then the environment, then this file, then the defaults — so
+# `XYBEROS_APP__ENVIRONMENT=staging` wins over the line below without editing it.
+[app]
+name = "orders"
+environment = "development"
+debug = false
