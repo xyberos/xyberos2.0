@@ -87,10 +87,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh api "repos/$GITHUB_REPOSITORY/pages" > /dev/null 2>&1; then
+          if error=$(gh api "repos/$GITHUB_REPOSITORY/pages" 2>&1); then
             exit 0
           fi
-          echo "::error::$GITHUB_REPOSITORY has no GitHub Pages site, so there is nowhere to deploy to."
+          echo "::error::$GITHUB_REPOSITORY has no readable Pages site: $error"
           echo "::error::Set Settings -> Pages -> Source: GitHub Actions on $GITHUB_REPOSITORY and re-run."
           echo "::error::A run that started before the setting was saved fails here too: re-run it."
           exit 1
