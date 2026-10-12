@@ -509,7 +509,7 @@ These were open when this plan was written and are now settled. The execution de
 
 | Decision | Resolution | Consequence |
 | -------- | ---------- | ----------- |
-| Host | This site replaces the content of `docs.xyberos.com`, and the 1.x line's documentation points at that line's own repository docs | The site publishes at its GitHub Pages address first, then the 1.x documentation moves, then `[project.urls] Documentation` follows — release-guide precondition 4 — and the 1.x documentation is out of scope here |
+| Host | This site replaces the content of `docs.xyberos.com`, and the 1.x line's documentation is served from that line's own repository | The site publishes at its GitHub Pages address first, then the custom domain moves off the 1.x site, then `[project.urls] Documentation` follows — release-guide precondition 4 — and the 1.x site is out of scope here |
 | Site build | MkDocs with the Material theme: `mkdocs.yml` at the repository root, `docs_dir: site` | The content stays Markdown and the toolchain stays Python; nothing under `site/` becomes an importable package, because `site` is a standard-library module |
 | `docs/tutorial.md` | Retired into the Fundamentals path | Its chapter modules and `<!-- output: -->` blocks move with it, so the suite that already runs every chapter keeps working |
 | API reference | Generated from `docs/` from the first release | One copy of every guide is maintained; the build copies it into `/reference/` and CI asserts the copy is generated rather than committed |

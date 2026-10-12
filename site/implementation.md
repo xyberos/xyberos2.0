@@ -612,8 +612,16 @@ precondition 4 records the same order.
 | # | Step | Where it happens |
 | --- | --- | --- |
 | 1 | **Publish the preview.** [`.github/workflows/site.yml`](../.github/workflows/site.yml) builds with the same command CI uses and deploys to `https://xyberos.github.io/xyberos2.0/` | This repository, on a push that touches the site or by hand |
-| 2 | **Move the 1.x documentation** to that line's own repository docs, so `docs.xyberos.com` stops documenting the wrong line | The 1.x repository — out of scope here, and nothing in this repository can do it |
+| 2 | **Move the domain off the 1.x site.** Its guides already live in `xyberos/xyberos` and are already served at `https://xyberos.github.io/xyberos/`, so what moves is the custom domain, not the documentation | That repository's Pages settings — out of scope here, and nothing in this repository can change them |
 | 3 | **Point the domain at this site**, then move `[project.urls] Documentation` to it | This repository's Pages settings and `pyproject.toml` |
+
+Step 2 is smaller than it looked, and the evidence is a lookup rather than an assumption:
+`https://docs.xyberos.com/` serves the 1.x line's site today, and `https://xyberos.github.io/xyberos/`
+answers `200` with the same guides, because that repository's `docs/` tree is its own MkDocs site,
+deployed from its `gh-pages` branch. Nothing has to be copied anywhere. The custom domain is set in the
+1.x repository's Pages settings, and the DNS records need no change: a GitHub Pages custom domain
+already resolves to `xyberos.github.io`, which both repositories share. The only content change on that
+side — a notice telling its readers where this line's documentation lives — belongs to that repository.
 
 Step 1 ships the two sections that are still `planned`, which is what makes it a preview rather than a
 release: `build.py --check` validates every page, and only `roadmap.py --check --release` refuses a
@@ -639,7 +647,7 @@ the release default.
 | A lesson teaches a framework-shaped feature that is application code (templates, vector search, auth) | The reader blames the runtime for a gap it documented as a boundary | The four labels in section 5, plus `test_claimed_tier_matches_stability_guide` |
 | The AI path becomes untestable in CI (live model, network) | The suite loses its "no service needed" property | Fake provider and declared capabilities in every AI lesson; no output block for anything that cannot run offline |
 | Scope: three full application projects ship in one release (decision 5) | The release is gated on the slowest path, so a slip in phase 4 or 5 delays everything | Deliver in the decided order so each path is reviewable as it completes; keep paths independent, so no lesson links forward across paths except as a prerequisite; start the Smart Support Desk (phase 5) once the hybrid design is fixed rather than after the AI path is finished, because it is the critical path to the release |
-| The 1.x documentation keeps serving `docs.xyberos.com` | A reader at that URL gets the wrong line's documentation | Decision 1 splits the two: this site owns `docs.xyberos.com` and the 1.x docs move to that line's repository. The site is published at its GitHub Pages address first, so the domain switch is made against a site that is already up and read; only the domain move waits for the 1.x move |
+| The 1.x documentation keeps serving `docs.xyberos.com` | A reader at that URL gets the wrong line's documentation | Decision 1 splits the two: this site takes `docs.xyberos.com` and the 1.x site keeps serving from its own repository at `https://xyberos.github.io/xyberos/`, where its guides already are. The site is published at its own Pages address first, so the domain switch is made against a site that is already up and read; only the domain move waits for the 1.x repository's Pages setting |
 
 ## 13. Decisions taken
 
@@ -647,7 +655,7 @@ Settled by the owner. Each is mirrored in `site.md` §12, so the plan and this f
 
 | # | Question | Decision | Consequence for this plan |
 | --- | --- | --- | --- |
-| 1 | Host | This site replaces the content of `docs.xyberos.com`; the 1.x line's documentation points at that line's own repository docs | The site publishes at `https://xyberos.github.io/xyberos2.0/` first, then the 1.x documentation moves, then the domain and `[project.urls] Documentation` follow ([`docs/release.md`](../docs/release.md) precondition 4). The 1.x site is out of scope here. |
+| 1 | Host | This site replaces the content of `docs.xyberos.com`; the 1.x line's documentation is served from that line's own repository | The site publishes at `https://xyberos.github.io/xyberos2.0/` first, then the custom domain moves off the 1.x site, then `[project.urls] Documentation` follows ([`docs/release.md`](../docs/release.md) precondition 4). The 1.x site is out of scope here. |
 | 2 | Stack | MkDocs + Material: `mkdocs.yml` at the repository root, `docs_dir: site` | Section 10 is a decision rather than a recommendation, and no Node toolchain enters CI |
 | 3 | `docs/tutorial.md` | Retired into the Fundamentals path | The chapter modules and their output blocks move in one commit and the harness follows them; `site.md` §2 records the chapter-to-lesson map |
 | 4 | Reference sourcing | Generated from `docs/` from the first release | The `/reference/` copy step moves from phase 6 to phase 1, and the "one copy of each guide" rule is enforced from the start |
