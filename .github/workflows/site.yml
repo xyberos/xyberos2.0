@@ -1,0 +1,81 @@
+# Publish the documentation site to GitHub Pages.
+#
+# This is the *preview* URL, not the release: `https://xyberos.github.io/xyberos2.0/`. The release
+# publishes to `https://docs.xyberos.com`, which currently serves the 1.x documentation. The order is
+# preview first, then the 1.x documentation moves to that line's repository and this line takes the
+# domain — see docs/release.md precondition 4, which records it.
+#
+# A preview is allowed to contain pages the release gate refuses: `--check` validates the pages, and
+# only `--release` requires every one of them to be finished. That is why this URL ships the two
+# sections that are still `planned`, and why the roadmap page reports them.
+#
+# The build is the same one CI runs (`python site/scripts/build.py`): the generated pages first, then
+# `mkdocs build --strict`, then the check that no page kept an unrendered snippet marker. A publish that
+# cannot build strictly does not happen, so a broken page never reaches the URL.
+
+name: site
+
+on:
+  # Manual, so a publish is a decision someone made rather than a side effect of a merge.
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - "site/**"
+      - "docs/**"
+      - "examples/**"
+      - "tests/site/**"
+      - "mkdocs.yml"
+      - "pyproject.toml"
+      - ".github/workflows/site.yml"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One publish at a time, and the newest wins: a queue of superseded builds is a queue of URLs nobody
+# wants.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # First, because its outputs are what the build publishes under: `base_url` is the Pages URL for
+      # this repository. The one-time setup this needs — Settings → Pages → Source: GitHub Actions —
+      # belongs to the repository owner, and cannot be done by a token this workflow holds.
+      - uses: actions/configure-pages@v5
+        id: pages
+        with:
+          # The repository has no Pages site yet, and the output the build publishes under comes from
+          # one. `enablement` creates it here rather than leaving a first run to fail on a setting only
+          # a repository owner can reach.
+          enablement: true
+      - run: python -m pip install --upgrade pip
+      # The site's own dependencies: mkdocs-material for the theme, and the extras the lessons import.
+      - run: python -m pip install -e ".[dev,http,database]"
+      - run: python -m pip install --no-deps -e tests/fixtures/metrics_plugin
+      # The lessons are the site's content, so the suite runs before the artifact is built.
+      - run: python -m pytest tests/site
+      - name: Build the site
+        run: python site/scripts/build.py --check --site-url "${{ steps.pages.outputs.base_url }}/"
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deployment

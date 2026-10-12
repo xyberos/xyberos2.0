@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}User management{% endblock %}</title>
+    <!-- Both of these are application dependencies, not framework features. Tailwind's play build is
+         for prototyping: a deployment compiles the stylesheet it uses. -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@2" defer></script>
+  </head>
+  <body class="bg-slate-50 text-slate-800">
+    <header class="border-b border-slate-200 bg-white">
+      <h1 class="mx-auto max-w-3xl px-4 py-6 text-2xl font-semibold">User management</h1>
+    </header>
+    <main class="mx-auto max-w-3xl px-4 py-6">
+      {% block content %}{% endblock %}
+    </main>
+  </body>
+</html>

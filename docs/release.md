@@ -149,7 +149,7 @@ an existing one, which is why these four things come first.
 | 1 | The trusted publisher on the PyPI project — **registered: owner `xyberos`, repository `xyberos2.0`, workflow `publish.yml`, environment left empty** | Only a project owner can add one or correct it, and a single field that disagrees with the workflow fails as an authentication error with nothing to fall back on: there is no second name, and no token is kept | Compare the registration against the table in [The publishing workflow](#the-publishing-workflow), including the empty environment |
 | 2 | The repository this line publishes from — **`https://github.com/xyberos/xyberos2.0`**, default branch `master` | The declared project URLs, the README's links, and a trusted publisher all bind to it, so the URL and the branch name have to be settled before the metadata is written | `git rev-parse master origin/master` matches, and every declared URL resolves — see [Preparing the repository](#preparing-the-repository) |
 | 3 | The publication path — **trusted publishing from `.github/workflows/publish.yml`**, started by hand, with PyPI as its only destination | The run authenticates with an OIDC identity and keeps no secret, and it uploads straight to the index, so the publisher has to be correct before the first attempt rather than during it | See [The publishing workflow](#the-publishing-workflow) |
-| 4 | The `Documentation` URL — **decided for now: the repository's own `docs/` directory** | `https://docs.xyberos.com` documents the 1.x line, so pointing this line's page at it would advertise the wrong codebase | The declared value in `[project.urls]`; it moves when the documentation site carries content for this line |
+| 4 | The `Documentation` URL — **decided: this line's site at `https://docs.xyberos.com`, once it carries content for this line**; the repository's `docs/` directory holds until then | `https://docs.xyberos.com` currently documents the 1.x line, so the 1.x documentation moves to that line's own repository docs before this line's site takes the domain — in the other order the URL advertises the wrong codebase. The move is ordered after the site is published at its GitHub Pages address and read there, so the switch is made against something that already works | The declared value in `[project.urls]`, and the published site at `https://xyberos.github.io/xyberos2.0/` ([the documentation site plan](../site/implementation.md) records the order: Pages preview, then the 1.x move, then the domain) |
 
 ### Preparing the repository
 
@@ -170,7 +170,9 @@ Two properties of that arrangement are load-bearing, and both are easy to undo b
 
 - **The branch name is load-bearing.** The README's links and the `Documentation` URL name `master`
   explicitly. Renaming the default branch to `main` later breaks all of them at once, and the project
-  page keeps showing the links it can no longer resolve.
+  page keeps showing the links it can no longer resolve. (The `Documentation` URL is the one exception
+  once it moves to this line's site — see [precondition 4](#preconditions) — but every README link
+  still binds to this branch name.)
 - **An empty repository is not a valid target for the declared URLs.** Until the first push lands, the
   `Repository`, `Issues`, and `Documentation` links and every link in the README resolve to a
   repository with no content, which is worse than declaring nothing at all. The push is part of

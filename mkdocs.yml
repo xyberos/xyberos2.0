@@ -1,0 +1,147 @@
+# The documentation site.
+#
+# Two directories are generated and are not committed: `roadmap.md`, and everything under
+# `reference/` (a copy of the repository's `docs/`, made by site/scripts/reference.py). `docs_dir`
+# cannot therefore be built by a bare `mkdocs build`; `python site/scripts/build.py` is the entry
+# point, and it is what CI runs.
+#
+# `site_dir` is `build/site` rather than MkDocs's default `site/`, because `site/` is this file's
+# source directory: the default would write the built site on top of the pages it is built from.
+
+site_name: Xyberos
+site_description: A composable Python application runtime — tutorials, guides, and reference
+# The release URL. A preview publishes under its own URL by setting `SITE_URL`, which is how the same
+# build serves `https://xyberos.github.io/xyberos2.0/` before the release moves it to this one.
+site_url: !ENV [SITE_URL, "https://docs.xyberos.com/"]
+repo_url: https://github.com/xyberos/xyberos2.0
+repo_name: xyberos/xyberos2.0
+edit_uri: edit/master/site/
+
+docs_dir: site
+site_dir: build/site
+
+# The two plan documents live in this directory but are not part of the published site: their links
+# are repository-relative, which is what makes them correct where they are read, and a documentation
+# build resolves links against its own source directory. They are linked from the navigation instead.
+exclude_docs: |
+  site.md
+  implementation.md
+
+theme:
+  name: material
+  language: en
+  features:
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - toc.follow
+    - content.code.copy
+    - content.tabs.link
+    - search.suggest
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  # Lesson code is included from the file the test suite runs, so a page cannot disagree with the
+  # code. `check_paths` turns a missing include into a build failure rather than a silent gap.
+  - pymdownx.snippets:
+      base_path: ["."]
+      check_paths: true
+
+# A page claims its code with `<!-- snippet: path -->`, which is the form `tests/site` reads; MkDocs
+# only understands `--8<--`, so this hook is what turns the claim into rendered code.
+hooks:
+  - site/scripts/snippets_hook.py
+
+nav:
+  - Home: index.md
+  - Fundamentals:
+      - learn/fundamentals/index.md
+      - learn/fundamentals/01-what-is-xyberos.md
+      - learn/fundamentals/02-install.md
+      - learn/fundamentals/03-create-a-project.md
+      - learn/fundamentals/04-your-first-application.md
+      - learn/fundamentals/05-run-your-application.md
+      - learn/fundamentals/06-lifecycle.md
+      - learn/fundamentals/07-configuration.md
+      - learn/fundamentals/08-dependency-injection.md
+      - learn/fundamentals/09-scopes.md
+      - learn/fundamentals/10-registry.md
+      - learn/fundamentals/11-read-xyberos-check.md
+      - learn/fundamentals/12-organize.md
+      - learn/fundamentals/13-write-your-first-test.md
+      - learn/fundamentals/14-errors-and-logging.md
+      - learn/fundamentals/15-command-line.md
+  - Traditional Apps:
+      - learn/traditional/index.md
+      - learn/traditional/01-http.md
+      - learn/traditional/02-requests-and-errors.md
+      - learn/traditional/03-database.md
+      - learn/traditional/04-users.md
+      - learn/traditional/05-pagination.md
+      - learn/traditional/06-crud.md
+      - learn/traditional/07-migrations.md
+      - learn/traditional/08-identity.md
+      - learn/traditional/09-protected.md
+      - learn/traditional/10-pages.md
+      - learn/traditional/11-partials.md
+      - learn/traditional/12-deploy.md
+  - AI Apps:
+      - learn/ai/index.md
+      - learn/ai/01-ready.md
+      - learn/ai/02-providers.md
+      - learn/ai/03-first-call.md
+      - learn/ai/04-switch.md
+      - learn/ai/05-structured.md
+      - learn/ai/06-errors.md
+      - learn/ai/07-history.md
+      - learn/ai/08-memory.md
+      - learn/ai/09-knowledge.md
+      - learn/ai/10-retrieval.md
+      - learn/ai/11-tools.md
+      - learn/ai/12-intents.md
+      - learn/ai/13-workflows.md
+      - learn/ai/14-agent.md
+      - learn/ai/15-testing.md
+      - learn/ai/16-evaluation.md
+      - learn/ai/17-security.md
+  - Hybrid Apps:
+      - learn/hybrid/index.md
+      - The design: hybrid-design.md
+  - Extend Xyberos:
+      - extend/index.md
+      - Extend: extend/durable.md
+  - Reference:
+      - reference/index.md
+  - Project:
+      - Feature support: feature-support.md
+      - Terminology: terminology.md
+      - Appendices: appendices/index.md
+      - Roadmap: roadmap.md
+  # The plan documents are linked rather than copied in: their links are repository-relative, which
+  # is what makes them correct on GitHub, and a documentation build resolves links against its own
+  # source directory. Publishing a copy would mean maintaining a second set of links.
+  - About:
+      - The content plan: "https://github.com/xyberos/xyberos2.0/blob/master/site/site.md"
+      - The implementation plan: "https://github.com/xyberos/xyberos2.0/blob/master/site/implementation.md"

@@ -22,9 +22,12 @@ jobs:
       - run: python -m pip install --upgrade pip
       - run: python -m pip install -e ".[dev,http,database]"
       - run: python -m pip install --no-deps -e tests/fixtures/metrics_plugin
+      # Before the tests: two of the site's pages are generated, and the suite verifies the rendered
+      # reference against `docs/`. `--check` also refuses a `draft` lesson in the navigation.
+      - run: python site/scripts/build.py --check
       - run: python -m pytest
-      - run: ruff check src tests examples
-      - run: ruff format --check src tests examples
+      - run: ruff check src tests examples site/scripts
+      - run: ruff format --check src tests examples site/scripts
       - run: mypy
       - run: python -m build
 

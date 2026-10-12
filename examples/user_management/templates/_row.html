@@ -1,0 +1,20 @@
+<tr id="user-{{ user.id }}" class="border-b border-slate-100">
+  <td class="px-2 py-2 text-slate-500">{{ user.id }}</td>
+  <td class="px-2 py-2">{{ user.email }}</td>
+  <td class="px-2 py-2">{{ user.display_name }}</td>
+  <td class="px-2 py-2">
+    <span class="{{ 'text-emerald-700' if user.enabled else 'text-rose-700' }}">
+      {{ "yes" if user.enabled else "no" }}
+    </span>
+  </td>
+  <td class="px-2 py-2 text-right">
+    <button
+      class="rounded bg-slate-200 px-3 py-1 text-sm hover:bg-slate-300"
+      hx-post="/pages/users/{{ user.id }}/toggle"
+      hx-target="closest tr"
+      hx-swap="outerHTML"
+    >
+      {{ "Disable" if user.enabled else "Enable" }}
+    </button>
+  </td>
+</tr>

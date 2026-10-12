@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Edit {{ user.display_name }}{% endblock %}
+{% block content %}
+  {% if error %}
+    <p role="alert">{{ error }}</p>
+  {% endif %}
+  <h2>Edit {{ user.email }}</h2>
+  <form method="post" action="/pages/users/{{ user.id }}/edit">
+    <p>
+      <label for="display_name">Name</label>
+      <input id="display_name" name="display_name" value="{{ form.display_name if form else user.display_name }}">
+    </p>
+    <button type="submit">Save</button>
+  </form>
+  <p><a href="/pages/users">Back to the list</a></p>
+{% endblock %}

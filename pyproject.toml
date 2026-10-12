@@ -49,10 +49,16 @@ dev = [
   "build>=1.2,<2",
   "hatchling>=1.25,<2",
   "httpx>=0.27,<1",
+  # The Traditional Apps path's interface lessons render templates, and Xyberos does not ship a
+  # template engine: Jinja2 belongs to the application, so it is a development dependency here rather
+  # than an extra on the package.
+  "jinja2>=3.1,<4",
+  "mkdocs-material>=9.5,<10",
   "mypy>=1.11,<2",
   "pytest>=8,<10",
   "ruff>=0.6,<1",
   "tomli>=2,<3",
+  "types-PyYAML>=6.0,<7",
 ]
 http = [
   "httpx>=0.27,<1",
@@ -94,11 +100,19 @@ files = [
   "examples/broker_worker/app.py",
   "examples/durable_workflow/app.py",
   "examples/hello_app/app.py",
+  "examples/learn_ai",
+  "examples/learn_fundamentals",
+  "examples/learn_traditional",
   "examples/tenancy/app.py",
   "examples/tutorial",
+  "examples/user_management",
+  "site/scripts",
   "tests/contracts/examples/phase1_minimal_app.py",
   "tests/contracts/examples/phase4_workflow.py",
+  "tests/site",
 ]
+# The site's scripts import each other by bare name, the way `python site/scripts/build.py` runs them.
+mypy_path = "site/scripts"
 python_version = "3.10"
 strict = true
 warn_unused_configs = true
