@@ -40,7 +40,7 @@ dependencies = [
 xyberos = "xyberos.cli.main:main"
 
 [project.urls]
-Documentation = "https://github.com/xyberos/xyberos2.0/tree/master/docs"
+Documentation = "https://docs.xyberos.com/"
 Repository = "https://github.com/xyberos/xyberos2.0"
 Issues = "https://github.com/xyberos/xyberos2.0/issues"
 

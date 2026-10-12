@@ -377,7 +377,7 @@ src/xyberos/                                    10 783 lines over 62 modules
 
 tests/                           14 507 lines, 994 tests
 examples/                        11 657 lines, sixteen worked examples
-site/                             9 542 lines of scripts and pages, minus the generated reference
+site/                             9 539 lines of scripts and pages, minus the generated reference
 docs/                             a guide per subsystem, plus cross-cutting pages and 17 ADRs
 ```
 
