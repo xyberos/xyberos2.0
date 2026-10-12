@@ -532,9 +532,13 @@ Two structural choices follow, and one of them was only discovered by building t
 2. **The host is decided: this site replaces the content of `docs.xyberos.com`.** The 1.x line's
    documentation points at that line's own repository docs, so this plan does not carry it. That
    resolves [`docs/release.md`](../docs/release.md) precondition 4, and `[project.urls] Documentation`
-   moves to `https://docs.xyberos.com` once the site carries this line's content. The site publishes
+   moves to `https://docs.xyberos.com` once the domain resolves to this site. The site publishes
    earlier than that, at its GitHub Pages address, which is the preview the domain switch is made
-   against — see section 11's publish order.
+   against — see section 11's publish order. What the domain actually was, checked rather than assumed
+   on 2026-10-12: a **Cloudflare-hosted deployment of a stale 1.x build**, carrying a custom theme the
+   current 1.x repository does not have and missing its newest lesson. It was not that repository's
+   Pages custom domain, so no setting there had to change; only the DNS record, which was deleted with
+   it.
 
 Two details the build settled, both recorded because they are easy to get wrong again:
 
@@ -619,16 +623,26 @@ precondition 4 records the same order.
 | # | Step | Where it happens |
 | --- | --- | --- |
 | 1 | **Publish the preview.** [`.github/workflows/site.yml`](../.github/workflows/site.yml) builds with the same command CI uses and deploys to `https://xyberos.github.io/xyberos2.0/` — **live**, 54 of 54 lessons, and the roadmap page reports the two sections that are still planned | This repository, on a push that touches the site or by hand |
-| 2 | **Move the domain off the 1.x site.** Its guides already live in `xyberos/xyberos` and are already served at `https://xyberos.github.io/xyberos/`, so what moves is the custom domain, not the documentation | That repository's Pages settings — out of scope here, and nothing in this repository can change them |
-| 3 | **Point the domain at this site**, then move `[project.urls] Documentation` to it | This repository's Pages settings and `pyproject.toml` |
+| 2 | **Move the domain off the 1.x site.** Its guides already live in `xyberos/xyberos` and are already served at `https://xyberos.github.io/xyberos/`, so what moves is the domain, not the documentation — **done 2026-10-12**: the Cloudflare deployment that held `docs.xyberos.com` was deleted, and that repository now names its own address in the README, in `[project.urls]`, and in `site_url` | `xyberos/xyberos`, and the Cloudflare account that held the domain — out of scope here, and nothing in this repository can change them |
+| 3 | **Point the domain at this site**, then move `[project.urls] Documentation` to it | A `docs` CNAME to `xyberos.github.io` with the proxy off, then this repository's Pages settings, then `pyproject.toml` |
 
-Step 2 is smaller than it looked, and the evidence is a lookup rather than an assumption:
-`https://docs.xyberos.com/` serves the 1.x line's site today, and `https://xyberos.github.io/xyberos/`
-answers `200` with the same guides, because that repository's `docs/` tree is its own MkDocs site,
-deployed from its `gh-pages` branch. Nothing has to be copied anywhere. The custom domain is set in the
-1.x repository's Pages settings, and the DNS records need no change: a GitHub Pages custom domain
-already resolves to `xyberos.github.io`, which both repositories share. The only content change on that
-side — a notice telling its readers where this line's documentation lives — belongs to that repository.
+Step 2 is smaller than it looked, and the evidence is a lookup rather than an assumption: the 1.x line's
+guides serve at `https://xyberos.github.io/xyberos/` because that repository's `docs/` tree is its own
+MkDocs site, deployed from its `gh-pages` branch, and its build now declares that address as `site_url`,
+so its next deploy carries a canonical link on every page. The domain was the part that needed looking
+up, and it was not what the first reading of it assumed: `docs.xyberos.com` was a
+**Cloudflare-hosted deployment of a stale build** — a custom theme this repository does not have,
+extensionless URLs behind `307` redirects, and the newest 1.x lesson answering `404` — so there was no
+Pages setting to clear on either side, and no content to rescue from it. Public resolvers returned
+nothing for the name after the deletion, and `https://docs.xyberos.com/` answers Cloudflare's `530`
+rather than a site.
+
+What remains is DNS and one setting, and neither is a copy operation: a `docs` CNAME to
+`xyberos.github.io` **with the Cloudflare proxy off**, because GitHub issues a certificate against a
+plain record and a proxied one leaves the site on an invalid certificate; then the custom domain set on
+this repository's Pages site, then HTTPS enforced. The DNS record did not survive the deletion, so
+"DNS needs no change" — the first reading of this step — was true only while the domain belonged to a
+Pages site, and it is the record that has to be recreated.
 
 Step 1 ships the two sections that are still `planned`, which is what makes it a preview rather than a
 release: `build.py --check` validates every page, and only `roadmap.py --check --release` refuses a
@@ -655,7 +669,7 @@ the release default.
 | A lesson teaches a framework-shaped feature that is application code (templates, vector search, auth) | The reader blames the runtime for a gap it documented as a boundary | The four labels in section 5, plus `test_claimed_tier_matches_stability_guide` |
 | The AI path becomes untestable in CI (live model, network) | The suite loses its "no service needed" property | Fake provider and declared capabilities in every AI lesson; no output block for anything that cannot run offline |
 | Scope: three full application projects ship in one release (decision 5) | The release is gated on the slowest path, so a slip in phase 4 or 5 delays everything | Deliver in the decided order so each path is reviewable as it completes; keep paths independent, so no lesson links forward across paths except as a prerequisite; start the Smart Support Desk (phase 5) once the hybrid design is fixed rather than after the AI path is finished, because it is the critical path to the release |
-| The 1.x documentation keeps serving `docs.xyberos.com` | A reader at that URL gets the wrong line's documentation | Decision 1 splits the two: this site takes `docs.xyberos.com` and the 1.x site keeps serving from its own repository at `https://xyberos.github.io/xyberos/`, where its guides already are. The site is published at its own Pages address first, so the domain switch is made against a site that is already up and read; only the domain move waits for the 1.x repository's Pages setting |
+| The 1.x documentation keeps serving `docs.xyberos.com` | A reader at that URL gets the wrong line's documentation | **Resolved 2026-10-12.** Decision 1 splits the two: this site takes `docs.xyberos.com` and the 1.x site keeps serving from its own repository at `https://xyberos.github.io/xyberos/`, where its guides already are. What the domain actually was turned out to be neither repository's Pages site but a Cloudflare deployment of a stale 1.x build; it was deleted, the 1.x repository now names its own address, and the name resolves nowhere until this line's site claims it |
 
 ## 13. Decisions taken
 
@@ -663,7 +677,7 @@ Settled by the owner. Each is mirrored in `site.md` §12, so the plan and this f
 
 | # | Question | Decision | Consequence for this plan |
 | --- | --- | --- | --- |
-| 1 | Host | This site replaces the content of `docs.xyberos.com`; the 1.x line's documentation is served from that line's own repository | The site publishes at `https://xyberos.github.io/xyberos2.0/` first, then the custom domain moves off the 1.x site, then `[project.urls] Documentation` follows ([`docs/release.md`](../docs/release.md) precondition 4). The 1.x site is out of scope here. |
+| 1 | Host | This site replaces the content of `docs.xyberos.com`; the 1.x line's documentation is served from that line's own repository | The site published at `https://xyberos.github.io/xyberos2.0/` first; the stale Cloudflare deployment that held the domain was deleted and the 1.x repository now names its own address (`xyberos/xyberos` `8c8a49f`); the domain is claimed with a `docs` CNAME to `xyberos.github.io` plus this repository's Pages setting, and `[project.urls] Documentation` follows ([`docs/release.md`](../docs/release.md) precondition 4) |
 | 2 | Stack | MkDocs + Material: `mkdocs.yml` at the repository root, `docs_dir: site` | Section 10 is a decision rather than a recommendation, and no Node toolchain enters CI |
 | 3 | `docs/tutorial.md` | Retired into the Fundamentals path | The chapter modules and their output blocks move in one commit and the harness follows them; `site.md` §2 records the chapter-to-lesson map |
 | 4 | Reference sourcing | Generated from `docs/` from the first release | The `/reference/` copy step moves from phase 6 to phase 1, and the "one copy of each guide" rule is enforced from the start |
@@ -715,13 +729,16 @@ The site is done when all of the following hold:
    stay in `docs/tutorial.md` until the path that owns them exists, because deleting them now would
    leave that content with nowhere to live. The rule the migration follows is per chapter: exactly one
    home, exactly one suite.
-5. Update [`docs/release.md`](../docs/release.md) precondition 4 and the `Documentation` entry in
-   [`pyproject.toml`](../pyproject.toml) once the site serves content, so the published metadata points
-   at this line's documentation. The order is fixed: publish at the GitHub Pages address, then the 1.x
-   line moves off `docs.xyberos.com`, then the domain and the metadata entry follow (section 11).
-   Publishing is done — the preview is live and the workflows are green — so what remains is the middle
-   step, which belongs to the other repository: remove the custom domain there, add it here, and move
-   the metadata entry after that.
+5. **The 1.x side is done; the DNS record and one setting remain.** `xyberos/xyberos` no longer points at
+   `docs.xyberos.com`: its README, its `[project.urls]`, and its `mkdocs.yml` `site_url` all name
+   `https://xyberos.github.io/xyberos/`, committed as `8c8a49f`. The domain itself turned out to be a
+   Cloudflare deployment of a stale 1.x build rather than a Pages custom domain, and it has been
+   deleted: the name resolves nowhere now. What is left is to create a `docs` CNAME to
+   `xyberos.github.io` with the Cloudflare proxy off, set the custom domain on this repository's Pages
+   site and enforce HTTPS, then update [`docs/release.md`](../docs/release.md) precondition 4 and the
+   `Documentation` entry in [`pyproject.toml`](../pyproject.toml) so the published metadata points at
+   this line's documentation. The order is fixed: the domain has to serve this line's site before the
+   metadata advertises it (section 11).
 6. **Done.** `mkdocs.yml` with `docs_dir: site` and `site_dir: build/site`, with the navigation naming
    the two plan documents where they are readable rather than copying them in, and `exclude_docs`
    keeping their repository-relative links out of the strict build. `git status` lists `site/`, and the

@@ -1,9 +1,11 @@
 # Publish the documentation site to GitHub Pages.
 #
 # This is the *preview* URL, not the release: `https://xyberos.github.io/xyberos2.0/`. The release
-# publishes to `https://docs.xyberos.com`, which currently serves the 1.x documentation. The order is
-# preview first, then the 1.x documentation moves to that line's repository and this line takes the
-# domain — see docs/release.md precondition 4, which records it.
+# publishes to `https://docs.xyberos.com`, which until 2026-10-12 served a Cloudflare-hosted build of
+# the 1.x documentation rather than either repository's Pages site. That deployment is gone and the
+# 1.x line documents itself at `https://xyberos.github.io/xyberos/`; what remains is a `docs` CNAME to
+# `xyberos.github.io` with the proxy off, this repository's Pages custom domain, and then the metadata
+# — see docs/release.md precondition 4, which records the order.
 #
 # A preview is allowed to contain pages the release gate refuses: `--check` validates the pages, and
 # only `--release` requires every one of them to be finished. That is why this URL ships the two

@@ -149,7 +149,7 @@ an existing one, which is why these four things come first.
 | 1 | The trusted publisher on the PyPI project — **registered: owner `xyberos`, repository `xyberos2.0`, workflow `publish.yml`, environment left empty** | Only a project owner can add one or correct it, and a single field that disagrees with the workflow fails as an authentication error with nothing to fall back on: there is no second name, and no token is kept | Compare the registration against the table in [The publishing workflow](#the-publishing-workflow), including the empty environment |
 | 2 | The repository this line publishes from — **`https://github.com/xyberos/xyberos2.0`**, default branch `master` | The declared project URLs, the README's links, and a trusted publisher all bind to it, so the URL and the branch name have to be settled before the metadata is written | `git rev-parse master origin/master` matches, and every declared URL resolves — see [Preparing the repository](#preparing-the-repository) |
 | 3 | The publication path — **trusted publishing from `.github/workflows/publish.yml`**, started by hand, with PyPI as its only destination | The run authenticates with an OIDC identity and keeps no secret, and it uploads straight to the index, so the publisher has to be correct before the first attempt rather than during it | See [The publishing workflow](#the-publishing-workflow) |
-| 4 | The `Documentation` URL — **decided: this line's site at `https://docs.xyberos.com`, once it carries content for this line**; the repository's `docs/` directory holds until then | `https://docs.xyberos.com` serves the 1.x line's site today, so the custom domain is removed from that repository's Pages settings before this line's site takes it — in the other order the URL advertises the wrong codebase. The 1.x guides need no move: they already serve from `xyberos/xyberos` at `https://xyberos.github.io/xyberos/` | The declared value in `[project.urls]`, and the published site at `https://xyberos.github.io/xyberos2.0/` ([the documentation site plan](../site/implementation.md) records the order: Pages preview, then the domain, then the metadata) |
+| 4 | The `Documentation` URL — **decided: this line's site at `https://docs.xyberos.com`, once it carries content for this line**; the repository's `docs/` directory holds until then | The domain was held by a **Cloudflare-hosted deployment of a stale 1.x build**, not by a GitHub Pages setting in either repository, so nothing in `xyberos/xyberos` had to change for it to move. It was deleted on **2026-10-12** and now resolves nowhere, which is what makes this line's site the only candidate for it — in the other order the URL advertises the wrong codebase. The 1.x guides need no move: they already serve from `xyberos/xyberos` at `https://xyberos.github.io/xyberos/`, and that repository now points at that address rather than at the domain | The declared value in `[project.urls]`; a `docs` CNAME to `xyberos.github.io` with the Cloudflare proxy **off**, because GitHub issues the certificate against a plain record; the custom domain set on **this** repository's Pages site, then HTTPS enforced; and the published site at `https://xyberos.github.io/xyberos2.0/` ([the documentation site plan](../site/implementation.md) records the order: Pages preview, then the domain, then the metadata) |
 
 ### Preparing the repository
 
@@ -191,10 +191,10 @@ readers see. The evidence is the wheel built in [Before the tag](#before-the-tag
   Repository, and Issues links that `1.0.3` supplies are not replaced by this release — a page carries
   the newest release's metadata, so they are dropped by it.
 - **`Documentation` is the one interim value.** It points at the repository's `docs/` directory rather
-  than at `https://docs.xyberos.com`, which serves the 1.x line. Advertising the other line's site from
-  this line's page is worse than linking the source tree, so the value moves once the domain does — and
-  this line's site is already published at its own address in the meantime
-  ([the documentation site plan](../site/implementation.md)).
+  than at `https://docs.xyberos.com`, which until 2026-10-12 served a stale build of the 1.x line.
+  Advertising another line's site from this line's page is worse than linking the source tree, so the
+  value moves once the domain resolves to this line's site — and this line's site is already published
+  at its own address in the meantime ([the documentation site plan](../site/implementation.md)).
 - **Absolute links in the long description.** `readme = "README.md"` ships as
   `Description-Content-Type: text/markdown`, and a relative target in it resolves against
   `https://pypi.org/project/xyberos/` rather than the repository, so each one becomes a dead link on
