@@ -106,6 +106,7 @@ files = [
   "examples/durable_workflow/app.py",
   "examples/hello_app/app.py",
   "examples/learn_ai",
+  "examples/learn_extend",
   "examples/learn_fundamentals",
   "examples/learn_hybrid",
   "examples/learn_traditional",

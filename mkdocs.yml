@@ -141,7 +141,11 @@ nav:
       - The design: hybrid-design.md
   - Extend Xyberos:
       - extend/index.md
-      - Extend: extend/durable.md
+      - The provider registry: extend/registry.md
+      - Writing a module: extend/modules.md
+      - Writing a plugin: extend/plugins.md
+      - Writing a database provider: extend/database-providers.md
+      - Multi-step work that outlives the process (experimental): extend/durable.md
   - Reference:
       - reference/index.md
   - Project:
