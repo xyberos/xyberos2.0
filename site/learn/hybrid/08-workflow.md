@@ -24,6 +24,10 @@ Two properties the transcript makes visible:
 - a transient provider failure is retried **inside the step that failed**, and the run still finishes —
   the classification count is one more than the number of model-visible steps for that ticket.
 
+The engine's own contract — a validated graph, bounded retries, per-step and whole-run deadlines, and no
+loops or parallel steps — is the AI path's [lesson 13](../ai/13-workflows.md). This lesson is that
+contract applied to a sequence with a side effect at the end of it.
+
 ## What you need
 
 Nothing new.
