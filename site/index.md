@@ -19,9 +19,9 @@ published. A lesson that has drifted fails the build rather than misleading a re
 | Section | Read it if |
 | ------- | ---------- |
 | [Fundamentals](learn/fundamentals/index.md) | you have not used Xyberos before |
-| Traditional Apps | you are building a database-backed web application |
-| AI Apps | you are calling a model from an application |
-| Hybrid Apps | you are putting both in one application |
+| [Traditional Apps](learn/traditional/index.md) | you are building a database-backed web application |
+| [AI Apps](learn/ai/index.md) | you are calling a model from an application |
+| [Hybrid Apps](learn/hybrid/index.md) | you are putting both in one application |
 | [Extend Xyberos](extend/index.md) | you are writing a provider, a plugin, or a module |
 | [Reference](reference/index.md) | you want one specific API, parameter, or exception |
 
