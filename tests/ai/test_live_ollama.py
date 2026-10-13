@@ -27,8 +27,9 @@ import pytest
 
 pytest.importorskip("httpx", reason="the Ollama adapter needs the 'ollama' extra")
 
-from xyberos.ai import ChatRequest, EmbeddingRequest, Message, ModelStatus  # noqa: E402
+from xyberos.ai import ChatRequest, EmbeddingRequest, Message, ModelStatus, ToolSpec  # noqa: E402
 from xyberos.ai.ollama import OllamaProvider, OllamaSettings  # noqa: E402
+from xyberos.ai.testing import assert_model_provider_contract  # noqa: E402
 
 LIVE = os.environ.get("XYBEROS_OLLAMA_LIVE") == "1"
 TOOLS = os.environ.get("XYBEROS_OLLAMA_LIVE_TOOLS") == "1"
@@ -50,6 +51,25 @@ def live_provider(**settings: object) -> OllamaProvider:
     arguments: dict[str, object] = {"model": MODEL, "base_url": BASE_URL, "timeout": 120.0}
     arguments.update(settings)
     return OllamaProvider(OllamaSettings(**arguments))  # type: ignore[arg-type]
+
+
+NAME_SCHEMA: dict[str, object] = {
+    "type": "object",
+    "properties": {"name": {"type": "string"}},
+    "required": ["name"],
+    "additionalProperties": False,
+}
+
+LOOKUP_TOOL = ToolSpec(
+    name="lookup",
+    description="Look up a topic and return a note about it.",
+    parameters={
+        "type": "object",
+        "properties": {"topic": {"type": "string"}},
+        "required": ["topic"],
+        "additionalProperties": False,
+    },
+)
 
 
 @requires_tools
@@ -144,3 +164,32 @@ def test_embeddings_round_trip() -> None:
         assert response.dimensions > 1
 
     asyncio.run(scenario())
+
+
+def test_the_live_adapter_satisfies_the_provider_contract() -> None:
+    """The suite an adapter package elsewhere runs against its own backend, run here against ours.
+
+    Capability-specific gates still apply: this needs a tool-capable model and
+    ``XYBEROS_OLLAMA_LIVE_TOOLS=1``, because a provider is checked from both sides of every claim.
+    """
+
+    async def scenario() -> tuple[str, ...]:
+        provider = live_provider(tools=True, structured_output=True)
+        try:
+            checked = await assert_model_provider_contract(
+                provider,
+                chat_prompt="Reply with the single word: ready",
+                structured_prompt='Reply with JSON only and no prose: {"name": "Ada"}',
+                tool_prompt="Use the lookup tool to find the topic 'rain'.",
+                schema=NAME_SCHEMA,
+                tool=LOOKUP_TOOL,
+            )
+        finally:
+            await provider.aclose()
+        return checked
+
+    checked = asyncio.run(scenario())
+
+    assert len(checked) == 8
+    assert any("structured output honours" in name for name in checked)
+    assert any("names a declared tool" in name for name in checked)

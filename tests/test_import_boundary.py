@@ -214,6 +214,17 @@ assert "routes: 1 (not compiled" in report.getvalue(), report.getvalue()
     assert result.returncode == 0, result.stderr
 
 
+def test_the_storage_module_loads_no_third_party_package() -> None:
+    result = run_python(
+        "import sys; import xyberos.storage, xyberos.storage.testing; "
+        "optional = ('starlette', 'sqlalchemy', 'aiosqlite', 'alembic', 'httpx', 'jinja2'); "
+        "loaded = [name for name in optional if name in sys.modules]; "
+        "assert not loaded, loaded"
+    )
+
+    assert result.returncode == 0, result.stderr
+
+
 def test_the_durable_package_requires_its_extra() -> None:
     result = run_python(
         "import sys\n"

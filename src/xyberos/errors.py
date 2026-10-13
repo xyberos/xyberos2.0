@@ -58,6 +58,11 @@ __all__ = [
     "ScopeViolationError",
     "ShutdownError",
     "StepTimeoutError",
+    "StorageConfigurationError",
+    "StorageError",
+    "StorageKeyError",
+    "StorageNotFoundError",
+    "StorageSizeLimitError",
     "TransactionError",
     "TransientDatabaseError",
     "TransientError",
@@ -432,4 +437,43 @@ class DurableOutcomeUnknownError(DurableError):
 
     It is deliberately not a :class:`TransientError`: retrying an operation whose effect is
     uncertain is a decision the caller has to make explicit, through idempotency or a reconciler.
+    """
+
+
+class StorageError(XyberosError):
+    """Base class for storage failures.
+
+    A backend that can fail transiently — a remote object store, a network filesystem — raises a
+    subclass that is also a :class:`TransientError`, so a retry decision stays a classification
+    rather than a guess. The shipped local-filesystem provider owns no remote resource and never
+    raises one.
+    """
+
+
+class StorageConfigurationError(StorageError):
+    """Raised when storage settings are missing, unknown, or unusable."""
+
+
+class StorageKeyError(StorageError):
+    """Raised when a key is not a usable storage key.
+
+    A key is a relative, forward-slash-separated path with no empty, ``.``, or ``..`` segment, so a
+    key can never name something outside the space it was given. The refusal is an error rather
+    than a silent normalization, because a caller that meant to escape has a bug worth seeing.
+    """
+
+
+class StorageNotFoundError(StorageError):
+    """Raised when a key was never stored, or has been deleted.
+
+    Reading a missing object is an error rather than a ``None``, because a read that silently
+    yields nothing turns an absent object into an ``AttributeError`` somewhere further away.
+    """
+
+
+class StorageSizeLimitError(StorageError):
+    """Raised when an object exceeds the ceiling its provider was configured with.
+
+    The ceiling belongs to the provider (``Storage.max_object_bytes``) rather than to the call, so
+    the contract suite can check the boundary at exactly one byte over it.
     """

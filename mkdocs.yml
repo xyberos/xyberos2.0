@@ -197,6 +197,7 @@ nav:
       - reference/runtime.md
       - reference/security.md
       - reference/stability.md
+      - reference/storage.md
       - reference/testing.md
       - reference/troubleshooting.md
       - reference/tutorial.md
@@ -219,6 +220,8 @@ nav:
       - reference/adr/0015-durability-is-single-host.md
       - reference/adr/0016-database-providers-are-an-extension-point.md
       - reference/adr/0017-release-identity-and-lineage.md
+      - reference/adr/0018-capability-placement-rule.md
+      - reference/adr/0019-storage-contract.md
   - Project:
       - Feature support: feature-support.md
       - Terminology: terminology.md

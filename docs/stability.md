@@ -30,6 +30,7 @@ happens when a test is not enough and the shape turns out to be wrong.
 | Error taxonomy | `xyberos.errors` | stable |
 | Deprecation mechanics | `xyberos.deprecation` | stable |
 | HTTP adapter (Starlette) | `xyberos.http` | preview |
+| Object storage: contract, filesystem provider, and double | `xyberos.storage` | preview |
 | SQLite provider and migrations | `xyberos.database` | preview |
 | AI facade, contracts, tools, schema subset, fake provider | `xyberos.ai` | preview |
 | Ollama adapter | `xyberos.ai.ollama` | preview |

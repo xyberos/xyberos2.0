@@ -730,7 +730,15 @@ section), one reusable conformance suite, and two tested examples — all of it 
 
 ### Phase 9 - extras here, and the placement rule
 
-**Status:** planned; not started. 2.0 already has every mechanism a package needs — `register(app)` for
+**Status:** *partly implemented.* Landed in this repository: **ADR 0018** (the placement rule),
+**ADR 0019** (the storage contract), `xyberos.storage` with the shipped filesystem provider, the
+in-memory double and `assert_storage_contract` (`tests/storage/`, 44 cases), request metrics as
+`xyberos.http.RequestMetricsMiddleware` (`tests/http/test_metrics.py`), and
+`assert_model_provider_contract` with the embedding half in `xyberos.ai.testing`, run against the
+shipped Ollama adapter in the opt-in live suite. Remaining: **`xyberos[mcp]`** — the client work
+package below is untouched — and the **retirement patches**, which need an upload to the package index
+rather than a change here, so they belong to the release that publishes them. 2.0 already has every
+mechanism a package needs — `register(app)` for
 providers and routes, `Plugin` for a distribution the runtime validates, orders, and attributes, and the
 provider registry for scopes, dependencies, and test overrides — so this phase adds no mechanism. The
 capability-placement decision is recorded under "Adopted implementation decisions", so this phase applies it,
@@ -762,16 +770,16 @@ extension-point contract.
 | --- | --- | --- |
 | MCP tools (consume a server's tools) | **extra here**: `[mcp]`, a **streamable-HTTP client only**; the stdio transport belongs *there*, with the package | the 1.x client's own description says it speaks JSON-RPC over stdio and streamable HTTP using only the standard library — so no dependency, and the port must re-prove that rather than assume it. If it cannot, the rule sends it *there* as a package. HTTP-only here, because a stdio transport spawns a process: that collides with the standing policy that the framework starts nothing, and `asyncio` subprocess behaviour is platform-specific while CI has no non-Linux leg |
 | Request metrics | **here, inside `[http]`**: a middleware class, no new extra | no dependency, and the smallest thing on this list; the application passes it to `HttpAdapter`, which is the only shape 2.0 offers for middleware. A separate extra is earned only if the capability grows a sink, an exporter, or a dependency: an extra costs a release row, a CI row, a tier entry, a feature-matrix row, and a catalogue row, and one class does not repay them |
-| Storage (files and blobs) | **extra here**: `[storage]` with local files, a double, and the provider suite | no dependency, and an extra has to ship one working implementation rather than a bare contract — which is what `[database]` and `[ollama]` do |
+| Storage (files and blobs) | **module here**: `xyberos.storage` with local files, a double, and the provider suite | no third-party dependency at all, and an extra that installs nothing is theatre: `pip install "xyberos[storage]"` would pull in no dependency and gate no import. `xyberos.ai` is the precedent — a dependency-free capability is a built-in module, not an empty extra (ADR 0018) |
 | Storage (S3-compatible), PostgreSQL, MySQL | package there | each needs a client library core will not adopt; [ADR 0016](adr/0016-database-providers-are-an-extension-point.md) already places database engines there |
-| Templates, static files, forms | package there: `xyberos-templates` | it needs Jinja2, and `pyproject.toml` already records why Jinja2 is not an extra of this package |
+| Templates, static files, forms | package there: `xyberos-templates`, an engine-neutral `Templates` contract with Jinja2 as the shipped implementation | it needs Jinja2 **and** `python-multipart`, and `pyproject.toml` already records why neither is an extra of this package; the contract stays engine-neutral so a team that would rather write typed components satisfies the same protocol instead of forking the package |
 | A logging preset and tracing | package there: `xyberos-observability` | it needs OpenTelemetry, and the runtime configures no handler by decision |
 | Identity and authentication | package there: `xyberos-auth`, verification only | real assertions are asymmetric, so it needs `cryptography`; [ADR 0014](adr/0014-no-identity-or-authorization-model.md) still owns the policy half, and no flow, preset, session, or role returns |
 | LLM providers | package there: `xyberos-openai-compatible`; the suite stays here | the adapter is a second backend for a facade whose first is [ADR 0004](adr/0004-initial-ai-provider.md)'s Ollama; promoting it to an extra would amend that ADR |
 | Multi-tenancy | module, either home | it needs nothing new: `examples/tenancy/` already proves the pattern, so a package is a convenience rather than a capability |
 | Parallel fan-out | module, here, as an example | the backlog defers any runtime claim, so it needs ADR 0021 and the owner's sign-off before it exists at all |
 | A revived `xyberos-db` | **retire, with a pointer** | `xyberos[database]` and the provider seam already answer it |
-| `xyberos-metrics` | **retire, with a pointer** | its capability lands in `xyberos[http]` here, so a 2.x release under the old name would be a second answer |
+| `xyberos-metrics` | **retire, with a pointer** | its capability ships as a middleware class in `xyberos.http` here, so a 2.x release under the old name would be a second answer |
 | `xyberos-mcp` | **reused there, for the other direction** | the extra here carries the client and the package carries the server, so one name answers one question instead of two |
 | `check --json`, `--why`, `--schema`, the configuration schema | tooling here | nothing installs them; they are one binary's flags — ADR 0020 records the serialized documents as a contract |
 | Session inspection of the journal | tooling here | read-only, and retention, pruning, and scheduling stay deferred |
@@ -803,16 +811,20 @@ first line — is the honest form of the same move, and it is the move
    the placement table's candidate rows as an import-path decision, because the extra's path is a promise of
    this package and cannot be undone in a later release. **Evidence:** the ADR, linked from `CONTRIBUTING.md`
    and the Extend pages.
-2. **`[storage]`, with an implementation and a suite (ADR 0019).** `Storage` — put, get, delete, list, an
-   explicit key space, bounded sizes, and errors mapped onto the existing taxonomy — plus a local-filesystem
-   provider, an in-memory double in `xyberos.storage.testing`, and `assert_storage_contract` for the providers
-   that live elsewhere, in the shape `tests/database/test_provider_contract.py` already sets. Keys are the
-   security boundary and are treated as one: a key is a set of relative, normalized path segments, and the local
-   provider refuses an absolute path, a `..` segment, and a key that resolves outside the configured root, each
-   with its own test. The extra ships one working implementation because an extra is a promise a release makes,
-   and the suite exists because a zero-dependency engine seam is exactly where a third party should be able to
-   prove itself. **Evidence:** the suite passing for two providers and failing for two deliberately broken ones —
-   the bar the database suite already sets — and the traversal refusals.
+2. **`xyberos.storage`, with an implementation and a suite (ADR 0019). — implemented.** `Storage` — `put`,
+   `get`, `delete`, `list_keys`, an explicit key space, bounded sizes, and errors mapped onto the existing
+   taxonomy — plus a local-filesystem provider, an in-memory double in `xyberos.storage.testing`, and
+   `assert_storage_contract` for the providers that live elsewhere, in the shape
+   `tests/database/test_provider_contract.py` already sets. Keys are the
+   security boundary and are treated as one: `validate_key` refuses an absolute key, an empty or `.` or
+   `..` segment, a backslash, a control character, and the reserved `.xyberos-` segment prefix, and the
+   filesystem provider checks containment again on the *resolved* path so a symlink out of the root is a
+   refusal rather than a write, and refuses Windows device names on every platform. It is a **module, not
+   an extra**: it needs nothing from PyPI, and an extra that installs nothing is theatre. **Evidence:** the
+   suite passing for the filesystem provider and the double, failing for two deliberately broken ones — a
+   `delete` that reports removing what was never there and a `list_keys` that ignores its prefix — plus
+   the traversal, symlink, device-name, and ceiling refusals, and the settings-object path proven through
+   the registry.
 3. **`[mcp]`, the client.** One `Tool` per server tool, projected into the shipped `xyberos.ai.tools`
    `Tool`/`ToolSet` and the existing allowlist rather than a parallel tool model, namespaced `{server}_{tool}` as
    the 1.x package already does, with arguments *validated* against the declared schema through the closed
@@ -826,19 +838,29 @@ first line — is the honest form of the same move, and it is the move
    `mcp` SDK, the client moves *there* too and the extra is dropped rather than the dependency policy bent.
    **Evidence:** the package's suite against a stub MCP server, and the allowlist behaviour asserted with the
    same tests the facade's own tools use.
-4. **Request metrics, inside `[http]`.** Counters per route and status as a middleware class the application
-   passes to `HttpAdapter`, with a readout a test can assert and no sink, exporter, or background task. It is the
-   smallest candidate on the list, so it does not earn a release row of its own: an extra costs a release row, a
-   CI row, a tier entry, a feature-matrix row, and a catalogue row, and one class does not repay them. A separate
-   `[metrics]` extra is the documented upgrade path if the capability later grows a sink or a dependency, and
-   that reason is recorded so promotion is a decision rather than a drift. **Evidence:**
-   `tests/http/test_metrics.py`, a line in the feature matrix, and no new extra row in the release guide.
-5. **The AI provider conformance suite.** `assert_model_provider_contract`, with the embedding half beside it,
-   in `xyberos.ai.testing` — where the fake provider already lives. Its customers are the adapter packages in
-   the other repository and any third party; a provider proves a refusal is reported rather than inferred, usage
-   is reported rather than guessed, the closed schema subset is honoured, tools are called, cancellation is
-   obeyed, and its settings object rejects an unknown key through the same `from_mapping` shape `OllamaSettings`
-   uses. **Evidence:** the suite, and the shipped Ollama adapter running it in `tests/ai/`.
+4. **Request metrics, inside `[http]`. — implemented.** Counters per route and status as a middleware
+   class the application passes to `HttpAdapter`, with a readout a test can assert and no sink, exporter,
+   or background task. The counters are keyed by the adapter's matched-route template rather than by the raw
+   path, and they are bounded the way the storage key space is: a request that matched no route is one key,
+   and past `max_routes` the rest fold into `<other>`, so a client cannot choose how much memory the counter
+   map uses. Because the middleware sits inside error normalization it counts a failure at the status the
+   client receives. It is the smallest candidate on the list, so it does not earn a release row of its own: an extra
+   costs a release row, a CI row, a tier entry, a feature-matrix row, and a catalogue row, and one class does
+   not repay them. A separate `[metrics]` extra is the documented upgrade path if the capability later grows
+   a sink or a dependency. **Evidence:** `tests/http/test_metrics.py` (eight cases, including the template
+   keying, the `<unmatched>` fold, and that nothing is counted when the application does not pass the
+   middleware), a line in the feature matrix, and no new extra row in the release guide.
+5. **The AI provider conformance suite. — implemented.** `assert_model_provider_contract`, with
+   `assert_embedding_provider_contract` beside it, in `xyberos.ai.testing` — where the fake provider already
+   lives. Its customers are the adapter packages in the other repository and any third party; a provider
+   proves a refusal is reported rather than inferred, usage is reported rather than guessed, the closed schema
+   subset is honoured, tools are called, cancellation is obeyed, and — the property that makes it usable
+   against a live model — every capability claim is checked from **both sides**, so a provider that claims
+   nothing is checked for refusing rather than skipped, and one that overclaims fails. Writing it found a real
+   gap: `FakeModelProvider.stream` did not refuse a model that does not claim streaming, while the shipped
+   Ollama adapter did, and the fake now matches. **Evidence:** `tests/ai/test_model_provider_contract.py`
+   (eight cases, including two deliberately broken providers) and the opt-in live run against the shipped
+   Ollama adapter in `tests/ai/test_live_ollama.py`.
 6. **Retirement as a mechanism, not a sentiment.** For each name whose capability lands in an extra or in a
    class an extra ships, the 1.x line gets a metadata-only patch — `0.1.3`, `0.2.3`, and so on — whose
    description points at the replacement and which keeps the `xyberos>=1.0,<2` pin, so nothing moves under a 1.x
@@ -863,19 +885,19 @@ first line — is the honest form of the same move, and it is the move
 | Criterion | Evidence |
 | --- | --- |
 | The rule is written once and applied per candidate | ADR 0018, and a catalogue row for every candidate in the table above |
-| Every new extra ships a working implementation | `[storage]` has a local provider, `[mcp]` a client that passes its suite, and the AI suite runs against the shipped Ollama adapter |
-| Every extension point that a package implements has a suite | storage and the AI providers, beside the database's |
-| A package can be configured without widening `Settings` | one new extra proves the typed `[plugins.<name>]` path and one new package proves the explicit-settings-object path, and `config.py` accepts no new root key |
-| Each extra's import path is decided before its code | ADR 0018's table names the path for every candidate, and `tests/test_public_surface.py` records the extras' own names |
-| Every new extra is booked once | a boundary case, a CI matrix row, a feature-matrix row, a release-guide row, and a catalogue row per extra — and no metrics row, because request metrics ships inside `[http]` |
-| A retired name points somewhere and moves nobody | the metadata-only patch keeps the `<2` pin, and its description names the replacement |
-| The mechanism 2.0 already has is enough | no change to `src/xyberos/__init__.py`, to the root keys `config.py` accepts, to the plugin protocol, to the provider registry, or to the routing API; `tests/test_public_surface.py` grows only by the new extras' own names |
+| Every extension point that ships here has a working implementation | `xyberos.storage` has a filesystem provider, request metrics has a class, and the AI suite runs against the shipped Ollama adapter |
+| Every extension point that a package implements has a suite | storage, AI, and the database's, each run against deliberately broken implementations so the suite is evidence rather than decoration |
+| A capability can be configured without widening `Settings` | `FilesystemStorageSettings` plus `filesystem_storage(...)` is proven through the registry in `tests/storage/test_filesystem.py`, and `config.py` accepts no new root key |
+| Each import path is decided before its code | ADR 0018's table names the path for every candidate — `xyberos.storage` and `xyberos.http` are promises of this package — and `tests/test_public_surface.py` records them |
+| Every placement is booked once | a feature-matrix row, a stability row, a reference page, and a boundary case per capability — and no new extra row, because neither storage nor metrics is an extra |
+| A retired name points somewhere and moves nobody | *not yet: the pointer patches need an upload to the package index, and belong to the release that publishes them* |
+| The mechanism 2.0 already has is enough | no change to `src/xyberos/__init__.py`, to the root keys `config.py` accepts, to the plugin protocol, to the provider registry, or to the routing API; the new names live in `xyberos.storage`, `xyberos.http`, `xyberos.ai.testing`, and the `xyberos.errors` taxonomy |
 | The middleware limit is respected | metrics is a class the application passes, and nothing pretends a plugin can install middleware |
 
-**Deliverables:** two ADRs (0018 and 0019), two new extras (`[storage]` and `[mcp]`) plus one middleware class
-that ships inside `[http]` instead of as an extra, three conformance suites and their doubles, the retirement
-patches for the names that have somebody to tell, and the catalogue, feature-matrix, stability, plugin, and
-release documentation each one changes.
+**Deliverables:** two ADRs (0018 and 0019), one new module (`xyberos.storage`) plus one middleware class
+that ships inside `[http]`, two conformance suites and their doubles, the retirement patches for the names
+that have somebody to tell (**outstanding**, and an upload rather than a change here), and the catalogue,
+feature-matrix, stability, plugin, and release documentation each one changes.
 
 ### Phase 10 - the packages that stay in the ecosystem repository
 
@@ -915,11 +937,29 @@ is what decides the repository, the publisher, and each name before the first up
    one. *Here:* a catalogue row that names which direction this name carries, and a recipe for the application
    that wants to expose its own tools. **Evidence:** the package's suite against a stub server, the recipe, and
    a negative test that the package exports no client.
-3. **`xyberos-templates`.** *There:* a module-shaped package — a request-scoped `Templates` contract over
-   Jinja2, a static mount, and form reading — declaring Jinja2 itself, owning its own import root, and taking
-   its directory as an explicit settings object or a plugin section rather than from a new core key. *Here:* a
-   catalogue row, and the traditional path's lessons keep teaching the shape it packages. **Evidence:** the
-   package's tests, and the lesson cross-reference.
+3. **`xyberos-templates`.** *There:* an engine-neutral `Templates` contract — render a named template with a
+   context, a static mount, and form reading — with Jinja2 as the one **shipped** implementation, declared
+   alongside `python-multipart`, because `request.form()` raises without it; that library already sits in the
+   `dev` extra for exactly that reason. The contract is engine-neutral for the same reason `DatabaseProvider`
+   is: the seam is reusable, one implementation ships, and a team that would rather write typed components
+   satisfies the same protocol instead of forking the package. Two properties are the package's reason to
+   exist, because `starlette.templating.Jinja2Templates` provides neither:
+   - **Rendering stays off the event loop.** Starlette's `TemplateResponse` renders synchronously inside
+     `__init__`, so the whole cost lands on the loop. The package renders through
+     `anyio.to_thread.run_sync(template.render, ...)` for CPU-bound work, and uses Jinja2's
+     `enable_async=True` with `await render_async(...)` when a template itself awaits — and it documents the
+     difference, because `render_async` yields but does not reduce CPU time.
+   - **Autoescape is stated, not inherited.** `select_autoescape()` decides by file extension, so a page named
+     `page.j2` would silently be unescaped. The package sets and documents its policy, and a test renders both
+     the escaped and the explicitly-safe case.
+   It owns its own import root, and takes its directory as an explicit settings object or a plugin section
+   rather than from a new core key. *Here:* a catalogue row, and the traditional path's lessons keep teaching
+   the shape it packages, minus the wiring the package replaces. **Evidence:** the package's tests, including
+   the escaping pair, a render that does not stall a concurrent request, and the lesson cross-reference.
+   **The placement test, applied before it is published:** this package earns a *distribution* only if it owns
+   the off-loop renderer and the engine-neutral contract. If it reduces to a wrapper over `Jinja2Templates`,
+   the rule's own cost test applies — the one that put request metrics inside `[http]` — and it ships as a
+   **recipe** in the `examples/<name>/` plus integration-test pattern the tenancy example already uses.
 4. **`xyberos-observability`.** *There:* one explicit call from the composition root that configures a handler,
    a level, a format, and the runtime's own `ContextLogFilter`; workflow and step spans from an `EventSink`
    subscription rather than from patching internals; and request spans keyed by the correlation id the adapter
@@ -964,6 +1004,7 @@ is what decides the repository, the publisher, and each name before the first up
 | The names are claimed before the code is written | a pre-release placeholder holds every decided name, and no placeholder is a normal release |
 | Trusted publishing is re-registered once, not once per release | the publisher list matches the ecosystem repository, and the first upload's provenance appears in the release guide |
 | Nothing in the ecosystem reaches back into core | no `[project.dependencies]` or extra entry here names a package, and the compatibility job is the only place the pair is proved |
+| A package that would only wrap something is a recipe | `xyberos-templates` is published only if it owns the off-loop renderer and the engine-neutral contract; otherwise the catalogue row points at the recipe, and either form is a decision rather than a default |
 
 **Deliverables:** the packages, the ports, and the retirement patches in the ecosystem repository, with
 `packages.toml` as the manifest that names them; here, the catalogue rows checked against that manifest, the
@@ -1053,7 +1094,12 @@ repin instruction becomes per-name rather than blanket, since retiring a name co
 the plugin guide's catalogue stops describing extensions as hypothetical and starts naming a repository that is
 not this one. The site's snippet harness still reads this repository only, so a page about a *package* is a
 link and a contract description rather than a page that runs its code — and the page says which it is, while a
-page about an extra keeps the stronger guarantee because the extra is tested here.
+page about an extra keeps the stronger guarantee because the extra is tested here. And the templates decision
+lands in [positioning.md](positioning.md) rather than in a package README: the "you need X, reach for Y" table
+gains the row that says which renderer each case wants — Jinja2 for pages a non-Python contributor edits, a
+typed-component builder for markup that has to survive `mypy --strict`, and nothing at all for an application
+that serves JSON — so the one genuinely contested choice in the traditional path is answered by the page that
+decides fit.
 
 Three more follow from the publication decision, and each is a correction rather than an addition.
 [The release guide](release.md#releasing-beside-the-published-1x-line) still records the satellites'
@@ -1080,8 +1126,9 @@ visible to a reader who never opens an ADR.
   hand-maintained catalogue is the visibility that was actually missing.
 - **No pytest plugin and no fixture library.** [The testing guide](testing.md) refuses it, and the doubles
   stay ordinary functions.
-- **No template engine in the package.** The engine belongs to the application and to `xyberos-templates`,
-  which is what keeps the comment in `pyproject.toml` true.
+- **No template engine in the package, and no engine named in the contract.** The engine belongs to the
+  application and to `xyberos-templates`, which is what keeps the comment in `pyproject.toml` true, and the
+  contract names no engine, so a team that renders typed components is not opting out of the seam.
 - **No identity, session, or authorization model in the framework.** `xyberos-auth` verifies an assertion and
   stops; reversing [ADR 0014](adr/0014-no-identity-or-authorization-model.md) would take an owner decision and
   its own ADR.

@@ -99,6 +99,38 @@ Outermost to innermost:
 Application middleware therefore sees a bound correlation ID and can resolve request-scoped
 services, because both happen further out.
 
+### Counting requests
+
+Request metrics ship as a middleware class, not as an installed feature: Xyberos configures nothing
+behind an application's back, so the application passes it and holds the counters
+([ADR 0018](adr/0018-capability-placement-rule.md)).
+
+```python
+from starlette.middleware import Middleware
+
+from xyberos.http import HttpAdapter, RequestMetrics, RequestMetricsMiddleware
+
+metrics = RequestMetrics()
+adapter = HttpAdapter(
+    app, middleware=(Middleware(RequestMetricsMiddleware, metrics=metrics),)
+)
+
+# after serving:
+for row in metrics.snapshot():
+    print(row.route, row.status, row.count)
+```
+
+The counters are keyed by the **route template**, not the raw path: a request for `/users/1234` is
+counted under `/users/{user_id}`, because a counter keyed by the path itself grows without bound. A
+request that matched no route is counted under `<unmatched>` for the same reason, and once
+`max_routes` distinct routes have been seen the rest are folded into `<other>`. Nothing is exported
+and nothing runs in the background — read `snapshot()` on a schedule the deployment owns.
+
+Because the middleware sits *inside* error normalization, a failure is counted at the status the
+client will receive: a handler raising a 404 `HttpError` is one 404, not a 500. A request that
+produced no response at all is counted as 500, which is what reaches a client unless an outer
+middleware maps it.
+
 ## Error policy
 
 | Raised | Response |

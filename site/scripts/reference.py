@@ -58,6 +58,7 @@ _SUMMARIES = {
     "runtime": "Scopes, lifecycle, configuration, and the error taxonomy",
     "security": "The security posture, and the one deployment failure mode that matters",
     "stability": "Which surface is stable, preview, or experimental",
+    "storage": "Object storage: the contract, the shipped filesystem provider, and the key rules",
     "testing": "Test doubles and how to test an application without a service",
     "troubleshooting": "Diagnosing the errors the runtime raises",
     "tutorial": "The tutorial that this site retires into the Fundamentals path",

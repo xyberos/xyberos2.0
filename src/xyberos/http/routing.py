@@ -55,6 +55,17 @@ class CompiledRoute:
     parameters: tuple[HandlerParameter, ...]
 
 
+MATCHED_ROUTE_KEY = "xyberos.route"
+"""The scope key the compiled endpoint writes its route template to.
+
+ASGI lets anything in the stack add keys to ``scope``, and Starlette already puts ``app``,
+``router``, ``path_params``, and ``endpoint`` there. Xyberos records its own template under a
+namespaced key so that middleware can count or trace per *route* instead of per raw path — which
+matters because a counter keyed by ``/users/1234`` grows without bound. Nothing else reads this key,
+and it is not part of the routing API.
+"""
+
+
 def compile_route(route: Route) -> CompiledRoute:
     """Validate one handler signature and describe how to call it."""
     where = f"{route.method} {route.path}"
@@ -118,6 +129,7 @@ def build_endpoint(
     """Return an endpoint that resolves injected arguments and converts the return value."""
 
     async def endpoint(request: Request) -> Response:
+        request.scope[MATCHED_ROUTE_KEY] = compiled.route.path
         arguments: dict[str, object] = {}
         for parameter in compiled.parameters:
             if parameter.kind == INJECT:

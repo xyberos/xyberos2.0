@@ -35,6 +35,9 @@ teaches you to build. Each lesson on this site carries one of these labels, and
 | Database provider contract and conformance suite | `xyberos.database`, `xyberos.database.testing` | Extension point | `[database]` |
 | Durable executor | `xyberos.durable` | **Experimental** | `[durable]` |
 | HTML templates, static files, CSRF, sessions | Starlette and Jinja2 | You add it | application code |
+| Object storage: filesystem provider and in-memory double | `xyberos.storage` | Built-in | core |
+| Storage provider contract and conformance suite | `xyberos.storage`, `xyberos.storage.testing` | Extension point | core |
+| Request metrics counters | `xyberos.http` (`RequestMetricsMiddleware`) | Built-in (extra) | `[http]` |
 | PostgreSQL, MySQL, MariaDB providers | — | Extension point, nothing shipped | — |
 | Redis | — | You add it | — |
 | Identity, sessions, roles, tenancy model | — | Not provided, and it will not be | — |

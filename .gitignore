@@ -88,10 +88,11 @@ checkpoints/
 *.gguf
 *.safetensors
 
-# Local runtime data
-instance/
-storage/
-uploads/
+# Local runtime data. Root-anchored on purpose: a bare `storage/` would also match the framework's
+# own `src/xyberos/storage/` package and swallow it.
+/instance/
+/storage/
+/uploads/
 
 # Documentation builds
 # `site/` is the documentation site's tracked source, not its build output: MkDocs writes to
