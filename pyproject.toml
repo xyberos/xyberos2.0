@@ -70,7 +70,7 @@ dev = [
 ]
 http = [
   "httpx>=0.27,<1",
-  "starlette>=0.40,<1",
+  "starlette>=0.40,<2",
 ]
 database = [
   "aiosqlite>=0.20,<1",

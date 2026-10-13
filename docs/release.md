@@ -55,7 +55,7 @@ at all rather than published with a caveat.
    .smoke\Scripts\xyberos check
    .smoke\Scripts\xyberos new smoke --directory .
    .smoke\Scripts\xyberos check --app smoke.app:create_app --app-dir smoke\src
-   .smoke\Scripts\python -m pip install "starlette>=0.40,<1" "httpx>=0.27,<1"
+   .smoke\Scripts\python -m pip install "starlette>=0.40,<2" "httpx>=0.27,<1"
    .smoke\Scripts\xyberos check --app smoke.app:create_app --app-dir smoke\src
    ```
 
