@@ -189,6 +189,7 @@ nav:
       - reference/durable.md
       - reference/getting-started.md
       - reference/http.md
+      - reference/mcp.md
       - reference/performance.md
       - reference/PLAN.md
       - reference/plugins.md
@@ -222,6 +223,7 @@ nav:
       - reference/adr/0017-release-identity-and-lineage.md
       - reference/adr/0018-capability-placement-rule.md
       - reference/adr/0019-storage-contract.md
+      - reference/adr/0020-introspection-documents.md
   - Project:
       - Feature support: feature-support.md
       - Terminology: terminology.md

@@ -1,0 +1,50 @@
+{
+  "$id": "https://docs.xyberos.com/schema/xyberos-config-1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Configuration for a Xyberos application. Generated from the Settings dataclasses by `xyberos check --schema`; do not edit it by hand.",
+  "properties": {
+    "ai": {
+      "additionalProperties": {
+        "type": "object"
+      },
+      "description": "One table per AI provider. Core validates the shape and leaves every AI concept to the adapter that reads it, so this schema describes no keys.",
+      "type": "object"
+    },
+    "app": {
+      "additionalProperties": false,
+      "description": "Settings owned by the runtime.",
+      "properties": {
+        "debug": {
+          "type": "boolean"
+        },
+        "environment": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "shutdown_timeout": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "plugins": {
+      "additionalProperties": {
+        "type": "object"
+      },
+      "description": "One table per plugin, keyed by the plugin's name. Each plugin validates its own section against the config_type it declares, and rejects unknown keys.",
+      "type": "object"
+    },
+    "schema_version": {
+      "description": "The configuration format version. Required from the first public format.",
+      "type": "integer"
+    }
+  },
+  "title": "xyberos.toml",
+  "type": "object"
+}

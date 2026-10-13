@@ -285,12 +285,14 @@ place they get decided. They are decided here.
   written. A README-only placeholder published as a **pre-release** (`2.0.0a0`, `requires-python`, an empty
   package, the `Development Status` classifier) reserves it at essentially no cost. The placeholder must be a
   pre-release: a normal release would be selected by `pip` and would describe something that does not exist.
-- **One manifest, and the documentation is checked against it.** A `packages.toml` in the ecosystem repository
-  is the single source for each distribution's name, import root, core range, dependency set, publisher
-  environment, and status (`placeholder`, `planned`, `published`, `retired`). The plugin guide's catalogue, the
-  Extend pages, and the release guide's per-name rows are checked against it by a test, the way `mkdocs.yml`'s
-  navigation and `site/scripts/reference.py` are checked against the pages today. A hand-maintained list is what
-  Phase 8 shipped for a repository with no packages in it; a checked one is what a published ecosystem needs.
+- **One manifest, and the documentation is checked against it.** [`packages.toml`](../packages.toml) at this
+  repository's root is the single source for each distribution's name, import root, core range, dependency
+  set, conformance target, and status (`placeholder`, `planned`, `published`, `retired`). It lives here
+  because the documents checked against it are here: the plugin guide's catalogue, the feature matrix, and
+  the release guide, all verified by `tests/test_packages_manifest.py`, the way `mkdocs.yml`'s navigation
+  and `site/scripts/reference.py` are checked against the pages. The compatibility job reads the same file
+  for its matrix, so nothing in the ecosystem has to repeat the list. A hand-maintained list is what Phase 8
+  shipped for a repository with no packages in it; a checked one is what a published ecosystem needs.
 - **Compatibility is proved against installable artefacts, and on both sides of the boundary.** The job installs
   the *published* core and the *published* package from the index into one environment, and then runs the
   package's **conformance suite** rather than a smoke test, because the suites are the contract and a smoke test
@@ -303,8 +305,9 @@ place they get decided. They are decided here.
 ## Phase status
 
 The detailed work packages live in the phase-by-phase plan below; this table is the at-a-glance
-state. Phases 0–8 are complete; Phases 9-11 are planned and not started. The release decision is the
-project owner's, and no artefact is published before it is made.
+state. Phases 0–8 are complete; Phase 9 and Phase 11 are complete here, and Phase 10 is complete here
+with its ecosystem half still belonging to another repository. The release decision is the project
+owner's, and no artefact is published before it is made.
 
 | Phase | Scope | Status | Exit-gate evidence |
 | --- | --- | --- | --- |
@@ -317,9 +320,9 @@ project owner's, and no artefact is published before it is made.
 | 6 | Experimental single-host durable executor | complete | `src/xyberos/durable/` (10 modules), `tests/durable/` (100 tests), `tests/crash_recovery/` (17 process-kill tests), `tests/integration/test_durable_example.py`, `examples/durable_workflow/`, `docs/durable.md`, [ADR 0011](adr/0011-durable-executor-contract.md) |
 | 7 | Developer experience, hardening, and release | complete (release decision pending owner sign-off) | all seven work packages: `docs/stability.md` + [ADR 0013](adr/0013-stable-surface-and-versioning.md) + `tests/test_public_surface.py` + `tests/test_compatibility.py` + `tests/test_deprecation.py` + `src/xyberos/deprecation.py`; `docs/getting-started.md`, `docs/testing.md`, `docs/troubleshooting.md`, `docs/security.md`, `examples/hello_app/`; `src/xyberos/cli/` + `docs/cli.md` + `tests/cli/`; `CHANGELOG.md`, `SECURITY.md`, `docs/release.md`, `tests/test_release_artefacts.py`; `tests/perf/` + `docs/performance.md`; the threat review with two credential-echo defects fixed |
 | 8 | Boundary legibility and extension points | complete | [ADR 0014](adr/0014-no-identity-or-authorization-model.md), [0015](adr/0015-durability-is-single-host.md), [0016](adr/0016-database-providers-are-an-extension-point.md); `docs/positioning.md`, `docs/database-providers.md`; `assert_provider_contract` in `xyberos.database.testing` + `tests/database/test_provider_contract.py`; `examples/tenancy/`, `examples/broker_worker/` and their integration tests; the write-throughput baseline |
-| 9 | Extras here, and the placement rule | planned (not started) | the exit gate below; no extra, suite, or retirement patch it names exists yet |
-| 10 | The packages that stay in the ecosystem repository | planned (not started) | the exit gate below; no port, catalogue row, or retirement notice exists yet |
-| 11 | Developer tooling and the contributor loop | planned (not started) | the exit gate below; no command, schema, or CI step exists yet |
+| 9 | Extras here, and the placement rule | complete here (retirement patches belong to the publishing release) | [ADR 0018](adr/0018-capability-placement-rule.md), [ADR 0019](adr/0019-storage-contract.md); `src/xyberos/storage/` + `tests/storage/` (44 cases), `src/xyberos/http/metrics.py` + `tests/http/test_metrics.py`, `src/xyberos/mcp/` + `tests/mcp/` (23 cases), `assert_model_provider_contract` + `assert_embedding_provider_contract` in `src/xyberos/ai/testing.py`, the opt-in live Ollama leg, `docs/storage.md`, `docs/mcp.md` |
+| 10 | The packages that stay in the ecosystem repository | complete here; the packages themselves are work in that repository | [`packages.toml`](../packages.toml) + `tools/ecosystem.py` + `tests/test_packages_manifest.py` (13 cases); [`.github/workflows/compatibility.yml`](../.github/workflows/compatibility.yml) installing the published core per leg; the plugin catalogue, feature matrix, and per-name release-guide wording checked against the manifest |
+| 11 | Developer tooling and the contributor loop | complete here | [ADR 0020](adr/0020-introspection-documents.md); `src/xyberos/cli/{check,schema,durable}.py` + `src/xyberos/config.schema.json` + `tests/cli/test_introspection.py` + `tests/cli/test_durable_status.py` + `tests/test_config_schema.py`; the published schema copy (`site/scripts/build.py`); `.devcontainer/devcontainer.json`, `.pre-commit-config.yaml`, `tests/test_contributor_loop.py`; `tests/integration/test_first_five_minutes.py` |
 
 ### Phase 7 entry checklist
 
@@ -730,14 +733,15 @@ section), one reusable conformance suite, and two tested examples — all of it 
 
 ### Phase 9 - extras here, and the placement rule
 
-**Status:** *partly implemented.* Landed in this repository: **ADR 0018** (the placement rule),
+**Status:** *implemented here, apart from the retirement patches.* Landed in this repository: **ADR 0018** (the placement rule),
 **ADR 0019** (the storage contract), `xyberos.storage` with the shipped filesystem provider, the
 in-memory double and `assert_storage_contract` (`tests/storage/`, 44 cases), request metrics as
-`xyberos.http.RequestMetricsMiddleware` (`tests/http/test_metrics.py`), and
+`xyberos.http.RequestMetricsMiddleware` (`tests/http/test_metrics.py`), `xyberos.mcp` with its
+streamable-HTTP client, tool projection and stub-server suite (`tests/mcp/`, 23 cases), and
 `assert_model_provider_contract` with the embedding half in `xyberos.ai.testing`, run against the
-shipped Ollama adapter in the opt-in live suite. Remaining: **`xyberos[mcp]`** — the client work
-package below is untouched — and the **retirement patches**, which need an upload to the package index
-rather than a change here, so they belong to the release that publishes them. 2.0 already has every
+shipped Ollama adapter in the opt-in live suite. Remaining: the **retirement patches**, which need an
+upload to the package index rather than a change here, so they belong to the release that publishes
+them. 2.0 already has every
 mechanism a package needs — `register(app)` for
 providers and routes, `Plugin` for a distribution the runtime validates, orders, and attributes, and the
 provider registry for scopes, dependencies, and test overrides — so this phase adds no mechanism. The
@@ -768,7 +772,7 @@ extension-point contract.
 
 | Candidate | Placement | Why |
 | --- | --- | --- |
-| MCP tools (consume a server's tools) | **extra here**: `[mcp]`, a **streamable-HTTP client only**; the stdio transport belongs *there*, with the package | the 1.x client's own description says it speaks JSON-RPC over stdio and streamable HTTP using only the standard library — so no dependency, and the port must re-prove that rather than assume it. If it cannot, the rule sends it *there* as a package. HTTP-only here, because a stdio transport spawns a process: that collides with the standing policy that the framework starts nothing, and `asyncio` subprocess behaviour is platform-specific while CI has no non-Linux leg |
+| MCP tools (consume a server's tools) | **module here**: `xyberos.mcp`, a streamable-HTTP client; the stdio transport belongs *there*, with the package | the 1.x client's own description says it speaks JSON-RPC over stdio and streamable HTTP using only the standard library — so no dependency, and the port re-proved that rather than assuming it: `xyberos.mcp` imports nothing outside the standard library, which makes it a module rather than an extra that would install nothing. HTTP-only here, because a stdio transport spawns a process: that collides with the standing policy that the framework starts nothing, and `asyncio` subprocess behaviour is platform-specific while CI has no non-Linux leg |
 | Request metrics | **here, inside `[http]`**: a middleware class, no new extra | no dependency, and the smallest thing on this list; the application passes it to `HttpAdapter`, which is the only shape 2.0 offers for middleware. A separate extra is earned only if the capability grows a sink, an exporter, or a dependency: an extra costs a release row, a CI row, a tier entry, a feature-matrix row, and a catalogue row, and one class does not repay them |
 | Storage (files and blobs) | **module here**: `xyberos.storage` with local files, a double, and the provider suite | no third-party dependency at all, and an extra that installs nothing is theatre: `pip install "xyberos[storage]"` would pull in no dependency and gate no import. `xyberos.ai` is the precedent — a dependency-free capability is a built-in module, not an empty extra (ADR 0018) |
 | Storage (S3-compatible), PostgreSQL, MySQL | package there | each needs a client library core will not adopt; [ADR 0016](adr/0016-database-providers-are-an-extension-point.md) already places database engines there |
@@ -825,19 +829,29 @@ first line — is the honest form of the same move, and it is the move
    `delete` that reports removing what was never there and a `list_keys` that ignores its prefix — plus
    the traversal, symlink, device-name, and ceiling refusals, and the settings-object path proven through
    the registry.
-3. **`[mcp]`, the client.** One `Tool` per server tool, projected into the shipped `xyberos.ai.tools`
-   `Tool`/`ToolSet` and the existing allowlist rather than a parallel tool model, namespaced `{server}_{tool}` as
-   the 1.x package already does, with arguments *validated* against the declared schema through the closed
-   subset rather than coerced, a schema outside the subset refused at registration with the server and keyword
-   named, servers named in configuration with their tools opted into by name, a server's descriptions and results
-   treated as data, and a reachable-server failure reported rather than inferred. The transport is **streamable
-   HTTP**: a stdio transport spawns a process, which collides with the standing policy that the framework starts
-   nothing and whose behaviour is platform-specific in a suite that has only ever run on Linux. The stdio
-   transport and the `expose()` direction live in `xyberos-mcp`, *there*, so the two names carry two directions
-   rather than two versions of one. The stdlib-only claim is re-proved here; if the port turns out to need the
-   `mcp` SDK, the client moves *there* too and the extra is dropped rather than the dependency policy bent.
-   **Evidence:** the package's suite against a stub MCP server, and the allowlist behaviour asserted with the
-   same tests the facade's own tools use.
+3. **`xyberos.mcp`, the client. — implemented.** One `Tool` per server tool, projected into the shipped
+   `xyberos.ai.tools` `Tool`/`ToolSet` and the existing allowlist rather than a parallel tool model,
+   namespaced `{server}_{tool}`, with arguments *validated* against the declared schema through the closed
+   subset rather than coerced, a schema outside the subset refused at registration with the server, the tool,
+   and the keyword named, servers named in settings with their tools opted into by name, a server's
+   descriptions and results treated as data, and a reachable-server failure reported rather than inferred.
+   The transport is **streamable HTTP**: a stdio transport spawns a process, which collides with the standing
+   policy that the framework starts nothing and whose behaviour is platform-specific in a suite that has only
+   ever run on Linux. The client subset is `initialize`, `tools/list` with bounded pagination, and
+   `tools/call`; prompts, resources, sampling, and server-initiated notifications are refused rather than
+   half-implemented, and the handshake reports no capabilities rather than claiming ones that do not exist.
+   The stdlib-only claim is **re-proved**: the client uses `urllib.request` in a worker thread through
+   `asyncio.to_thread`, because the standard library has no asynchronous HTTP client — a documented cost of
+   one thread per request rather than a hand-rolled HTTP/1.1. It needs nothing from PyPI, so it is a
+   **module** (`xyberos.mcp`) and not an empty extra, for the same reason `xyberos.storage` is. Its failures
+   are its own family in the taxonomy (`McpError`, `McpConfigurationError`, `McpProtocolError`, and
+   `McpTransportError`, which is also a `TransientError`), because an unreachable server, a JSON-RPC error,
+   and a wrong tool name are three different things a caller has to be able to tell apart. **Evidence:**
+   `tests/mcp/` — 23 cases against a stub MCP server on a real socket, covering the handshake, a negotiated
+   protocol mismatch, pagination, session-ID echo, an event-stream response, a non-JSON body, the schema
+   refusal, the opt-out that keeps a server usable, argument validation happening *before* the call leaves
+   the process, the server's own `isError` becoming a failed result, the allowlist denial, and the facade
+   running a projected tool end to end through `chat_with_tools`.
 4. **Request metrics, inside `[http]`. — implemented.** Counters per route and status as a middleware
    class the application passes to `HttpAdapter`, with a readout a test can assert and no sink, exporter,
    or background task. The counters are keyed by the adapter's matched-route template rather than by the raw
@@ -885,24 +899,35 @@ first line — is the honest form of the same move, and it is the move
 | Criterion | Evidence |
 | --- | --- |
 | The rule is written once and applied per candidate | ADR 0018, and a catalogue row for every candidate in the table above |
-| Every extension point that ships here has a working implementation | `xyberos.storage` has a filesystem provider, request metrics has a class, and the AI suite runs against the shipped Ollama adapter |
-| Every extension point that a package implements has a suite | storage, AI, and the database's, each run against deliberately broken implementations so the suite is evidence rather than decoration |
-| A capability can be configured without widening `Settings` | `FilesystemStorageSettings` plus `filesystem_storage(...)` is proven through the registry in `tests/storage/test_filesystem.py`, and `config.py` accepts no new root key |
-| Each import path is decided before its code | ADR 0018's table names the path for every candidate — `xyberos.storage` and `xyberos.http` are promises of this package — and `tests/test_public_surface.py` records them |
-| Every placement is booked once | a feature-matrix row, a stability row, a reference page, and a boundary case per capability — and no new extra row, because neither storage nor metrics is an extra |
+| Every extension point that ships here has a working implementation | `xyberos.storage` has a filesystem provider, `xyberos.mcp` has a client that passes its stub-server suite, request metrics has a class, and the AI suite runs against the shipped Ollama adapter |
+| Every extension point that a package implements has a suite | storage, MCP, AI, and the database's, each run against deliberately broken or failing implementations so the suite is evidence rather than decoration |
+| A capability can be configured without widening `Settings` | `FilesystemStorageSettings` plus `filesystem_storage(...)` is proven through the registry in `tests/storage/test_filesystem.py`, `McpServerSettings` carries a server and its opt-in, and `config.py` accepts no new root key |
+| Each import path is decided before its code | ADR 0018's table names the path for every candidate — `xyberos.storage`, `xyberos.mcp`, and `xyberos.http` are promises of this package — and `tests/test_public_surface.py` records them |
+| Every placement is booked once | a feature-matrix row, a stability row, a reference page, and a boundary case per capability — and no new extra row, because neither storage nor MCP nor metrics is an extra |
 | A retired name points somewhere and moves nobody | *not yet: the pointer patches need an upload to the package index, and belong to the release that publishes them* |
 | The mechanism 2.0 already has is enough | no change to `src/xyberos/__init__.py`, to the root keys `config.py` accepts, to the plugin protocol, to the provider registry, or to the routing API; the new names live in `xyberos.storage`, `xyberos.http`, `xyberos.ai.testing`, and the `xyberos.errors` taxonomy |
 | The middleware limit is respected | metrics is a class the application passes, and nothing pretends a plugin can install middleware |
 
-**Deliverables:** two ADRs (0018 and 0019), one new module (`xyberos.storage`) plus one middleware class
-that ships inside `[http]`, two conformance suites and their doubles, the retirement patches for the names
-that have somebody to tell (**outstanding**, and an upload rather than a change here), and the catalogue,
-feature-matrix, stability, plugin, and release documentation each one changes.
+**Deliverables:** two ADRs (0018 and 0019), two new modules (`xyberos.storage` and `xyberos.mcp`) plus one
+middleware class that ships inside `[http]`, three conformance suites and their doubles, and the catalogue,
+feature-matrix, stability, plugin, and release documentation each one changes. The retirement patches for
+the names that have somebody to tell remain **outstanding**, and they are an upload rather than a change
+here.
 
 ### Phase 10 - the packages that stay in the ecosystem repository
 
-**Status:** planned; not started. The placement rule leaves this phase with the candidates that need a
-dependency core will not adopt, carry policy, or have their own cadence. Almost all of it is work in
+**Status:** *implemented here; the ecosystem half is not.* The **ecosystem half** — the packages, the ports, the retirement
+patches — remains work in another repository, and nothing here can publish it. Landed in this repository:
+[`packages.toml`](../packages.toml) as the manifest of every name beside this line, with
+`tests/test_packages_manifest.py` (13 cases) checking the plugin guide's catalogue, the feature matrix, and
+the release guide against it and enforcing ADR 0018's import-root rule; [`tools/ecosystem.py`](../tools/ecosystem.py)
+as the tested selector the job reads; the [compatibility workflow](../.github/workflows/compatibility.yml),
+which installs the **published** core from the index, scaffolds against it, and grows one conformance leg per
+published package; and the per-name wording in [the release guide](release.md#releasing-beside-the-published-1x-line).
+Two honest limits are recorded rather than hidden: a GitHub Actions matrix cannot be empty, so the package
+legs are *gated* and the manifest job announces the empty list in an annotation instead of passing in
+silence; and the manifest lives here rather than in the ecosystem repository, because the documents checked
+against it are here. Almost all of the rest is work in
 the ecosystem repository, so each work package names both halves: what happens *there*, and what has to change
 *here* — usually a catalogue row and a link, never a copied file. Where this phase says `xyberos/xyberos`, read
 it as that repository, whose name and URL
@@ -920,7 +945,8 @@ is what decides the repository, the publisher, and each name before the first up
 
 1. **The publication mechanics, decided once for every name.** *There:* one directory per distribution with its
    own `pyproject.toml`, version, and changelog; the `packages.toml` manifest described under
-   ["Where the ecosystem lives"](#where-the-ecosystem-lives-and-under-which-names); one CI matrix that builds,
+   ["Where the ecosystem lives"](#where-the-ecosystem-lives-and-under-which-names), consumed from this
+   repository rather than re-listed; one CI matrix that builds,
    tests, and lints every distribution and installs the **published** core rather than a checkout; a trusted
    publisher registered per distribution against whichever repository became the ecosystem home, once, before
    the first upload; a `<distribution>-v<version>` tag scheme; the `project_urls` the satellites have never
@@ -928,7 +954,9 @@ is what decides the repository, the publisher, and each name before the first up
    retired names released from the same repository so that one place owns every `xyberos-*` name. *Here:* the
    catalogue rows, checked against the manifest rather than maintained beside it, and the release guide's
    per-name wording. **Evidence:** the first release, the manifest agreeing with the catalogue and the index,
-   and the compatibility job passing against published artefacts.
+   and the compatibility job passing against published artefacts. **Landed here:** the manifest, the checked
+   catalogue, the feature-matrix placement, the per-name release-guide wording, and the compatibility job's
+   core leg.
 2. **`xyberos-mcp`, the server direction, and the stdio transport if the owner approves it.** *There:* the
    `expose()` direction and a stdio transport — the two things `xyberos[mcp]` refuses — and nothing that
    duplicates the client, because two names answering one question is what the placement rule exists to prevent.
@@ -984,13 +1012,20 @@ is what decides the repository, the publisher, and each name before the first up
    settings object plus a factory. *Here:* catalogue rows, and the provider guide's section on running a suite
    from another repository. **Evidence:** each package's CI, the PostgreSQL job against a service container, and
    the compatibility job below.
-7. **Catch drift with a job, not a hope.** A scheduled CI job here — and a required one before a core release is
-   tagged, and before a package release is tagged *there*, which an earlier draft left out — installs the
-   published core and the published packages from the index into one environment built from a single constraints
-   file, and then runs each package's **conformance suite** rather than a smoke test. Version drift is the
+7. **Catch drift with a job, not a hope. — landed here.** A scheduled CI job — and a required one before a
+   core release is tagged, and before a package release is tagged *there*, which an earlier draft left out —
+   installs the published core and the published packages from the index into one environment and then runs
+   each package's **conformance suite** rather than a smoke test. Version drift is the
    failure mode this arrangement invites, and this is the only place it can be caught, because neither
-   repository owns the other's code. **Evidence:** the job, and its result recorded in
-   [the release guide](release.md).
+   repository owns the other's code. Two design decisions are worth recording because the first is a real
+   constraint rather than a preference: a GitHub Actions matrix **cannot be empty**, so the package legs are
+   gated on the manifest's published list and the empty case is announced in an annotation rather than
+   passing in silence; and the job installs from the **index**, not from a checkout or a local wheel, because
+   the `installed-artefact` job in `ci.yml` already covers the artefact this repository just built, and the
+   one failure it cannot catch is a bad upload. The core leg therefore earns its keep today, before any
+   package exists. **Evidence:** `.github/workflows/compatibility.yml` and
+   `tests/test_packages_manifest.py`, which parses the workflow and asserts the gate, the manifest-derived
+   matrix, the conformance call, and that nothing in the core leg installs a local build.
 
 **Exit gate**
 
@@ -1004,6 +1039,8 @@ is what decides the repository, the publisher, and each name before the first up
 | The names are claimed before the code is written | a pre-release placeholder holds every decided name, and no placeholder is a normal release |
 | Trusted publishing is re-registered once, not once per release | the publisher list matches the ecosystem repository, and the first upload's provenance appears in the release guide |
 | Nothing in the ecosystem reaches back into core | no `[project.dependencies]` or extra entry here names a package, and the compatibility job is the only place the pair is proved |
+| A package release cannot be tagged on a red compatibility job | the job's matrix comes from the manifest, so a package marked `published` without a conformance target is refused before it is installed |
+| The 1.x line's names are tracked in one place | `packages.toml` plus `tests/test_packages_manifest.py`, which keeps the catalogue, the feature matrix, and the release guide in step with it |
 | A package that would only wrap something is a recipe | `xyberos-templates` is published only if it owns the off-loop renderer and the engine-neutral contract; otherwise the catalogue row points at the recipe, and either form is a decision rather than a default |
 
 **Deliverables:** the packages, the ports, and the retirement patches in the ecosystem repository, with
@@ -1015,7 +1052,21 @@ names, the ecosystem repository, the five conditions, and supersedes that clause
 
 ### Phase 11 - developer tooling and the contributor loop
 
-**Status:** planned; not started.
+**Status:** *implemented here.* Landed in this repository: **ADR 0020** (the introspection documents as
+a versioned contract), `check --json` / `--why CONTRACT` / `--schema` with `DOCUMENT_VERSION = 1` and
+the shipped `config.schema.json` (`tests/cli/test_introspection.py`, `tests/test_config_schema.py`,
+`tests/test_compatibility.py`), the published copy at the `$id` the schema names
+(`site/scripts/build.py`, checked by `tests/site/test_pages.py`); `xyberos durable status` with its
+`--json` form, reading the journal through SQLite's `mode=ro` and never migrating it
+(`tests/cli/test_durable_status.py`, `tests/durable/test_journal.py`); the contributor loop as three
+files — [`.devcontainer/devcontainer.json`](../.devcontainer/devcontainer.json),
+[`.pre-commit-config.yaml`](../.pre-commit-config.yaml), and the ordered loop in
+[CONTRIBUTING.md](../CONTRIBUTING.md) — kept in agreement by `tests/test_contributor_loop.py`; and
+`tests/integration/test_first_five_minutes.py`, which scaffolds a project, runs the two commands the
+scaffold prints that need no install, and compares the block with the getting started guide. The one
+thing not done as written is running the scaffold's own `pip install -e`, which installs into the
+interpreter running the suite; the test asserts that command and runs the two after it, which establish
+the property it would have.
 
 **Objective:** make the framework legible to the tools a developer already has — an editor, a script, a CI
 job — and make this repository's own loop reproducible by somebody who is not its author.
@@ -1050,41 +1101,58 @@ conformance suite lands with its contract and before any implementation claims t
    that to the guide. Two behaviours belong to the contract rather than to the implementation: without the extra
    it fails with the `xyberos[durable]` command to install, exactly as the `installed-artefact` job asserts for
    `check`; and a journal written by a newer build is reported as the refusal the journal itself raises, not as a
-   traceback. **Evidence:** `tests/cli/test_durable_status.py`, the operator section in
-   [the durable guide](durable.md), and the subcommand list in [the CLI guide](cli.md).
+   traceback. **What "read-only" cost.** Opening read-only needed three small additions rather than a promise:
+   `SqliteSettings.read_only` (which opens the file through SQLite's `mode=ro` URI and installs no header
+   pragma), `JournalSettings.read_only` (which checks the recorded schema version and refuses a newer one
+   instead of migrating), and `JournalStore.oldest_non_terminal()`, because the longest wait is a query the
+   existing readers could not answer — `list_executions` is newest-first. SQLite still creates an empty `-wal`
+   and a `-shm` index beside a WAL database it opens, so "writes nothing" is stated as what it is: the
+   journal's bytes are unchanged, and a test compares them. **Evidence:** `tests/cli/test_durable_status.py`
+   (which includes the byte comparison, the refusal, the missing file, and a blocked-`sqlalchemy` subprocess),
+   `tests/durable/test_journal.py`, the operator section in [the durable guide](durable.md), and the subcommand
+   list in [the CLI guide](cli.md).
 3. **The contributor loop, reproducible.** `.devcontainer/devcontainer.json` installs the extras CI installs,
    `.pre-commit-config.yaml` runs the two `ruff` commands **pinned to the same version range the `dev` extra
    declares**, so the hook and CI cannot disagree about a rule, `pre-commit` joins the `dev` extra, and
    CONTRIBUTING gains the ordered loop CI runs, with a test that the commands CONTRIBUTING lists and the
    commands the workflow runs are the same list. `.vscode/` is in `.gitignore`, so editor settings arrive by
-   that negation or not at all.
+   that negation or not at all — here through the container's own `customizations`, which is why the committed
+   file is the devcontainer rather than a `.vscode/`. **Evidence:** `tests/test_contributor_loop.py`, which
+   compares the two lists in order, asserts the loop's ordering (the site build precedes the tests), and keeps
+   the hook's revision inside the declared range.
 4. **A DX claim that is a test.** `tests/integration/test_first_five_minutes.py`: scaffold with `xyberos new`
    in a temporary directory, take the `next:` block the command prints — today a `cd`, an editable install,
    `pytest`, and `xyberos check`, so the harness performs the `cd` itself and runs the three that follow — and
    assert that each one succeeds and that the block names the same commands the getting-started page shows, so
    the scaffold and the guide cannot drift apart. That is how "five minutes to a running application" becomes a
-   suite entry instead of a sentence.
+   suite entry instead of a sentence. **One deliberate substitution:** the editable install writes into the
+   interpreter running the suite, so the test asserts that command and runs the two after it, which establish
+   the property the install would have; the getting-started block gained the `xyberos check` line the scaffold
+   prints, so the two blocks are compared as equals rather than as one being a subset.
 
 **Exit gate**
 
 | Criterion | Evidence |
 | --- | --- |
-| What an editor validates is what the runtime reads | the schema ships in the wheel, is served from a stable URL, covers each declared plugin's section, `check --schema` emits it, and drift fails a test rather than a user |
-| The introspection documents are contracts | ADR 0020 plus pinned keys in `tests/test_compatibility.py` |
-| The command and the runtime cannot disagree | `check --json` uses `suggest_extra` and `PluginInfo`, so a missing extra and a plugin's state have one answer, not two |
-| The experimental surface can be inspected without hand-written SQL | `durable status` reads only, opens the journal read-only, and never writes or prunes |
-| A stranger can reproduce the loop | the devcontainer installs what CI installs, pre-commit runs what CI runs at the same `ruff` range, and CONTRIBUTING gives the order |
-| Five minutes is measured | `tests/integration/test_first_five_minutes.py` runs the scaffold's own printed commands and compares them with the getting-started page |
+| What an editor validates is what the runtime reads | the schema ships in the wheel (`src/xyberos/config.schema.json`), `check --schema` regenerates it, `--app` types each declared plugin's section, `site/scripts/build.py` publishes it at the `$id` it names, and `tests/test_config_schema.py` + `tests/site/test_pages.py` fail on drift rather than a user |
+| The introspection documents are contracts | ADR 0020 plus `tests/test_compatibility.py` (version and top-level keys, and the two information records) and `tests/cli/test_introspection.py` (nested shape, and that text and JSON describe one application) |
+| The command and the runtime cannot disagree | `check --json` uses `suggest_extra` and `PluginInfo`, so a missing extra and a plugin's state have one answer, not two; `durable status` formats `JournalStore`'s own readers rather than re-querying |
+| The experimental surface can be inspected without hand-written SQL | `durable status` opens the journal with `mode=ro`, never migrates it, refuses a newer journal, never creates a missing one, and a test compares the file's bytes before and after |
+| A stranger can reproduce the loop | the devcontainer installs what CI installs, pre-commit runs what CI runs at the same `ruff` range, CONTRIBUTING gives the order, and `tests/test_contributor_loop.py` compares all three with the workflow |
+| Five minutes is measured | `tests/integration/test_first_five_minutes.py` runs the scaffold's own printed commands and compares the block with the getting-started page |
 
 **Deliverables:** one ADR (0020), three new `check` outputs (`--json`, `--why`, `--schema`) and one read-only
-command with its `--json` form (`durable status`), the configuration and plugin-section schema, two repository
-files for the contributor loop, and the CLI and README documentation they change.
+command with its `--json` form (`durable status`), the configuration and plugin-section schema including the
+copy the site publishes, three files for the contributor loop (the devcontainer, the hook configuration, and
+the ordered loop in CONTRIBUTING), the first-five-minutes suite entry, and the CLI and README documentation
+they change.
 
 **Consequences these three phases own.** The ripples are part of the work rather than something a failing
 build discovers: [the CLI guide](cli.md) and the README's command block gain the new flags and the `durable`
 command, while `PLAN.md` section 9's "four subcommands" note gains a pointer rather than being rewritten,
-because it records Phase 7; the `installed-artefact` CI job's `routes: 2 (handler signatures valid)` assertion
-moves with the route report it greps for; a new guide under `docs/` means three registrations, not one —
+because it records Phase 7; the `installed-artefact` CI job gains a core-only leg asserting that
+`xyberos durable status` names the `durable` extra, and keeps its `routes: 2 (handler signatures valid)`
+assertion, which the route report it greps for did not change; a new guide under `docs/` means three registrations, not one —
 `mkdocs.yml`'s Reference list, `site/scripts/reference.py`'s `_SUMMARIES`, and the file — with `tests/site`
 failing when one is missed; and the wheel gains one data file and no import, which
 `tests/test_release_artefacts.py` states rather than trusts. Three more follow from the placement rule. An

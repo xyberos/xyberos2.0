@@ -1,0 +1,22 @@
+{
+  // The same environment CI builds, so "it works on my machine" and "it passes the build" are the
+  // same claim. The image tracks a Python version the quality job tests, and the two install lines
+  // are the workflow's own: the extras plus the fixture plugin, installed without dependencies so
+  // the local copy is what tests import.
+  "name": "xyberos",
+  "image": "mcr.microsoft.com/devcontainers/python:3.12",
+  "postCreateCommand": "python -m pip install -e \".[dev,http,database]\" && python -m pip install --no-deps -e tests/fixtures/metrics_plugin && pre-commit install",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "charliermarsh.ruff",
+        "ms-python.python",
+        "ms-python.mypy-type-checker"
+      ],
+      "settings": {
+        "python.testing.pytestEnabled": true,
+        "python.testing.pytestArgs": ["tests"]
+      }
+    }
+  }
+}

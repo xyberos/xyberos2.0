@@ -37,6 +37,7 @@ except ModuleNotFoundError as error:
 from xyberos.durable.contracts import SystemWallClock, WallClock
 from xyberos.durable.journal import Journal, from_iso, to_iso
 from xyberos.durable.models import (
+    TERMINAL_EXECUTION_STATES,
     ActivityPolicy,
     Claim,
     EventKind,
@@ -1636,6 +1637,30 @@ class JournalStore:
 
         identifiers = await self._read(operation)
         return tuple([await self.inspect(identifier) for identifier in identifiers])
+
+    async def oldest_non_terminal(self) -> ExecutionView | None:
+        """Return the longest-waiting unfinished execution, or ``None`` when the queue is empty.
+
+        "Oldest" is by submission, not by last update: an execution that has been retrying for
+        hours is the one an operator needs to see, and its ``updated_at`` is recent. Terminal
+        executions are excluded, so an idle journal reports nothing rather than its last success.
+        """
+        terminal = ", ".join(f"'{state.value}'" for state in sorted(TERMINAL_EXECUTION_STATES))
+
+        async def operation(connection: AsyncConnection) -> str | None:
+            row = (
+                await connection.execute(
+                    text(
+                        "SELECT execution_id FROM executions"
+                        f" WHERE status NOT IN ({terminal})"
+                        " ORDER BY submitted_at, execution_id LIMIT 1"
+                    )
+                )
+            ).first()
+            return None if row is None else str(row[0])
+
+        execution_id = await self._read(operation)
+        return None if execution_id is None else await self.inspect(execution_id)
 
     async def expired_leases(self) -> tuple[str, ...]:
         """Return executions a worker abandoned mid-step: their owner stopped heartbeating.

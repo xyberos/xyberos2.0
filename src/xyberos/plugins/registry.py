@@ -67,6 +67,7 @@ class PluginRegistry:
                 api_version=getattr(entry.plugin, "api_version", ""),
                 requires=tuple(getattr(entry.plugin, "requires", ())),
                 state=entry.state,
+                config_type=getattr(entry.plugin, "config_type", None),
             )
             for entry in self._entries.values()
         )

@@ -30,9 +30,34 @@ message and, where the license requires it, in the repository.
 
 ## Before submitting a change
 
-Run the commands in the README. New stable public APIs require an architecture decision
-record or an update to an existing one, an API-contract example, type coverage, and a
-compatibility/release-note entry when applicable.
+Run the same loop CI runs, in the same order. `tests/test_contributor_loop.py` compares this list
+with the workflow, so a step added to one and not the other fails a test rather than the build.
+
+```powershell
+python site/scripts/build.py --check
+python -m pytest
+ruff check src tests examples site/scripts tools
+ruff format --check src tests examples site/scripts tools
+mypy
+python -m build
+```
+
+Installing is the two lines the workflow runs before the loop:
+
+```powershell
+python -m pip install -e ".[dev,http,database]"
+python -m pip install --no-deps -e tests/fixtures/metrics_plugin
+```
+
+`pre-commit install` enables the hooks in your clone, which is why the container does it for you.
+From then on the two `ruff` commands in the loop run before each commit, where they are cheapest.
+
+The site build comes first on purpose: two pages under `site/` are generated from `docs/`, and
+`tests/site/` verifies the rendered reference against `docs/`, so building after the tests would
+report a failure from the previous run's output. `tests/fixtures/metrics_plugin` is installed without
+dependencies so that the local copy, rather than a published one, is what the tests import.
+New stable public APIs require an architecture decision record or an update to an existing one, an
+API-contract example, type coverage, and a compatibility/release-note entry when applicable.
 
 ## Compatibility
 

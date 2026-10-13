@@ -1,0 +1,107 @@
+# The distributions this line knows about outside this repository.
+#
+# This file is the single source for a name, its import root, the core range it declares, and whether it
+# is published yet. The plugin guide's catalogue, the feature matrix, and the release guide are checked
+# against it by `tests/test_packages_manifest.py`, so a renamed package, a forgotten pointer, or a
+# package that quietly acquired a dependency it was not supposed to have is a failing test rather than a
+# reader's discovery.
+#
+# Two rules from ADR 0018 are enforced by that test rather than stated here:
+#
+#   * `import_root` is the package's own top-level module, never a path inside `xyberos.*`. Two
+#     distributions owning paths under `xyberos/` would make a partial install a half-existing directory
+#     and an uninstall a stale one, and it would disarm the import-boundary tests.
+#   * every name this line publishes begins with `xyberos-`, so the retirements and the reuses stay
+#     recognizable as this project's own.
+#
+# `status` is one of four values, and nothing is implied by their absence:
+#
+#   * `placeholder` - the name is claimed on the index with a pre-release, and no work has started.
+#   * `planned`     - the capability is decided and the package is not written yet.
+#   * `published`   - a release exists, so the compatibility job installs and exercises it.
+#   * `retired`     - the 1.x name stays published and points at what replaced it.
+#
+# A `published` entry also declares `conformance`: a dotted path to a callable the package installs, which
+# runs the shipped suite against its own implementation and exits non-zero when it fails. The compatibility
+# job refuses to install a published package that does not declare one, because a package that is installed
+# and not checked is worse than one that is not installed at all.
+
+schema_version = 1
+
+# What every package beside this line must declare. A package that needs a newer core is a bug rather
+# than a compatibility note, because this line's minor releases add names and never remove them.
+core_requirement = "xyberos>=2,<3"
+
+[[package]]
+name = "xyberos-mcp"
+import_root = "xyberos_mcp"
+status = "planned"
+summary = "The server direction: exposing an application's tools, and a stdio transport"
+dependencies = ["xyberos[http]"]
+rationale = "expose() needs an HTTP surface, and stdio spawns a process. The shipped client refuses both on purpose."
+
+[[package]]
+name = "xyberos-templates"
+import_root = "xyberos_templates"
+status = "planned"
+summary = "Server-rendered pages: an engine-neutral Templates contract with Jinja2 shipped, a static mount, and form reading"
+dependencies = ["jinja2>=3.1,<4", "python-multipart>=0.0.18,<1"]
+rationale = "It needs Jinja2, which pyproject.toml records as an application's dependency rather than this line's."
+
+[[package]]
+name = "xyberos-observability"
+import_root = "xyberos_observability"
+status = "planned"
+summary = "One explicit call that configures a logging handler and spans, fed by the runtime's own event sink"
+dependencies = ["opentelemetry-api>=1.20,<2", "opentelemetry-sdk>=1.20,<2"]
+rationale = "It needs OpenTelemetry, and the runtime configures no handler by decision."
+
+[[package]]
+name = "xyberos-auth"
+import_root = "xyberos_auth"
+status = "planned"
+summary = "Verification only: an assertion from a shared secret or a JWKS, and a Principal"
+dependencies = ["cryptography>=42,<47"]
+rationale = "Real assertions are asymmetric. The policy half stays absent from the framework (ADR 0014)."
+
+[[package]]
+name = "xyberos-postgres"
+import_root = "xyberos_postgres"
+status = "planned"
+summary = "A DatabaseProvider for PostgreSQL, proved against the shipped conformance suite"
+dependencies = ["asyncpg>=0.29,<1", "sqlalchemy>=2.0,<2.1"]
+rationale = "It needs a driver core will not adopt, and it answers the two SQLite-specific promises the provider guide names or refuses loudly."
+
+[[package]]
+name = "xyberos-storage-s3"
+import_root = "xyberos_storage_s3"
+status = "planned"
+summary = "A Storage provider for S3-compatible object stores, proved against the shipped conformance suite"
+dependencies = ["aioboto3>=13,<16"]
+rationale = "It needs an object-store client core will not adopt."
+
+[[package]]
+name = "xyberos-openai-compatible"
+import_root = "xyberos_openai_compatible"
+status = "planned"
+summary = "A ModelProvider for OpenAI-compatible chat and embedding endpoints"
+dependencies = ["httpx>=0.27,<1"]
+rationale = "A second backend for a facade whose first is Ollama (ADR 0004); promoting it to an extra would amend that ADR."
+
+[[package]]
+name = "xyberos-db"
+import_root = "xyberos_db"
+status = "retired"
+summary = "Retired: the capability is xyberos[database] and the provider seam"
+dependencies = []
+replaced_by = "xyberos[database]"
+rationale = "A metadata-only pointer patch keeps the <2 pin, so nothing moves under a 1.x user."
+
+[[package]]
+name = "xyberos-metrics"
+import_root = "xyberos_metrics"
+status = "retired"
+summary = "Retired: request metrics ship as xyberos.http.RequestMetricsMiddleware"
+dependencies = []
+replaced_by = "xyberos.http"
+rationale = "The capability is here now, so a 2.x release under the old name would be a second answer."

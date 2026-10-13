@@ -206,6 +206,28 @@ stats.oldest_lease_age_seconds
 execution carries a spent lease because the lease row holds the fencing token, and that is not an
 orphan.
 
+### Inspection from the shell
+
+`xyberos durable status` answers the same questions without an event loop, and is safe to point at a
+production journal because it cannot change one: the file is opened through SQLite's `mode=ro` URI
+and the schema is never migrated.
+
+```powershell
+xyberos durable status
+xyberos durable status --journal var/journal.db --json
+```
+
+It reports the counters, the oldest unfinished execution, and — for each parked execution — the
+reason it was parked, which is the `detail` of the event that parked it. `--json` emits the same
+snapshot as one versioned document.
+
+Two behaviours belong to the contract. A journal written by a newer package is refused with the
+`upgrade xyberos` sentence the journal itself raises, and is left untouched rather than brought
+forward. A journal that does not exist is reported as missing rather than created, because pointing
+at the wrong path must not start a new history. What the command cannot avoid is SQLite's own
+bookkeeping: opening a WAL database creates an empty `-wal` and a `-shm` index beside it. The
+journal's bytes are unchanged.
+
 ### Incident triage
 
 | Symptom | Look at | Likely cause |

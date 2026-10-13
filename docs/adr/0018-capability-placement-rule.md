@@ -27,8 +27,8 @@ discovery; this ADR generalizes both.
 
 | Placement | Ships as | Applies when |
 | --- | --- | --- |
-| **Extra, here** | `xyberos[x]`, one working implementation, tested by this repository's suite | no third-party dependency this line will not adopt, no policy a recorded ADR refuses, and small enough that this suite can exercise it |
-| **Module, here** | a dependency-free module in the package, importable without an extra | the capability needs nothing from PyPI — the rule `xyberos.ai` already follows for the facade, the schema subset, and the fake provider |
+| **Extra, here** | `xyberos[x]`, one working implementation, tested by this repository's suite | it needs a third-party dependency this line accepts (`starlette`, `httpx`, `sqlalchemy`), and it is small enough that this suite can exercise it |
+| **Module, here** | a dependency-free module in the package, importable without an extra | it needs nothing from PyPI, so an extra name would gate no import and install no dependency — `xyberos.ai`, `xyberos.storage`, and `xyberos.mcp` all follow this |
 | **Package, there** | a distribution in the ecosystem repository | it needs a dependency core will not adopt, it carries policy, or it has its own release cadence |
 | **Retire, with a pointer** | the published version stays; a metadata-only patch names the replacement | the capability landed in an extra, so a second distribution would be a second answer to one question |
 

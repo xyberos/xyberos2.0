@@ -39,6 +39,13 @@ class PluginInfo:
     api_version: str
     requires: tuple[str, ...]
     state: PluginState
+    config_type: type[object] | None = None
+    """The plugin's declared configuration dataclass, when it has one.
+
+    Carried here rather than looked up elsewhere because it *is* plugin metadata: `xyberos check
+    --schema` describes each declared plugin's section from it, and the runtime already validates
+    that same type.
+    """
 
     def render(self) -> str:
         """Return a single-line description for diagnostics output."""

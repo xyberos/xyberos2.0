@@ -22,6 +22,23 @@ import snippets_hook
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
+#: The schema the package ships, and the address its own `$id` names. The site publishes a copy so
+#: an editor handed the `$id` can fetch it; the copy is made from the shipped file rather than
+#: regenerated, so there is one source and the test that pins the shipped file covers both.
+SCHEMA_SOURCE = REPOSITORY_ROOT / "src" / "xyberos" / "config.schema.json"
+SCHEMA_PUBLISHED = REPOSITORY_ROOT / "site" / "schema" / "xyberos-config-1.json"
+
+
+def publish_schema() -> int:
+    """Copy the configuration schema to the URL its `$id` names, and report a missing one."""
+    if not SCHEMA_SOURCE.exists():
+        print(f"site: {SCHEMA_SOURCE.name} is missing; run `xyberos check --schema > it` first")
+        return 1
+    SCHEMA_PUBLISHED.parent.mkdir(parents=True, exist_ok=True)
+    SCHEMA_PUBLISHED.write_bytes(SCHEMA_SOURCE.read_bytes())
+    print(f"site: published {SCHEMA_PUBLISHED.relative_to(REPOSITORY_ROOT).as_posix()}")
+    return 0
+
 
 def main(argv: list[str] | None = None) -> int:
     """Generate, then build or serve."""
@@ -41,6 +58,10 @@ def main(argv: list[str] | None = None) -> int:
         code = step([]) if step is roadmap.main else step()
         if code != 0:
             return code
+
+    code = publish_schema()
+    if code != 0:
+        return code
 
     if args.check:
         code = roadmap.main(["--check"])

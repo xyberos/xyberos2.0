@@ -62,6 +62,14 @@ class SqliteSettings:
     busy_timeout_ms: int = 5000
     retry_attempts: int = 5
     retry_base_delay: float = 0.05
+    read_only: bool = False
+    """Open the file through SQLite's ``mode=ro`` URI rather than a read-write one.
+
+    A diagnostic that reads a production database must not be able to change it: the file is
+    opened by SQLite itself in read-only mode, so a write is refused by the driver rather than by
+    the discipline of the code above it. Only ``busy_timeout`` is applied, because
+    ``journal_mode`` and ``synchronous`` both write to the file's header.
+    """
 
     def __post_init__(self) -> None:
         journal_mode = self.journal_mode.upper()
@@ -104,6 +112,8 @@ class SqliteSettings:
     @property
     def url(self) -> str:
         """The async SQLAlchemy URL used by the provider."""
+        if self.read_only:
+            return f"sqlite+aiosqlite:///file:{self._location}?mode=ro&uri=true"
         return f"sqlite+aiosqlite:///{self._location}"
 
     @property
@@ -140,7 +150,7 @@ class SqliteDatabase:
         if self._engine is not None:
             return
         file_path = self.settings.file_path
-        if file_path is not None:
+        if file_path is not None and not self.settings.read_only:
             file_path.parent.mkdir(parents=True, exist_ok=True)
         engine = create_async_engine(self.settings.url, echo=self.settings.echo)
         _install_pragmas(engine, self.settings)
@@ -230,12 +240,16 @@ def sqlite_provider(
 
 
 def _install_pragmas(engine: AsyncEngine, settings: SqliteSettings) -> None:
+    # `busy_timeout` is connection-local, so it is the one pragma a read-only connection still
+    # gets: `journal_mode` and `synchronous` write to the file's header, and SQLite refuses the
+    # first of them outright when the connection cannot write.
     statements = [f"PRAGMA busy_timeout={int(settings.busy_timeout_ms)}"]
-    if settings.foreign_keys:
-        statements.append("PRAGMA foreign_keys=ON")
-    if not settings.in_memory:
-        statements.append(f"PRAGMA journal_mode={settings.journal_mode}")
-    statements.append(f"PRAGMA synchronous={settings.synchronous}")
+    if not settings.read_only:
+        if settings.foreign_keys:
+            statements.append("PRAGMA foreign_keys=ON")
+        if not settings.in_memory:
+            statements.append(f"PRAGMA journal_mode={settings.journal_mode}")
+        statements.append(f"PRAGMA synchronous={settings.synchronous}")
 
     @event.listens_for(engine.sync_engine, "connect")
     def _apply_pragmas(dbapi_connection: Any, _connection_record: Any) -> None:

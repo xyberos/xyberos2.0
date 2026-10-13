@@ -1,7 +1,8 @@
 """The storage contract a service depends on, and the rules every key obeys.
 
-The protocol is the boundary a service depends on: put, get, delete, list, and a health check over an
-opaque byte payload. It deliberately says nothing about content types, versions, multipart uploads,
+The protocol is the boundary a service depends on: put, get, delete, list, and a health check over
+an opaque byte payload. It deliberately says nothing about content types, versions, multipart
+uploads,
 or signed URLs, so a provider cannot smuggle a backend-specific API into application code.
 
 Key validation lives here rather than in each provider. A key that escapes the space it was given is
@@ -106,7 +107,7 @@ class Storage(Protocol):
         ...
 
     async def delete(self, key: str) -> bool:
-        """Remove ``key`` and report whether an object was there; deleting nothing is not an error."""
+        """Remove ``key``, reporting whether an object was there; deleting nothing is an error."""
         ...
 
     def list_keys(self, prefix: str = "") -> AsyncIterator[str]:

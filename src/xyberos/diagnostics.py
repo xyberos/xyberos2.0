@@ -9,12 +9,18 @@ from xyberos.plugins.protocol import PluginInfo
 
 @dataclass(frozen=True)
 class ProviderInfo:
-    """A read-only description of one registered provider."""
+    """A read-only description of one registered provider.
+
+    ``dependencies`` are the contracts this provider's factory declares, by name. They are part of
+    the description rather than something a reader derives, because the CLI explains a resolution
+    path from this snapshot: two implementations of "what depends on what" would be one too many.
+    """
 
     contract: str
     scope: str
     eager: bool
     source: str
+    dependencies: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

@@ -1,8 +1,8 @@
 """The local-filesystem provider: what it refuses, what it bounds, and what it leaves behind.
 
 Key rules are tested in `test_keys.py`; this file is about the provider's own promises — the root it
-will not escape, the device names it will not write, the ceiling it enforces before touching the disk,
-and the publish that must never leave a half-written object or a temporary file behind.
+will not escape, the device names it will not write, the ceiling it enforces before touching the
+disk, and the publish that must never leave a half-written object or a temporary file behind.
 """
 
 from __future__ import annotations

@@ -1,7 +1,8 @@
 """The key rules, which every provider shares.
 
-A key is the one input that reaches a filesystem and a log line at the same time, so the refusals are
-tested here rather than in each provider: what a provider does is *call* this, and what this does is
+A key is the one input that reaches a filesystem and a log line at the same time, so the refusals
+are tested here rather than in each provider: what a provider does is *call* this, and what this
+does is
 the contract.
 """
 

@@ -31,6 +31,7 @@ happens when a test is not enough and the shape turns out to be wrong.
 | Deprecation mechanics | `xyberos.deprecation` | stable |
 | HTTP adapter (Starlette) | `xyberos.http` | preview |
 | Object storage: contract, filesystem provider, and double | `xyberos.storage` | preview |
+| MCP client: initialize, tools/list, tools/call over streamable HTTP | `xyberos.mcp` | preview |
 | SQLite provider and migrations | `xyberos.database` | preview |
 | AI facade, contracts, tools, schema subset, fake provider | `xyberos.ai` | preview |
 | Ollama adapter | `xyberos.ai.ollama` | preview |

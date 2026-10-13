@@ -72,6 +72,10 @@ def test_the_wheel_ships_the_package_and_its_marker(artefacts: tuple[Path, Path]
     assert "xyberos/__init__.py" in names
     assert "xyberos/py.typed" in names, "the package is typed, so the marker has to ship"
     assert "xyberos/cli/main.py" in names
+    assert "xyberos/config.schema.json" in names, (
+        "the configuration schema ships in the wheel, which is what lets an editor validate "
+        "xyberos.toml with no extension installed"
+    )
 
 
 def test_the_wheel_ships_no_test_or_example_code(artefacts: tuple[Path, Path]) -> None:

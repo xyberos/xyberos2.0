@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import ast
 import importlib
+import json
 import re
 import sys
 from pathlib import Path
@@ -321,6 +322,20 @@ def test_rendered_reference_matches_docs(tmp_path: Path) -> None:
     expected, actual = read(fresh), read(generated)
     assert actual.keys() == expected.keys()
     assert sorted(name for name in expected if expected[name] != actual[name]) == []
+
+
+def test_the_published_schema_is_the_one_the_package_ships() -> None:
+    """`$id` names an address, so the address has to answer with the schema the runtime reads."""
+    published = SITE_ROOT / "schema" / "xyberos-config-1.json"
+    if not published.exists():
+        pytest.skip("run `python site/scripts/build.py` to publish the schema first")
+
+    shipped = REPOSITORY_ROOT / "src" / "xyberos" / "config.schema.json"
+
+    assert published.read_bytes() == shipped.read_bytes()
+    assert json.loads(published.read_text(encoding="utf-8"))["$id"].endswith(
+        "/schema/xyberos-config-1.json"
+    )
 
 
 def test_the_navigation_names_every_reference_guide() -> None:

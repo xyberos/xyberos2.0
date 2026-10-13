@@ -78,6 +78,7 @@ def test_the_reverse_lookup_names_an_extra_only_when_one_provides_it(
         ("xyberos.http.testing", {"starlette"}, "http"),
         ("xyberos.database", {"sqlalchemy"}, "database"),
         ("xyberos.database.migrations", {"alembic"}, "database"),
+        ("xyberos.durable", {"sqlalchemy"}, "durable"),
         ("xyberos.ai.ollama", {"httpx"}, "ollama"),
     ],
 )

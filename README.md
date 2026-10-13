@@ -210,18 +210,22 @@ and the [`durable_workflow` example](https://github.com/xyberos/xyberos2.0/blob/
 
 ## Command line
 
-Four commands wrap APIs the runtime already provides — nothing is re-implemented, and no server is
+Five commands wrap APIs the runtime already provides — nothing is re-implemented, and no server is
 bundled:
 
 ```powershell
 xyberos new myapp                                   # a minimal project that runs
 xyberos check --app myapp.app:create_app --app-dir src   # settings, provider graph, handler signatures
+xyberos check --json --app myapp.app:create_app --app-dir src   # the same facts for a script
 xyberos run --app myapp.app:asgi_app --app-dir src --reload   # delegate to your ASGI server
 xyberos migrate --migrations migrations --url "sqlite:///var/app.db"
+xyberos durable status --journal var/journal.db     # read-only view of the experimental journal
 ```
 
 `check` never starts the application, and `run` hands the import string to the ASGI server so
-reloading and shutdown stay the server's business. See the
+reloading and shutdown stay the server's business. `check --json`, `--why CONTRACT`, and `--schema`
+(which types each declared plugin's `[plugins.<name>]` section) are the machine-facing half;
+`durable status` opens its journal through SQLite's `mode=ro` and never migrates it. See the
 [command-line guide](https://github.com/xyberos/xyberos2.0/blob/master/docs/cli.md).
 
 ## Development

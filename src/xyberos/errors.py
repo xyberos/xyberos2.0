@@ -44,6 +44,10 @@ __all__ = [
     "HttpError",
     "LifecycleError",
     "LifecycleStateError",
+    "McpConfigurationError",
+    "McpError",
+    "McpProtocolError",
+    "McpTransportError",
     "MissingProviderError",
     "PluginCompatibilityError",
     "PluginConfigurationError",
@@ -476,4 +480,33 @@ class StorageSizeLimitError(StorageError):
 
     The ceiling belongs to the provider (``Storage.max_object_bytes``) rather than to the call, so
     the contract suite can check the boundary at exactly one byte over it.
+    """
+
+
+class McpError(XyberosError):
+    """Base class for MCP client failures."""
+
+
+class McpConfigurationError(McpError):
+    """Raised when a server's settings are unusable, or name a tool the server does not have.
+
+    A tool an operator opted into by name and the server does not offer is a configuration mistake,
+    not a transient one, so it fails at startup with the server and the names it does offer.
+    """
+
+
+class McpProtocolError(McpError):
+    """Raised when the server answers with a JSON-RPC error, or a result that is not the promised
+    shape.
+
+    It is deliberately not a :class:`TransientError`: a protocol error means the two sides disagree
+    about the request, and repeating it produces the same disagreement.
+    """
+
+
+class McpTransportError(McpError, TransientError):
+    """Raised when the server cannot be reached, or answers with an unusable HTTP response.
+
+    It *is* a :class:`TransientError`: a refused connection, a timeout, and a 502 from a proxy are
+    all conditions a retry can fix, which is what makes the classification worth carrying.
     """

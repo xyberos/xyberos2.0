@@ -51,6 +51,7 @@ _SUMMARIES = {
     "getting-started": "Installation and the first application",
     "http": "The Starlette-backed HTTP adapter",
     "implementation": "The phase-by-phase implementation plan for this release",
+    "mcp": "Consuming an MCP server's tools through the shipped tool model",
     "performance": "The performance baselines",
     "plugins": "The trusted plugin contract",
     "positioning": "Who the framework is for, and who it is not for",

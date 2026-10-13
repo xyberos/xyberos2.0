@@ -1,0 +1,16 @@
+# The two checks CI runs, first — so a contributor sees the same failure locally that the build
+# would have reported, without waiting for it.
+#
+# `rev` is the newest release inside the `ruff>=0.6,<1` range the `dev` extra declares, and the
+# workflow installs from that same range, so the hook and CI resolve the same rules. The range lives
+# in pyproject.toml and this pin lives here; `tests/test_contributor_loop.py` fails when the pin
+# leaves the range, so the two cannot drift apart quietly.
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.0
+    hooks:
+      - id: ruff
+        args: [--fix]
+        files: ^(src|tests|examples|site/scripts|tools)/
+      - id: ruff-format
+        files: ^(src|tests|examples|site/scripts|tools)/

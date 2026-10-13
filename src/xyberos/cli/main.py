@@ -14,7 +14,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from xyberos import __version__
-from xyberos.cli.check import check
+from xyberos.cli.check import check, config_schema, document, explain
+from xyberos.cli.durable import document as durable_document
+from xyberos.cli.durable import status as durable_status
 from xyberos.cli.errors import CliError
 from xyberos.cli.migrations import DEFAULT_DIRECTORY, migrate
 from xyberos.cli.project import new
@@ -33,7 +35,8 @@ PROGRAM = "xyberos"
 
 DESCRIPTION = """\
 Developer experience for a Xyberos application: check a composition, scaffold a project, run an
-ASGI server, and apply migrations. Each command wraps an API the runtime already provides.
+ASGI server, apply migrations, and inspect a durable journal. Each command wraps an API the runtime
+already provides.
 """
 
 
@@ -58,6 +61,23 @@ def build_parser() -> argparse.ArgumentParser:
         "--app-dir",
         type=Path,
         help="directory to import the target from, for example src in a src layout",
+    )
+    outputs = checker.add_mutually_exclusive_group()
+    outputs.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="emit settings, providers, routes, and plugins as one machine-readable document",
+    )
+    outputs.add_argument(
+        "--why",
+        metavar="CONTRACT",
+        help="print the resolution path and scope for one contract",
+    )
+    outputs.add_argument(
+        "--schema",
+        action="store_true",
+        help="emit the JSON Schema for xyberos.toml; with --app, typed for its plugins",
     )
 
     creator = commands.add_parser(
@@ -102,6 +122,29 @@ def build_parser() -> argparse.ArgumentParser:
     migrator.add_argument(
         "--async", dest="use_asyncio", action="store_true", help="apply inside an event loop"
     )
+
+    durable = commands.add_parser(
+        "durable",
+        help="inspect the experimental durable journal",
+        description="Read-only inspection of the durable executor's journal.",
+    )
+    journal = durable.add_subparsers(dest="durable_command", required=True, metavar="command")
+    inspector = journal.add_parser(
+        "status",
+        help="report the queue, the longest wait, and the parked attempts (reads only)",
+        description=durable_status.__doc__,
+    )
+    inspector.add_argument(
+        "--journal",
+        type=Path,
+        help="path to the journal file (default: var/journal.db)",
+    )
+    inspector.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="emit the same snapshot as one machine-readable document",
+    )
     return parser
 
 
@@ -130,12 +173,24 @@ def main(argv: Sequence[str] | None = None) -> int:
 def _dispatch(parser: argparse.ArgumentParser, args: argparse.Namespace) -> str | None:
     """Run the parsed command and return what it wants printed, if anything."""
     if args.command == "check":
+        if args.schema:
+            return config_schema(target=args.app, app_dir=args.app_dir)
+        if args.why:
+            return explain(args.why, config_path=args.config, target=args.app, app_dir=args.app_dir)
+        if args.as_json:
+            return document(config_path=args.config, target=args.app, app_dir=args.app_dir)
         return check(config_path=args.config, target=args.app, app_dir=args.app_dir)
     if args.command == "new":
         written = new(args.name, directory=args.directory, force=args.force)
         return _describe_new(args.directory / args.name, written)
     if args.command == "migrate":
         return migrate(args.migrations, url=args.url, use_asyncio=args.use_asyncio)
+    if args.command == "durable":
+        if args.durable_command == "status":
+            if args.as_json:
+                return durable_document(journal_path=args.journal)
+            return durable_status(journal_path=args.journal)
+        parser.error(f"unknown durable command {args.durable_command!r}")
     if args.command == "run":
         run(
             target=args.app,

@@ -156,6 +156,14 @@ class JournalSettings:
     busy_timeout_ms: int = 5000
     retry_attempts: int = 5
     retry_base_delay: float = 0.05
+    read_only: bool = False
+    """Open the journal for inspection only: no migration, no writing, no file creation.
+
+    A journal written by a newer package is still refused, because reading rows this package would
+    misinterpret is the failure the version check exists to prevent — but the refusal is the only
+    thing that can happen, so `xyberos durable status` cannot bring a journal forward by looking at
+    it.
+    """
 
     def __post_init__(self) -> None:
         location = str(self.path).strip()
@@ -181,6 +189,7 @@ class JournalSettings:
             busy_timeout_ms=self.busy_timeout_ms,
             retry_attempts=self.retry_attempts,
             retry_base_delay=self.retry_base_delay,
+            read_only=self.read_only,
         )
 
 
@@ -202,10 +211,18 @@ class Journal:
         return self._database.settings.file_path
 
     async def start(self) -> None:
-        """Start the database and bring the schema to this package's version."""
+        """Start the database and bring the schema to this package's version.
+
+        A read-only journal is *checked* rather than migrated, and the check is the same refusal: a
+        newer file may hold rows this package would misread, and "open it anyway" is how a durable
+        executor corrupts history.
+        """
         await self._database.start()
         try:
-            await self.migrate()
+            if self.settings.read_only:
+                self._refuse_newer(await self.version())
+            else:
+                await self.migrate()
         except DurableSchemaError:
             await self._database.aclose()
             raise
@@ -221,11 +238,7 @@ class Journal:
         misinterpret, and "open it anyway" is how a durable executor corrupts history.
         """
         recorded = await self.version()
-        if recorded is not None and recorded > JOURNAL_SCHEMA_VERSION:
-            raise DurableSchemaError(
-                f"the journal uses schema version {recorded}, but this package understands "
-                f"version {JOURNAL_SCHEMA_VERSION}: upgrade xyberos or point at another journal"
-            )
+        self._refuse_newer(recorded)
         if recorded == JOURNAL_SCHEMA_VERSION:
             return recorded
         async with self._database.transaction() as connection:
@@ -265,6 +278,14 @@ class Journal:
                 )
             ).first()
         return None if row is None else int(row[0])
+
+    def _refuse_newer(self, recorded: int | None) -> None:
+        """Raise when the file was written by a package newer than this one."""
+        if recorded is not None and recorded > JOURNAL_SCHEMA_VERSION:
+            raise DurableSchemaError(
+                f"the journal uses schema version {recorded}, but this package understands "
+                f"version {JOURNAL_SCHEMA_VERSION}: upgrade xyberos or point at another journal"
+            )
 
 
 async def open_journal(settings: JournalSettings | None = None) -> Journal:

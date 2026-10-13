@@ -55,6 +55,9 @@ dev = [
   "jinja2>=3.1,<4",
   "mkdocs-material>=9.5,<10",
   "mypy>=1.11,<2",
+  # The two checks CI runs first are also a git hook, so the loop starts before the build does. The
+  # hook and the workflow install ruff from the same range below, which is what keeps them agreeing.
+  "pre-commit>=3.7,<5",
   # The interface lessons read a submitted form, and Starlette's form parsing needs this library to
   # be installed at all: without it `request.form()` asserts rather than parsing. An application that
   # reads forms needs it; Xyberos does not read one, so it belongs here for the same reason Jinja2
@@ -86,7 +89,7 @@ packages = ["src/xyberos"]
 
 [tool.pytest.ini_options]
 addopts = "-ra"
-pythonpath = ["src", "examples", "tests/fixtures/metrics_plugin"]
+pythonpath = ["src", "examples", "tests/fixtures/metrics_plugin", "tools"]
 testpaths = ["tests"]
 # The durable package warns on purpose once per process, and the behavior is asserted explicitly in
 # tests/durable/test_journal.py, so the suite does not need to print it again.
@@ -102,6 +105,7 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.mypy]
 files = [
   "src",
+  "tools",
   "examples/broker_worker/app.py",
   "examples/durable_workflow/app.py",
   "examples/hello_app/app.py",

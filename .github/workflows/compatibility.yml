@@ -1,0 +1,93 @@
+name: Compatibility
+
+# The job that proves the pair. This line's core and the packages that live beside it are separate
+# repositories — neither owns the other's code — so nothing else in either one can catch a drift between
+# them. It installs what a user can actually install, from the index rather than from a checkout, and then
+# runs each package's own conformance suite, because the suites are the contract: a smoke test would let a
+# package ship that passes on the exemplar and fails on everything else.
+#
+# Two things it deliberately does not do:
+#
+#   * It does not skip silently. Nothing is published beside this line yet, so the package legs are
+#     skipped — a GitHub Actions matrix cannot be empty; it errors — and the manifest job says so in an
+#     annotation instead. The core leg still runs, and that is the part worth having today: installing the
+#     *published* core is a different check from installing the wheel this repository just built
+#     (`installed-artefact` in ci.yml), and it catches the one failure that test cannot — a bad upload.
+#   * It does not run on every push. Drift appears on the timescale of releases, and an index install on
+#     every commit is a job people learn to ignore.
+#
+# A core release is expected to have this green before the tag, and a package release is expected to have
+# its own name green before it is tagged (docs/release.md).
+
+on:
+  schedule:
+    # Weekly, at a time nobody is releasing: a red result is then about drift rather than about a race.
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # The manifest is read once, here, so the matrix is derived from the file rather than from a list in this
+  # workflow that somebody would have to keep in step by hand.
+  manifest:
+    runs-on: ubuntu-latest
+    outputs:
+      core: ${{ steps.read.outputs.core }}
+      packages: ${{ steps.read.outputs.packages }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - id: read
+        run: python tools/ecosystem.py --github-output >> "$GITHUB_OUTPUT"
+      - run: |
+          echo "core requirement: ${{ steps.read.outputs.core }}"
+          echo "published packages: ${{ steps.read.outputs.packages }}"
+      - if: steps.read.outputs.packages == '[]'
+        run: |
+          echo "::notice title=Nothing published yet::packages.toml marks no package as published, so \
+          the package legs are skipped. The core leg still installs what the index serves."
+
+  # The leg that runs today: the published core, installed from the index, has to scaffold an application,
+  # check it, and pass its own generated test.
+  core:
+    needs: manifest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install "${{ needs.manifest.outputs.core }}" "${{ needs.manifest.outputs.core }}[http]" uvicorn pytest
+      - run: xyberos --version
+      - run: xyberos new smoke --directory .
+      - run: |
+          set -o pipefail
+          xyberos check --app smoke.app:create_app --app-dir smoke/src | tee report.txt
+          grep -q "routes: 2 (handler signatures valid)" report.txt
+      - run: python -m pytest smoke
+
+  # One leg per published package, each running that package's own conformance callable against the
+  # published core. Both halves come from the manifest, so a package cannot be published without saying how
+  # it is proved.
+  packages:
+    needs: manifest
+    if: needs.manifest.outputs.packages != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJSON(needs.manifest.outputs.packages) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install "${{ needs.manifest.outputs.core }}" "${{ matrix.package.name }}"
+      - name: Run the conformance suite this package declares
+        run: python -c "${{ matrix.package.conformance }}"

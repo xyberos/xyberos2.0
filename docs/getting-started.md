@@ -20,10 +20,13 @@ xyberos new myapp
 cd myapp
 python -m pip install -e ".[http,dev]" uvicorn
 pytest
+xyberos check --app myapp.app:create_app --app-dir src
 ```
 
-It writes the same shape this guide builds by hand, plus a settings file and a test. See the
-[command-line guide](./cli.md).
+Those are the commands `xyberos new` prints when it finishes, so the two cannot drift apart: the
+scaffold and this page are compared by a test, and the two that run without installing anything are
+run by it. It writes the same shape this guide builds by hand, plus a settings file and a test. See
+the [command-line guide](./cli.md).
 
 ## The smallest application
 

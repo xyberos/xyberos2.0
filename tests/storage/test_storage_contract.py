@@ -1,8 +1,8 @@
 """The storage contract, checked against the providers we ship.
 
 `assert_storage_contract` exists so a provider author outside this project can prove their
-implementation behaves the way the contract says. That makes two things worth testing here: that both
-shipped providers pass, and that the suite *fails* for a provider that breaks the contract. A
+implementation behaves the way the contract says. That makes two things worth testing here: that
+both shipped providers pass, and that the suite *fails* for a provider that breaks the contract. A
 conformance suite that passes for everything would be worse than none, because it would be evidence
 that means nothing.
 """
@@ -23,8 +23,9 @@ from xyberos.storage import (
 )
 from xyberos.storage.testing import InMemoryStorage, assert_storage_contract
 
-# A small ceiling keeps the boundary check cheap: the suite allocates one byte more than the provider
-# accepts, and the shipped default is 64 MiB, which is a lot of zeros to allocate in a unit test.
+# A small ceiling keeps the boundary check cheap: the suite allocates one byte more than the
+# provider accepts, and the shipped default is 64 MiB, which is a lot of zeros to allocate in a unit
+# test.
 CEILING = 4096
 
 
@@ -85,8 +86,8 @@ def test_the_suite_leaves_nothing_behind(tmp_path: Path) -> None:
 class SloppyDeleteStorage:
     """A provider that reports removing an object it never found.
 
-    Nothing is obviously broken at the call site: the caller is told the delete succeeded, and only a
-    later `get` — or the contract suite — notices that the answer was not about anything real.
+    Nothing is obviously broken at the call site: the caller is told the delete succeeded, and only
+    a later `get` — or the contract suite — notices that the answer was not about anything real.
     """
 
     def __init__(self, inner: Storage) -> None:

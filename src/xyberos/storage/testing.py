@@ -26,8 +26,8 @@ class InMemoryStorage:
 
     It enforces the same key rules and the same ceiling as the shipped provider, so a test that
     passes against the double is a test about the contract rather than about the double. It is also
-    the reference for which behaviours the contract owns: it has no filesystem, no directory pruning,
-    and no atomic rename, and it still satisfies everything the suite checks.
+    the reference for which behaviours the contract owns: it has no filesystem, no directory
+    pruning, and no atomic rename, and it still satisfies everything the suite checks.
     """
 
     def __init__(
@@ -88,8 +88,9 @@ async def assert_storage_contract(
     """Check that ``storage`` behaves the way :class:`Storage` says, and report what ran.
 
     This is the suite a provider author outside this project runs against their own implementation —
-    the same claims are checked here as against the shipped local-filesystem provider, so "we support
-    an S3-compatible backend" means evidence rather than intent. It raises ``AssertionError`` naming
+    the same claims are checked here as against the shipped local-filesystem provider, so "we
+    support an S3-compatible backend" means evidence rather than intent. It raises
+    ``AssertionError`` naming
     the check that failed, so it is usable from pytest, an ordinary script, or another test runner.
 
     The caller supplies a ``prefix``, so the suite touches one namespace and removes what it created

@@ -103,3 +103,6 @@ docs/_build/
 # the roadmap is derived from the pages' own front matter, and `reference/` is a copy of `docs/`.
 site/roadmap.md
 site/reference/
+# The published copy of the configuration schema, made from `src/xyberos/config.schema.json` by the
+# same build. Generated for the same reason: two committed copies of one schema is one too many.
+site/schema/

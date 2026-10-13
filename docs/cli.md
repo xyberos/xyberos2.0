@@ -1,12 +1,13 @@
 # Command-line guide
 
-> Status: Phase 7. The **command and its options are the promise**; the Python modules behind them
-> are internal and may move in any release. See the [stability guide](./stability.md).
+> Status: Phases 7 and 11. The **command and its options are the promise**; the Python modules
+> behind them are internal and may move in any release. See the [stability guide](./stability.md).
 
-The `xyberos` command exists so that four things a developer does over and over are one documented
-line each: inspecting a composition, starting a project, running a server, and applying migrations.
-It is a front door over APIs the runtime already proves — it never becomes a second implementation
-of the runtime, never starts an application implicitly, and never ships a server.
+The `xyberos` command exists so that things a developer does over and over are one documented line
+each: inspecting a composition, starting a project, running a server, applying migrations, and
+looking at a durable journal. It is a front door over APIs the runtime already proves — it never
+becomes a second implementation of the runtime, never starts an application implicitly, and never
+ships a server.
 
 ## Install and invoke
 
@@ -25,6 +26,7 @@ example.
 | `xyberos new` | nothing at all; it writes files | core |
 | `xyberos run` | an ASGI server's own `run`, handed an import string | an ASGI server |
 | `xyberos migrate` | `run_migrations` / `apply_migrations` | the `database` extra |
+| `xyberos durable status` | `JournalStats`, `JournalStore` readers | the `durable` extra |
 
 ## `xyberos check`
 
@@ -59,6 +61,35 @@ routes: 6 (handler signatures valid)
   compiled* rather than as a failure, because an application with no routes is a legitimate
   application.
 - It is read-only: nothing is written, started, or imported beyond the target.
+
+### Three outputs for machines
+
+The report is for a person. Three flags produce the same facts in a shape a script or an editor can
+consume, and they are mutually exclusive because each answers a different question completely.
+
+```powershell
+xyberos check --json --app billing.app:create_app --app-dir src
+xyberos check --why ItemRepository
+xyberos check --schema --app billing.app:create_app --app-dir src > xyberos.schema.json
+```
+
+- **`--json`** emits one document: the settings, the provider graph with scopes and dependencies, the
+  route table including whether it compiled, the plugin list with states, and the version of the
+  document itself. It is assembled from the same calls the text report uses, so the two cannot
+  disagree, and its keys are a contract — [ADR 0020](./adr/0020-introspection-documents.md) records
+  why, and a rename fails a test rather than your pipeline. A missing extra is named through the
+  same lookup the runtime's own import error uses.
+- **`--why CONTRACT`** prints the resolution path for one contract: which provider satisfied it, at
+  which scope, from which registration, and which dependency each hop came through. It is the
+  sentence `App.validate()` already builds for a failure, asked on purpose, and an unknown name is
+  refused with the list of registered ones.
+- **`--schema`** emits JSON Schema for `xyberos.toml`, generated from the `Settings` dataclasses, so
+  a renamed field cannot leave a stale property behind. It covers `schema_version`, `app`, and — with
+  `--app` — **each plugin's declared `config_type` section**, which is the completion a plugin author
+  wants for `[plugins.<name>]`. The `[ai.<name>]` channel is described as "an object" on purpose:
+  core does not know its keys, and a schema that guessed would validate less than it reads. The same
+  schema ships inside the package as `xyberos/config.schema.json` for the case where you would rather
+  point an editor at a file than run a command.
 
 ## `xyberos new`
 
@@ -114,6 +145,46 @@ xyberos migrate --migrations migrations --url "sqlite:///var/app.db"
 - Migrations are never applied at application startup, and this command does not change that: it is
   the explicit deploy step, not an implicit one.
 
+## `xyberos durable status`
+
+Reports what a durable journal holds, **without changing it**. The durable executor is experimental,
+and its journal is a SQLite file you could read by hand with SQL; this is that reading, without the
+SQL and without the risk of getting a statement wrong.
+
+```powershell
+xyberos durable status
+xyberos durable status --journal var/journal.db --json
+```
+
+```text
+journal: var/journal.db
+schema version: 1
+size: 81920 bytes
+queued: 1  running: 0  retrying: 0  waiting: 1
+completed: 0  failed: 0  cancelled: 0  timed out: 0
+expired leases: 0
+incompatible definitions: 0
+oldest unfinished: 54dce55f… (orders v1, waiting, submitted 2026-05-01T09:00:00+00:00)
+parked: 1
+  - 54dce55f… (orders v1, waiting, submitted 2026-05-01T09:00:00+00:00): the step declares no retry policy
+read-only: opened mode=ro, never migrated, no journal byte written
+```
+
+- **It cannot write.** The file is opened through SQLite's `mode=ro` URI, so the driver refuses a
+  write rather than this command promising not to attempt one, and the schema is never migrated. A
+  journal written by a newer package is reported as the refusal `xyberos.durable` already raises —
+  with the `upgrade xyberos` sentence — and is left exactly as it was.
+- **It never creates the journal.** A missing file is reported, not initialized: pointing at the
+  wrong path must not quietly start a new history.
+- **SQLite still creates its own sidecars.** Opening a WAL database creates `-shm` and an empty
+  `-wal` beside it; those are SQLite's bookkeeping, and the journal's bytes are unchanged.
+- `--journal PATH` points at a specific file; the default is the same `var/journal.db` a worker uses.
+- `--json` emits the same snapshot as one document, with the counters, the lease facts, the oldest
+  unfinished execution, and each parked execution with the reason it was parked. The document is
+  versioned like `check --json`, for the same reason.
+- It exits `0` whenever the journal is readable. A status is a report; a pipeline that needs a
+  verdict reads the JSON and decides.
+
 ## Exit codes
 
 | Code | Meaning |
@@ -136,4 +207,5 @@ standard output.
   service installation.
 - **It is not the only way to do anything.** Every command has a documented equivalent that does not
   involve the CLI at all; `check` is `App.validate()` plus `App.diagnostics()`, and `run` is
-  whatever your ASGI server already does.
+  whatever your ASGI server already does. `durable status` is `JournalStore.stats()`,
+  `oldest_non_terminal()`, and `list_executions(status="waiting")` — the CLI only formats them.

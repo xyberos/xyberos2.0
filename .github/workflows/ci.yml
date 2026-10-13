@@ -26,8 +26,8 @@ jobs:
       # reference against `docs/`. `--check` also refuses a `draft` lesson in the navigation.
       - run: python site/scripts/build.py --check
       - run: python -m pytest
-      - run: ruff check src tests examples site/scripts
-      - run: ruff format --check src tests examples site/scripts
+      - run: ruff check src tests examples site/scripts tools
+      - run: ruff format --check src tests examples site/scripts tools
       - run: mypy
       - run: python -m build
 
@@ -70,6 +70,14 @@ jobs:
             exit 1
           fi
           grep -q "xyberos\[http\]" missing.txt
+      # The experimental surface names its own extra, before it needs a journal to exist.
+      - run: |
+          set -o pipefail
+          if .smoke/bin/xyberos durable status 2>&1 | tee durable.txt; then
+            echo "durable status succeeded without the durable extra" >&2
+            exit 1
+          fi
+          grep -q "xyberos\[durable\]" durable.txt
       # ... and the same command must pass once it is installed.
       - run: .smoke/bin/python -m pip install "starlette>=0.40,<1" "httpx>=0.27,<1"
       - run: |

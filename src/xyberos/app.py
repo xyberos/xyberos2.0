@@ -117,6 +117,9 @@ class App:
                     scope=provider.scope.value,
                     eager=provider.eager,
                     source=provider.source,
+                    dependencies=tuple(
+                        _contract_name(dependency.contract) for dependency in provider.dependencies
+                    ),
                 )
                 for provider in self._registry.providers
             ),

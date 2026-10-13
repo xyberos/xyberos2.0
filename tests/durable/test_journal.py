@@ -11,7 +11,8 @@ import pytest
 from sqlalchemy import text
 
 from xyberos.durable import JOURNAL_SCHEMA_VERSION, JournalSettings, open_journal
-from xyberos.errors import DurableConfigurationError, DurableSchemaError
+from xyberos.durable.journal import Journal
+from xyberos.errors import DatabaseConnectionError, DurableConfigurationError, DurableSchemaError
 
 SOURCE_ROOT = Path(__file__).resolve().parents[2] / "src"
 
@@ -60,6 +61,64 @@ def test_a_newer_journal_is_refused_rather_than_guessed(tmp_path: Path) -> None:
         asyncio.run(scenario())
 
     assert "upgrade xyberos" in str(raised.value)
+
+
+def test_a_read_only_journal_refuses_a_newer_schema_without_migrating_it(tmp_path: Path) -> None:
+    """The inspection path must raise the same refusal and change nothing on the way out."""
+    path = tmp_path / "journal.db"
+    newer = JOURNAL_SCHEMA_VERSION + 1
+
+    async def write_newer() -> None:
+        journal = await open_journal(JournalSettings(path=path))
+        async with journal.database.transaction() as connection:
+            await connection.execute(
+                text("UPDATE journal_metadata SET value = :version WHERE name = 'schema_version'"),
+                {"version": str(newer)},
+            )
+        await journal.aclose()
+
+    async def inspect() -> int | None:
+        journal = await open_journal(JournalSettings(path=path, read_only=True))
+        try:
+            return await journal.version()
+        finally:
+            await journal.aclose()
+
+    asyncio.run(write_newer())
+
+    with pytest.raises(DurableSchemaError) as raised:
+        asyncio.run(inspect())
+
+    assert "upgrade xyberos" in str(raised.value)
+    assert asyncio.run(inspect_version_only(path)) == newer, "the file was brought forward anyway"
+
+    refusal = Journal(JournalSettings(path=path, read_only=True))
+    with pytest.raises(DurableSchemaError):
+        asyncio.run(refusal.start())
+    with pytest.raises(DatabaseConnectionError):
+        _ = refusal.database.engine
+
+
+async def inspect_version_only(path: Path) -> int | None:
+    """Read the recorded version without asking for the migration check, to see what is on disk."""
+    from xyberos.durable.journal import Journal
+
+    journal = Journal(JournalSettings(path=path, read_only=True))
+    await journal.database.start()
+    try:
+        return await journal.version()
+    finally:
+        await journal.aclose()
+
+
+def test_read_only_settings_reach_the_sqlite_provider(tmp_path: Path) -> None:
+    """The flag is not decorative: it is what makes SQLite refuse a write at the driver."""
+    settings = JournalSettings(path=tmp_path / "journal.db", read_only=True)
+
+    sqlite = settings.sqlite_settings()
+
+    assert sqlite.read_only is True
+    assert "mode=ro" in sqlite.url
 
 
 def test_a_failed_open_releases_the_engine(tmp_path: Path) -> None:

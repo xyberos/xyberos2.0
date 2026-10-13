@@ -735,6 +735,13 @@ whatever ASGI server is installed rather than bundling one, and `migrate` calls 
 the database extra exposes. It is `argparse` from the standard library, so a framework that refuses
 to depend on an HTTP stack does not depend on a CLI framework either.
 
+**Phase 11 adds two more, and the same test.** `check` gained `--json`, `--why`, and `--schema` so a
+script and an editor get the same answers as a person ([ADR 0020](adr/0020-introspection-documents.md)),
+and `durable status` reads the experimental journal read-only. Neither is a second implementation:
+`--json` is assembled from the calls the text report already makes, and `durable status` formats
+`JournalStore.stats()`, `oldest_non_terminal()`, and `list_executions()`. See
+[the implementation plan](implementation.md#phase-11---developer-tooling-and-the-contributor-loop).
+
 ## 10. Risks and mitigations
 
 | Risk                                           | Mitigation                                                                              |

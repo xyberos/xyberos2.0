@@ -34,13 +34,18 @@ teaches you to build. Each lesson on this site carries one of these labels, and
 | Command line: `new`, `check`, `run`, `migrate` | the `xyberos` command | Built-in (extra) | per command |
 | Database provider contract and conformance suite | `xyberos.database`, `xyberos.database.testing` | Extension point | `[database]` |
 | Durable executor | `xyberos.durable` | **Experimental** | `[durable]` |
-| HTML templates, static files, CSRF, sessions | Starlette and Jinja2 | You add it | application code |
+| HTML templates, static files, CSRF, sessions | Starlette and Jinja2 | You add it | `xyberos-templates` |
 | Object storage: filesystem provider and in-memory double | `xyberos.storage` | Built-in | core |
 | Storage provider contract and conformance suite | `xyberos.storage`, `xyberos.storage.testing` | Extension point | core |
+| MCP tools: consuming a server's tools over streamable HTTP | `xyberos.mcp` | Built-in | core |
+| MCP server direction: exposing an application's tools | — | You build it | `xyberos-mcp` |
 | Request metrics counters | `xyberos.http` (`RequestMetricsMiddleware`) | Built-in (extra) | `[http]` |
-| PostgreSQL, MySQL, MariaDB providers | — | Extension point, nothing shipped | — |
+| Logging handler and tracing spans | — | You add it | `xyberos-observability` |
+| PostgreSQL, MySQL, MariaDB providers | — | Extension point, nothing shipped | `xyberos-postgres` |
+| S3-compatible object storage | — | Extension point, nothing shipped | `xyberos-storage-s3` |
+| OpenAI-compatible chat and embedding endpoints | — | You add it | `xyberos-openai-compatible` |
 | Redis | — | You add it | — |
-| Identity, sessions, roles, tenancy model | — | Not provided, and it will not be | — |
+| Identity, sessions, roles, tenancy model | — | Not provided, and it will not be | `xyberos-auth` verifies an assertion and stops |
 | Vector store, embeddings index, memory, retrieval, intents, agents | — | You build it | — |
 
 ## The refusals are features
@@ -63,3 +68,15 @@ Three rows above are absences by decision rather than by omission, and each has 
 Nothing on this site describes a capability as "supported" unless a test in this repository exercises
 it. Where a lesson needs something the framework does not provide, the lesson says so at the top of the
 page and shows the code that supplies it.
+
+## Where the labels come from
+
+Every package named in the "Ships with" column above is an entry in
+[`packages.toml`](https://github.com/xyberos/xyberos2.0/blob/master/packages.toml) — the manifest of what
+lives outside this repository — and `tests/test_packages_manifest.py` checks this matrix against it. That
+is what keeps the table a claim about something real: a package that does not exist yet cannot appear here
+as shipped, and one that does exist cannot be missing.
+
+Two 1.x names are retired for this line rather than reused. `xyberos-db` points at `xyberos[database]` and
+the provider seam, and `xyberos-metrics` points at `xyberos.http.RequestMetricsMiddleware`; both keep their
+1.x release and gain a pointer, so nothing moves under a user who pinned them.

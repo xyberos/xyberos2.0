@@ -74,7 +74,7 @@ class FilesystemStorageSettings:
 
     @property
     def directory(self) -> Path:
-        """The absolute root directory, with ``~`` expanded and a relative path resolved from cwd."""
+        """The absolute root, with ``~`` expanded and a relative path resolved from cwd."""
         path = Path(self.root).expanduser()
         if not path.is_absolute():
             path = Path.cwd() / path
@@ -146,7 +146,7 @@ class FilesystemStorage:
             raise StorageError(f"{key!r} could not be read from {self._root}: {error}") from error
 
     async def delete(self, key: str) -> bool:
-        """Remove ``key`` and report whether an object was there, pruning any directory it emptied."""
+        """Remove ``key``, reporting whether it was there, pruning an emptied directory."""
         target = self._path_for(key)
         try:
             target.unlink()
@@ -162,8 +162,8 @@ class FilesystemStorage:
     async def list_keys(self, prefix: str = "") -> AsyncIterator[str]:
         """Yield the keys under ``prefix`` in ascending order.
 
-        ``prefix`` is matched as a literal string, not as a directory: ``list_keys("a/b")`` also yields
-        ``a/bc``. Only regular files are listed, so a directory, a temporary file left by an
+        ``prefix`` is matched as a literal string, not as a directory: ``list_keys("a/b")`` also
+        yields ``a/bc``. Only regular files are listed, so a directory, a temporary file left by an
         interrupted write, or a symlink never appears as an object.
         """
         for key in self._keys():
@@ -173,8 +173,9 @@ class FilesystemStorage:
     async def health(self) -> None:
         """Probe the root by publishing, reading back, and removing one object.
 
-        Existence alone is not enough: a filesystem that has gone read-only still reports a directory
-        that is there. The probe carries the reserved segment prefix, so it can never collide with a
+        Existence alone is not enough: a filesystem that has gone read-only still reports a
+        directory that is there. The probe carries the reserved segment prefix, so it can never
+        collide with a
         stored key, and it is removed whether or not the read succeeded.
         """
         probe = self._root / f"{RESERVED_SEGMENT_PREFIX}health"
@@ -192,10 +193,11 @@ class FilesystemStorage:
     def _ensure_root(self) -> None:
         """Make the root usable, or explain why it is not.
 
-        ``create_root`` is the difference between a deployment that may materialise its own directory
-        and one that must find a mounted volume where it expects it: with the setting off, a missing
-        root is a configuration failure at startup rather than a directory the process quietly makes.
-        """
+        ``create_root`` is the difference between a deployment that may materialise its own
+        directory and one that must find a mounted volume where it expects it: with the setting off,
+        a missing
+        root is a configuration failure at startup rather than a directory the process quietly
+        makes."""
         if self._root.is_dir():
             return
         if not self._settings.create_root:
@@ -233,7 +235,7 @@ class FilesystemStorage:
             if stem in _DEVICE_NAMES:
                 raise StorageKeyError(
                     f"a storage key segment must not name a device, and {segment!r} does: on "
-                    f"Windows it resolves to a device rather than a file, so one key would mean two "
+                    f"Windows it resolves to a device rather than a file, so one key means two "
                     f"things"
                 )
 

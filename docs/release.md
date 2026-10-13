@@ -281,14 +281,21 @@ the old release is neither edited nor yanked, and an environment that pins it ke
 
 - **What a 1.x user sees.** Their next unconstrained upgrade moves them to a rewrite. The changelog
   entry says so in its first line, and the README says it where they arrive.
-- **What the satellite distributions are told by their own metadata.** The 23 satellites named in
-  [ADR 0017](./adr/0017-release-identity-and-lineage.md) require the core with an open upper bound:
-  `xyberos-auth` `0.1.1`, `xyberos-db` `0.1.1`, and `xyberos-mcp` `0.2.1` all declare `xyberos>=1.0`.
-  After the upload, `pip install xyberos-auth` resolves the core to `2.0.0`, whose `xyberos.runtime`
-  and `xyberos.plugins` are unrelated to what those packages were written against, and the install
-  breaks with no version conflict to warn anyone. Repin them to `xyberos>=1.0,<2` and publish those
-  patches in the same window as the upload. This is the part of the upgrade that documentation cannot
-  fix, because a resolver is not a reader.
+- **Every name beside this line is tracked in one file.** [`packages.toml`](../packages.toml) records each
+  name, its import root, the core range it declares, and whether it is published, planned, or retired;
+  `tests/test_packages_manifest.py` keeps this page, the plugin guide's catalogue, and the feature matrix
+  in step with it. What follows is read from that file rather than from a blanket instruction.
+- **The repin has already shipped, per name.** The three satellites [ADR 0017](./adr/0017-release-identity-and-lineage.md)
+  names — `xyberos-auth` `0.1.2`, `xyberos-db` `0.1.2`, and `xyberos-mcp` `0.2.2` — declare
+  `xyberos>=1.0,<2`, so an unpinned install of any of them still resolves the 1.x core. There is no
+  blanket repin left to do: a name is repinned when it is touched, and the manifest records what each one
+  declares. Without that pin, `pip install xyberos-auth` resolves the core to `2.0.0`, whose
+  `xyberos.runtime` and `xyberos.plugins` are unrelated to what those packages were written against, and
+  the install breaks with no version conflict to warn anyone — a resolver is not a reader.
+- **A retired name gets a pointer, and nothing else.** `xyberos-db` points at `xyberos[database]`, and
+  `xyberos-metrics` at `xyberos.http`. Each gets a metadata-only patch — `0.1.3`, `0.2.3` — whose
+  description names the replacement and which keeps the `xyberos>=1.0,<2` pin, published in the same
+  window as the upload. No shim, and no 2.x release under a retired name.
 - **What to tell them.** A project that depends on the 1.x API should pin `xyberos<2`; a project that
   wants this line installs `xyberos>=2` into a clean environment rather than upgrading in place.
 - **What could soften the upgrade instead of only documenting it.** A final patch on the 1.x line — a

@@ -23,6 +23,8 @@ import pytest
 
 import xyberos
 from xyberos import AppSettings, ConfigurationError, Settings, Workflow, load_settings
+from xyberos.cli.check import DOCUMENT_VERSION, document
+from xyberos.diagnostics import ProviderInfo
 from xyberos.durable import JOURNAL_SCHEMA_VERSION, definition_fingerprint
 from xyberos.plugins import PLUGIN_API_VERSION, Plugin, PluginInfo, PluginState
 from xyberos.runtime.dependencies import ProviderRegistry
@@ -40,7 +42,11 @@ SETTINGS_FIELDS = ("schema_version", "app", "plugins", "ai")
 ENVIRONMENT_PREFIX = "XYBEROS_"
 NESTED_SEPARATOR = "__"
 PLUGIN_STATES = {"registered", "started", "stopped", "failed"}
-PLUGIN_INFO_FIELDS = {"api_version", "name", "requires", "state"}
+# `config_type` was added for `check --schema`, which types a plugin's `[plugins.<name>]` section
+# from it. The records below are read by `check --json` and `check --why`, so their fields are
+# pinned too: a field removed breaks a consumer that never imported anything.
+PLUGIN_INFO_FIELDS = {"api_version", "name", "requires", "state", "config_type"}
+PROVIDER_INFO_FIELDS = {"contract", "scope", "eager", "source", "dependencies"}
 # ClassVar annotations on the base class are the contract a plugin implements: they are declared
 # without values, so `hasattr` is false for two of them and the annotation is the real surface.
 PLUGIN_REQUIRED_CLASSVARS = {"name", "api_version", "requires", "config_type"}
@@ -150,6 +156,11 @@ def test_the_plugin_information_record_is_frozen() -> None:
     assert set(PluginInfo.__dataclass_fields__) == PLUGIN_INFO_FIELDS
 
 
+def test_the_provider_information_record_is_frozen() -> None:
+    """`check --json` serializes it and `check --why` walks `dependencies`, so both are surface."""
+    assert set(ProviderInfo.__dataclass_fields__) == PROVIDER_INFO_FIELDS
+
+
 def test_the_provider_registry_seams_are_stable() -> None:
     """Diagnostics and tests use these; removing one breaks them without breaking imports."""
     present = {name for name in vars(ProviderRegistry) if not name.startswith("_")}
@@ -210,3 +221,31 @@ def test_definition_metadata_is_json_serializable() -> None:
 
 def test_the_package_version_is_where_the_release_starts() -> None:
     assert xyberos.__version__ == "2.0.0"
+
+
+# --------------------------------------------------------------------------------------
+# Introspection documents
+# --------------------------------------------------------------------------------------
+
+# `check --json` is read by scripts, so its top-level keys are an interface. The nested shape is
+# pinned beside the code that builds it, in `tests/cli/test_introspection.py`.
+INTROSPECTION_DOCUMENT_KEYS = {
+    "document",
+    "xyberos_version",
+    "config_file",
+    "settings",
+    "application",
+}
+INTROSPECTION_SETTINGS_KEYS = {"schema_version", "app", "plugins", "ai"}
+
+
+def test_the_introspection_document_version_is_frozen() -> None:
+    """A reader ignores unknown keys, so adding one is additive; changing this is the break."""
+    assert DOCUMENT_VERSION == 1
+
+
+def test_the_introspection_document_keys_are_frozen() -> None:
+    body = json.loads(document())
+
+    assert set(body) == INTROSPECTION_DOCUMENT_KEYS
+    assert set(body["settings"]) == INTROSPECTION_SETTINGS_KEYS
