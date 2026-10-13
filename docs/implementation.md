@@ -1453,8 +1453,9 @@ core today. The owner's decision for this line is:
 One consequence is a document change rather than a code change: [the release guide](release.md#releasing-beside-the-published-1x-line)'s
 blanket repin instruction becomes per-name, and **ADR 0022** records this decision, the five conditions, and the
 name, URL, and owner of the ecosystem repository — which is also where `packages.toml` lives — and supersedes
-that clause of ADR 0017 for these two names. ADR numbers are taken when an ADR is written, so if this one lands
-before the four the phases propose, those become 0019-0022 and this one 0018.
+that clause of ADR 0017 for these two names. ADR numbers are taken when an ADR is written rather than reserved
+in advance: 0018-0020 went to the placement rule, the storage contract, and the introspection documents, so
+this one takes the next free number when it lands.
 
 **Still open, and owned by the project owner.**
 
