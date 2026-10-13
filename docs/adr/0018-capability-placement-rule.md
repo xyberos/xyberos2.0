@@ -67,7 +67,7 @@ satellite-names decision records (ADR 0022 in the plan's numbering, written when
 | --- | --- |
 | Object storage: the contract, a local-filesystem implementation, a double, and a conformance suite | **module here** (`xyberos.storage`) |
 | Request metrics: per-route and per-status counters as a middleware class | **module here**, inside the `http` extra (`xyberos.http.RequestMetricsMiddleware`) |
-| MCP tools (consuming a server's tools), streamable HTTP client only | **extra here** (`xyberos[mcp]`) |
+| MCP tools (consuming a server's tools), streamable HTTP client only | **module here** (`xyberos.mcp`) |
 | MCP `expose()`, and the stdio transport | **package there** (`xyberos-mcp`) |
 | Storage backends with a client library (S3-compatible), PostgreSQL, MySQL | **package there** |
 | Templates, static files, forms | **package there** (`xyberos-templates`) |

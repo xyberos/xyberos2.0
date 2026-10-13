@@ -16,6 +16,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import matrix
 import reference
 import roadmap
 import snippets_hook
@@ -54,19 +55,25 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    for step in (roadmap.main, reference.main):
-        code = step([]) if step is roadmap.main else step()
+    if args.check:
+        # Before anything writes: a stale inventory has to fail the build, not be repaired by it.
+        for check in (matrix.main, roadmap.main):
+            code = check(["--check"])
+            if code != 0:
+                return code
+
+    for step in (matrix.main, roadmap.main):
+        code = step([])
         if code != 0:
             return code
+
+    code = reference.main()
+    if code != 0:
+        return code
 
     code = publish_schema()
     if code != 0:
         return code
-
-    if args.check:
-        code = roadmap.main(["--check"])
-        if code != 0:
-            return code
 
     command = ["mkdocs", "serve" if args.serve else "build", "--strict"]
     environment = dict(os.environ)

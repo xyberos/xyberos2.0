@@ -791,12 +791,17 @@ extension-point contract.
 
 **One row reconciles two statements the plan made in different places.** `xyberos-mcp` was described as *reused
 as a rewrite* in the owner's decisions and as *retired with a pointer* here, and its client appeared in both the
-extra and the package. The directions are separable, and that is the resolution: **the extra here is the
+extra and the package. The directions are separable, and that is the resolution: **the module here is the
 client; the package there is `expose()`**, plus a stdio transport if the owner approves one. One name answers
 one question, the owner's decision section says the same thing in its own words, and ADR 0018 records it.
 
-**Why the rule beats a shim.** The tempting alternative is to publish `xyberos-mcp` 0.3.0 as a thin package
-that depends on `xyberos[mcp]` and re-exports it. It saves nothing and costs something: 2.0's `xyberos.runtime`
+The client needs no extra at all, which is the correction the implementation made to an earlier draft of this
+paragraph: a streamable-HTTP client over `urllib` has no third-party dependency, so it is `xyberos.mcp` in core
+like `xyberos.ai`, not `xyberos[mcp]`. The placement rule decides it — a module when the capability needs
+nothing from PyPI, an extra when it does — and an extra that installs nothing is theatre.
+
+**Why the rule beats a shim.** The tempting alternative is to publish `xyberos-mcp` 1.0.0 as a thin package
+that depends on core and re-exports `xyberos.mcp`. It saves nothing and costs something: 2.0's `xyberos.runtime`
 and `xyberos.plugins` are unrelated to the 1.x ones, so the package's body is a rewrite either way; the import
 root changes (`xyberos_mcp` to `xyberos.mcp`), so the shim preserves no import a 1.x user could rely on; and a
 second distribution answering one question inherits this repository's release cadence as a version constraint.
@@ -958,7 +963,8 @@ is what decides the repository, the publisher, and each name before the first up
    catalogue, the feature-matrix placement, the per-name release-guide wording, and the compatibility job's
    core leg.
 2. **`xyberos-mcp`, the server direction, and the stdio transport if the owner approves it.** *There:* the
-   `expose()` direction and a stdio transport — the two things `xyberos[mcp]` refuses — and nothing that
+   `expose()` direction and a stdio transport — the two things the core client `xyberos.mcp` refuses — and
+   nothing that
    duplicates the client, because two names answering one question is what the placement rule exists to prevent.
    The authorization gap is stated rather than closed: [ADR 0014](adr/0014-no-identity-or-authorization-model.md)
    leaves the framework no model to put in front of an RPC surface, so the package says that the caller brings
@@ -1428,17 +1434,19 @@ release guide names had already been repinned to `xyberos>=1.0,<2` — `xyberos-
 core today. The owner's decision for this line is:
 
 - **The placement rule decides the home.** A dependency-free capability small enough for this line's suite
-  ships here as an extra (`[storage]`, `[mcp]` while its client stays stdlib-only) or as a class inside an extra
-  that already exists (request metrics, in `[http]`); anything needing
+  ships here as a *module* when it needs nothing from PyPI (`xyberos.ai`, `xyberos.storage`, `xyberos.mcp`), as
+  an extra when it needs something this line accepts (`[http]`, `[database]`, `[ollama]`, `[durable]`), or as a
+  class inside an extra that already exists (request metrics, in `[http]`); anything needing
   Jinja2, OpenTelemetry, `cryptography`, a database driver, or an object-store client is a package in the
   ecosystem repository, and is released from there. One
   publishing path per name either way, and a name whose capability moved into an extra is retired with a
   metadata-only pointer rather than shimmed.
 - **`xyberos-mcp` is reused, as a rewrite** that declares `xyberos>=2,<3`, while `0.2.2` stays published and
   unedited for the 1.x line. What this name carries is the **server direction** — `expose()` and, if the owner
-  approves it, a stdio transport — while the **client** is `xyberos[mcp]` here, so one name answers one question
-  instead of two. [ADR 0014](adr/0014-no-identity-or-authorization-model.md) leaves the framework no
-  authorization model to put in front of an RPC surface, so the package says plainly that the caller brings one.
+  approves it, a stdio transport — while the **client** is the core module `xyberos.mcp` here, so one name
+  answers one question instead of two. [ADR 0014](adr/0014-no-identity-or-authorization-model.md) leaves the
+  framework no authorization model to put in front of an RPC surface, so the package says plainly that the
+  caller brings one.
 - **`xyberos-auth` is reused, carrying only the verification half.** The published `0.1.2` bundles OAuth2
   flows, OIDC, and Auth0/Okta/Entra presets; none of that returns, and the changelog's first line says so.
   The framework still owns no identity model, and the feature matrix's identity row is unchanged.

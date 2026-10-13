@@ -17,29 +17,87 @@ teaches you to build. Each lesson on this site carries one of these labels, and
 | **You add it** | A third-party library or server the framework deliberately does not depend on. |
 | **You build it** | Nothing ships. The lesson is the implementation. |
 
-## The matrix
+## What ships, and where it comes from
 
-| Capability | Import path or tool | Tier | Ships with |
-| ---------- | ------------------ | ---- | ---------- |
+<!-- generated:inventory -->
+
+_Generated when the site is built, and checked by `site/scripts/matrix.py --check`, so this inventory cannot describe a tree that no longer exists._
+
+**Modules.** What this package ships, and what a reader has to install for it. The `Needs` column is read from the code rather than remembered: a module that refuses to import without an extra names it in its own import guard, and the rollup follows each package's own entry point, which is why `xyberos.ai` is core while its Ollama adapter is not.
+
+| Module | What it provides | Needs |
+| ------ | ---------------- | ----- |
+| `xyberos` | Composition, dependency injection, lifecycle, configuration, routing, context, workflow engine, error taxonomy | core |
+| `xyberos.ai` | Provider-neutral AI facade: chat, streaming, structured output, tools, and a closed JSON Schema subset | core |
+| `xyberos.cli` | The `xyberos` command's implementation; the command and its options are the promise, not these modules | core |
+| `xyberos.database` | SQLite provider, connection and transaction handling, Alembic runner, provider conformance suite | `[database]` |
+| `xyberos.durable` | Experimental single-host durable execution: journal, store, scheduler, worker, recovery | `[durable]` |
+| `xyberos.execution` | In-process workflow engine: steps, edges, retries, timeouts, cancellation, events | core |
+| `xyberos.http` | Starlette adapter, route compiling, middleware, request metrics, test client | `[http]` |
+| `xyberos.mcp` | Model Context Protocol client over streamable HTTP, and the projection of a server's tools into the AI tool model | core |
+| `xyberos.plugins` | The plugin protocol and registry: trusted, ordered, no discovery | core |
+| `xyberos.runtime` | Dependency scopes, context binding, correlation ids, deadlines | core |
+| `xyberos.storage` | Storage contract, filesystem provider, in-memory double, conformance suite | core |
+
+**Extras.** One install each, and the modules that cannot be imported without it. `dev` is the contributor's toolchain rather than a user's: it is what makes the two libraries an *application* brings — Jinja2 and python-multipart — available to the test suite that documents them.
+
+| Extra | Declares | Needed by | What it adds |
+| ----- | -------- | --------- | ------------ |
+| `[database]` | `aiosqlite>=0.20,<1`, `alembic>=1.13,<2`, `sqlalchemy>=2.0,<2.1` | `xyberos.database.contracts`, `xyberos.database.migrations`, `xyberos.database.sqlite`, `xyberos.database.testing` | A single-file SQLAlchemy-friendly database, and the migrations that go with it |
+| `[dev]` | `build>=1.2,<2`, `hatchling>=1.25,<2`, `httpx>=0.27,<1`, `jinja2>=3.1,<4`, `mkdocs-material>=9.5,<10`, `mypy>=1.11,<2`, `pre-commit>=3.7,<5`, `python-multipart>=0.0.18,<1`, `pytest>=8,<10`, `ruff>=0.6,<1`, `tomli>=2,<3`, `types-PyYAML>=6.0,<7` | — | The contributor's toolchain, and the two libraries this line expects an *application* to bring: Jinja2 and python-multipart |
+| `[durable]` | `aiosqlite>=0.20,<1`, `alembic>=1.13,<2`, `sqlalchemy>=2.0,<2.1` | `xyberos.durable.journal`, `xyberos.durable.store` | Persistence for workflow progress, single host and at-least-once |
+| `[http]` | `httpx>=0.27,<1`, `starlette>=0.40,<2` | `xyberos.http.adapter`, `xyberos.http.metrics`, `xyberos.http.middleware`, `xyberos.http.requests`, `xyberos.http.routing`, `xyberos.http.testing` | Routing an application's routes as an ASGI application |
+| `[ollama]` | `httpx>=0.27,<1` | `xyberos.ai.ollama` | The first AI provider: a local Ollama service |
+
+**Packages outside this repository.** Every name this line knows about, from [`packages.toml`](https://github.com/xyberos/xyberos2.0/blob/master/packages.toml) — the manifest the compatibility job also reads. `planned` means decided and not written, `published` means a release exists that the job installs and proves.
+
+| Package | Import root | Status | Declares | Subject |
+| ------- | ----------- | ------ | -------- | ------- |
+| `xyberos-mcp` | `xyberos_mcp` | planned | `xyberos[http]` | The server direction: exposing an application's tools, and a stdio transport |
+| `xyberos-templates` | `xyberos_templates` | planned | `jinja2>=3.1,<4`, `python-multipart>=0.0.18,<1` | Server-rendered pages: an engine-neutral Templates contract with Jinja2 shipped, a static mount, and form reading |
+| `xyberos-observability` | `xyberos_observability` | planned | `opentelemetry-api>=1.20,<2`, `opentelemetry-sdk>=1.20,<2` | One explicit call that configures a logging handler and spans, fed by the runtime's own event sink |
+| `xyberos-auth` | `xyberos_auth` | planned | `cryptography>=42,<47` | Verification only: an assertion from a shared secret or a JWKS, and a Principal |
+| `xyberos-postgres` | `xyberos_postgres` | planned | `asyncpg>=0.29,<1`, `sqlalchemy>=2.0,<2.1` | A DatabaseProvider for PostgreSQL, proved against the shipped conformance suite |
+| `xyberos-storage-s3` | `xyberos_storage_s3` | planned | `aioboto3>=13,<16` | A Storage provider for S3-compatible object stores, proved against the shipped conformance suite |
+| `xyberos-openai-compatible` | `xyberos_openai_compatible` | planned | `httpx>=0.27,<1` | A ModelProvider for OpenAI-compatible chat and embedding endpoints |
+| `xyberos-db` | `xyberos_db` | retired → `xyberos[database]` | — | Retired: the capability is xyberos[database] and the provider seam |
+| `xyberos-metrics` | `xyberos_metrics` | retired → `xyberos.http` | — | Retired: request metrics ship as xyberos.http.RequestMetricsMiddleware |
+
+<!-- generated:end -->
+
+Every module above that needs an extra says so because of the code rather than because of this page:
+the guard that raises `ModuleNotFoundError` names the extra to install, and the inventory reads it
+from there. So a capability cannot be installed, documented, and forgotten about in the same commit.
+
+## Capabilities, extension points, and absences
+
+The inventory above is what exists. This table is what the framework *promises* about each capability
+— which is a decision rather than a fact about the tree, so it is written by hand. Everything named
+here is either shipped, or explicitly not shipped.
+
+| Capability | Where it lives | Tier | Ships with |
+| ---------- | -------------- | ---- | ---------- |
 | Application composition, dependency injection, scopes, lifecycle | `xyberos` | Built-in | core |
 | Typed configuration (`Settings`, `xyberos.toml`, `XYBEROS_*`) | `xyberos` | Built-in | core |
 | Context and logging helpers, error taxonomy | `xyberos` | Built-in | core |
 | Workflow engine: retries, branches, timeouts, cancellation | `xyberos` (`Workflow`, `WorkflowExecutor`, `direct`) | Built-in | core |
 | Trusted plugins | `xyberos` (`Plugin`, `PluginRegistry`) | Built-in | core |
 | AI facade, contracts, tools, JSON Schema subset, fake provider | `xyberos.ai` | Built-in | core |
+| Object storage: filesystem provider and in-memory double | `xyberos.storage` | Built-in | core |
+| MCP tools: consuming a server's tools over streamable HTTP | `xyberos.mcp` | Built-in | core |
 | HTTP routing over Starlette | `xyberos.http` | Built-in (extra) | `[http]` |
+| Middleware: correlation id, request scope, error mapping, request metrics | `xyberos.http` | Built-in (extra) | `[http]` |
 | SQLite provider and Alembic migrations | `xyberos.database` | Built-in (extra) | `[database]` |
 | Ollama adapter | `xyberos.ai.ollama` | Built-in (extra) | `[ollama]` |
-| Test doubles: `ManualClock`, `FakeModelProvider`, `temporary_database`, `create_test_client` | the `*.testing` modules | Built-in (extra) | with their extra |
-| Command line: `new`, `check`, `run`, `migrate` | the `xyberos` command | Built-in (extra) | per command |
-| Database provider contract and conformance suite | `xyberos.database`, `xyberos.database.testing` | Extension point | `[database]` |
+| Test doubles: `ManualClock`, `FakeModelProvider`, `InMemoryStorage`, `temporary_database`, `create_test_client` | the `*.testing` modules | Built-in | with the module they double |
+| Command line: `new`, `check`, `run`, `migrate`, `durable status` | the `xyberos` command | Built-in | per command |
 | Durable executor | `xyberos.durable` | **Experimental** | `[durable]` |
-| HTML templates, static files, CSRF, sessions | Starlette and Jinja2 | You add it | `xyberos-templates` |
-| Object storage: filesystem provider and in-memory double | `xyberos.storage` | Built-in | core |
-| Storage provider contract and conformance suite | `xyberos.storage`, `xyberos.storage.testing` | Extension point | core |
-| MCP tools: consuming a server's tools over streamable HTTP | `xyberos.mcp` | Built-in | core |
+| Database provider contract and conformance suite | `xyberos.database.testing` | Extension point | `[database]` |
+| Storage provider contract and conformance suite | `xyberos.storage.testing` | Extension point | core |
+| AI provider contract and conformance suite | `xyberos.ai.testing` | Extension point | core |
+| Plugin protocol, and the catalogue of packages that implement one | `xyberos.plugins`, [the plugin guide](reference/plugins.md) | Extension point | core |
+| HTML templates, static files, form reading, CSRF, sessions | Starlette and Jinja2 | You add it | `xyberos-templates` |
 | MCP server direction: exposing an application's tools | — | You build it | `xyberos-mcp` |
-| Request metrics counters | `xyberos.http` (`RequestMetricsMiddleware`) | Built-in (extra) | `[http]` |
 | Logging handler and tracing spans | — | You add it | `xyberos-observability` |
 | PostgreSQL, MySQL, MariaDB providers | — | Extension point, nothing shipped | `xyberos-postgres` |
 | S3-compatible object storage | — | Extension point, nothing shipped | `xyberos-storage-s3` |
@@ -71,11 +129,17 @@ page and shows the code that supplies it.
 
 ## Where the labels come from
 
-Every package named in the "Ships with" column above is an entry in
-[`packages.toml`](https://github.com/xyberos/xyberos2.0/blob/master/packages.toml) — the manifest of what
-lives outside this repository — and `tests/test_packages_manifest.py` checks this matrix against it. That
-is what keeps the table a claim about something real: a package that does not exist yet cannot appear here
-as shipped, and one that does exist cannot be missing.
+The inventory at the top of this page is generated, not maintained: `site/scripts/matrix.py` reads
+the modules from `src/xyberos/`, the extras from `pyproject.toml`, and the packages from
+[`packages.toml`](https://github.com/xyberos/xyberos2.0/blob/master/packages.toml) — the same manifest the
+compatibility job reads — and every build regenerates it. `python site/scripts/build.py --check` fails when
+it has drifted, `tests/test_packages_manifest.py` checks that the catalogue and the release guide agree
+with the same manifest, and `tests/site/test_matrix.py` checks the generator itself. A package that does
+not exist cannot appear here as shipped, and one that does exist cannot be missing.
+
+The tables *below* that one are written by hand on purpose, because they are decisions rather than
+descriptions: a capability the framework refuses, and a package that does not exist yet, cannot be
+derived from a tree that does not contain them.
 
 Two 1.x names are retired for this line rather than reused. `xyberos-db` points at `xyberos[database]` and
 the provider seam, and `xyberos-metrics` points at `xyberos.http.RequestMetricsMiddleware`; both keep their
