@@ -7,7 +7,9 @@
 > surface, and the release engineering. The phase table under "Phase status" is the at-a-glance state,
 > and nothing is released until the project owner signs the release gate. Phases 9-11 — the extras and
 > conformance suites this line ships, the packages that stay in the ecosystem repository, and developer tooling —
-> are planned rather than started. They apply the capability-placement decision recorded under "Adopted
+> are complete here: the distributions beside this line are written in
+[`xyberos/xyberos-plugins`](https://github.com/xyberos/xyberos-plugins), and none of them is published. They
+apply the capability-placement decision recorded under "Adopted
 > implementation decisions", together with the mechanism inventory and the publication-and-naming decision
 > recorded beside it: they are the additive work the release after `2.0.0` carries, they introduce no stable
 > public name, and their exit gates are below.
@@ -197,7 +199,7 @@ What the mechanisms do not settle is *placement*, and one rule settles it:
 | Placement | Ships as | Applies when |
 | --- | --- | --- |
 | **Extra, here** | `xyberos[x]`, one working implementation, tested by this repository's suite | no new third-party dependency, no policy a recorded ADR refuses, and small enough that this suite can exercise it |
-| **Package, there** | a distribution in `xyberos/xyberos`, the repository the published 1.x metadata declares | it needs a dependency core will not adopt, it carries policy, or it has its own release cadence |
+| **Package, there** | a distribution in the ecosystem repository, `xyberos/xyberos-plugins` ([ADR 0022](adr/0022-ecosystem-repository-and-satellite-names.md)) | it needs a dependency core will not adopt, it carries policy, or it has its own release cadence |
 | **Retire, with a pointer** | the published version stays; a metadata-only patch names the replacement | the capability landed in an extra, so a second distribution would be a second answer to one question |
 | **Refuse** | nothing | a recorded ADR refuses it, or the deferred backlog holds it |
 
@@ -250,20 +252,28 @@ is exactly the kind of claim the rest of this document refuses.
 publishes it, or what it is called, and leaving those to Phase 10 would make the first satellite release the
 place they get decided. They are decided here.
 
-- **One repository, several distributions.** The **ecosystem repository** is a single repository holding one
-  directory per distribution, each with its own `pyproject.toml`, version, and changelog. What is shared is the
-  machinery: one CI matrix, one review path, one release procedure, one drift job. Phase 10's work packages
-  already assume that layout; this makes it the decision rather than the discovery. Wherever the phase text
-  below says `xyberos/xyberos`, it means **the ecosystem repository**, and its name, URL, and owner are recorded
-  in ADR 0022.
+- **One repository, several distributions, grouped by subject.** The **ecosystem repository** is a single
+  repository holding one directory per subject and one directory per distribution inside it, each distribution
+  with its own `pyproject.toml`, version, and changelog. What is shared is the machinery: one CI matrix, one
+  review path, one release procedure, one drift job. Phase 10's work packages already assume that layout; this
+  makes it the decision rather than the discovery. The ecosystem repository is **`xyberos/xyberos-plugins`**,
+  not `xyberos/xyberos`, which holds the 1.x core line, and its name, URL, and owner are recorded in
+  [ADR 0022](adr/0022-ecosystem-repository-and-satellite-names.md).
+- **A subject folder owns its providers.** `db/` holds the database providers, `storage/` the storage
+  providers, and `llm-providers/` the model providers, one directory per distribution inside each:
+  `db/xyberos_postgres/` ships `xyberos-postgres`, and a second provider for the same subject lands beside it
+  rather than in a folder of its own. A retired name keeps its 1.x tree one level down, because a pointer patch
+  is the last release of a name a user may still have pinned; a reused name is rewritten where it already
+  lives, because a rewrite is not a patch.
 - **Re-create it only if it is not controllable, and re-create it before the first upload.** The deciding cost
   is not history or stars, it is **trusted publishing**: a PyPI trusted publisher binds to a (repository,
   workflow, environment) triple, so a repository that moves invalidates the publisher for every name it
-  published, and each one has to be re-registered. If the existing 1.x repository is still under the project's
-  control, keep it and make it the ecosystem home: it already has publishers, tags, and a release path whose
-  failures are understood. If it is not controllable, create the ecosystem repository and re-register every
-  publisher once, *before* the first 2.x upload rather than during it. Either way the pointer patches below need
-  only an upload — they do not need the old repository to still be the same repository.
+  published, and each one has to be re-registered. The repository that holds the satellites is under the
+  project's control, so it becomes the ecosystem home as it stands: it already has publishers, tags, and a
+  release path whose failures are understood. That is the branch
+  [ADR 0022](adr/0022-ecosystem-repository-and-satellite-names.md) took, and it is why that repository's name
+  and its publishing workflow's filename are both fixed. The pointer patches below need only an upload either
+  way — they do not need the repository to be a new one.
 - **Reuse the registered names rather than inventing new ones.** The owner already controls the `xyberos-*`
   names, so reuse costs nothing, whereas a fresh name for an existing capability splits search, documentation,
   and issue history for no gain. The resolver expresses the break on its own: a 2.x package declares
@@ -321,7 +331,7 @@ owner's, and no artefact is published before it is made.
 | 7 | Developer experience, hardening, and release | complete (release decision pending owner sign-off) | all seven work packages: `docs/stability.md` + [ADR 0013](adr/0013-stable-surface-and-versioning.md) + `tests/test_public_surface.py` + `tests/test_compatibility.py` + `tests/test_deprecation.py` + `src/xyberos/deprecation.py`; `docs/getting-started.md`, `docs/testing.md`, `docs/troubleshooting.md`, `docs/security.md`, `examples/hello_app/`; `src/xyberos/cli/` + `docs/cli.md` + `tests/cli/`; `CHANGELOG.md`, `SECURITY.md`, `docs/release.md`, `tests/test_release_artefacts.py`; `tests/perf/` + `docs/performance.md`; the threat review with two credential-echo defects fixed |
 | 8 | Boundary legibility and extension points | complete | [ADR 0014](adr/0014-no-identity-or-authorization-model.md), [0015](adr/0015-durability-is-single-host.md), [0016](adr/0016-database-providers-are-an-extension-point.md); `docs/positioning.md`, `docs/database-providers.md`; `assert_provider_contract` in `xyberos.database.testing` + `tests/database/test_provider_contract.py`; `examples/tenancy/`, `examples/broker_worker/` and their integration tests; the write-throughput baseline |
 | 9 | Extras here, and the placement rule | complete here (retirement patches belong to the publishing release) | [ADR 0018](adr/0018-capability-placement-rule.md), [ADR 0019](adr/0019-storage-contract.md); `src/xyberos/storage/` + `tests/storage/` (44 cases), `src/xyberos/http/metrics.py` + `tests/http/test_metrics.py`, `src/xyberos/mcp/` + `tests/mcp/` (23 cases), `assert_model_provider_contract` + `assert_embedding_provider_contract` in `src/xyberos/ai/testing.py`, the opt-in live Ollama leg, `docs/storage.md`, `docs/mcp.md` |
-| 10 | The packages that stay in the ecosystem repository | complete here; the packages themselves are work in that repository | [`packages.toml`](../packages.toml) + `tools/ecosystem.py` + `tests/test_packages_manifest.py` (13 cases); [`.github/workflows/compatibility.yml`](../.github/workflows/compatibility.yml) installing the published core per leg; the plugin catalogue, feature matrix, and per-name release-guide wording checked against the manifest |
+| 10 | The packages that stay in the ecosystem repository | complete here; the distributions are written in that repository and unpublished | [`packages.toml`](../packages.toml) + `tools/ecosystem.py` + `tests/test_packages_manifest.py` (13 cases); [`.github/workflows/compatibility.yml`](../.github/workflows/compatibility.yml) installing the published core per leg; the plugin catalogue, feature matrix, and per-name release-guide wording checked against the manifest |
 | 11 | Developer tooling and the contributor loop | complete here | [ADR 0020](adr/0020-introspection-documents.md); `src/xyberos/cli/{check,schema,durable}.py` + `src/xyberos/config.schema.json` + `tests/cli/test_introspection.py` + `tests/cli/test_durable_status.py` + `tests/test_config_schema.py`; the published schema copy (`site/scripts/build.py`); `.devcontainer/devcontainer.json`, `.pre-commit-config.yaml`, `tests/test_contributor_loop.py`; `tests/integration/test_first_five_minutes.py` |
 
 ### Phase 7 entry checklist
@@ -921,8 +931,14 @@ here.
 
 ### Phase 10 - the packages that stay in the ecosystem repository
 
-**Status:** *implemented here; the ecosystem half is not.* The **ecosystem half** — the packages, the ports, the retirement
-patches — remains work in another repository, and nothing here can publish it. Landed in this repository:
+**Status:** *implemented here; the ecosystem half is written there and unpublished.* The **ecosystem half** —
+the packages, the ports, the retirement patches — is source in
+[`xyberos/xyberos-plugins`](https://github.com/xyberos/xyberos-plugins), and nothing here can publish it. The
+seven planned distributions exist there, each passing its own gates — its suite, a strict type check, and a
+build that carries `py.typed` — and the three that implement a seam this repository ships a suite for pass that
+suite against a real service: a PostgreSQL server, an S3-compatible server, and a stub OpenAI-compatible
+endpoint. Every one of them is still `planned` in the manifest, because `published` means a release exists
+rather than that code does. Landed in this repository:
 [`packages.toml`](../packages.toml) as the manifest of every name beside this line, with
 `tests/test_packages_manifest.py` (13 cases) checking the plugin guide's catalogue, the feature matrix, and
 the release guide against it and enforcing ADR 0018's import-root rule; [`tools/ecosystem.py`](../tools/ecosystem.py)
@@ -933,10 +949,10 @@ Two honest limits are recorded rather than hidden: a GitHub Actions matrix canno
 legs are *gated* and the manifest job announces the empty list in an annotation instead of passing in
 silence; and the manifest lives here rather than in the ecosystem repository, because the documents checked
 against it are here. Almost all of the rest is work in
-the ecosystem repository, so each work package names both halves: what happens *there*, and what has to change
-*here* — usually a catalogue row and a link, never a copied file. Where this phase says `xyberos/xyberos`, read
-it as that repository, whose name and URL
-["Where the ecosystem lives"](#where-the-ecosystem-lives-and-under-which-names) leaves to ADR 0022.
+[`xyberos/xyberos-plugins`](https://github.com/xyberos/xyberos-plugins), the ecosystem repository, so each work
+package names both halves: what happens *there*, and what has to change *here* — usually a catalogue row and a
+link, never a copied file. Its name, URL, and owner are settled in
+[ADR 0022](adr/0022-ecosystem-repository-and-satellite-names.md).
 
 **Objective:** keep this repository's dependency graph and promise count small, and give the ecosystem one
 home. A capability that needs Jinja2, OpenTelemetry, `cryptography`, a database driver, or an object-store
@@ -948,13 +964,16 @@ is what decides the repository, the publisher, and each name before the first up
 
 **Work packages**
 
-1. **The publication mechanics, decided once for every name.** *There:* one directory per distribution with its
-   own `pyproject.toml`, version, and changelog; the `packages.toml` manifest described under
+1. **The publication mechanics, decided once for every name.** *There:* one directory per subject and one per
+   distribution inside it, each distribution with its own `pyproject.toml`, version, and changelog; discovery
+   of the distribution directories, because a workflow that enumerates them by hand cannot see one that was
+   added; the `packages.toml` manifest described under
    ["Where the ecosystem lives"](#where-the-ecosystem-lives-and-under-which-names), consumed from this
    repository rather than re-listed; one CI matrix that builds,
    tests, and lints every distribution and installs the **published** core rather than a checkout; a trusted
    publisher registered per distribution against whichever repository became the ecosystem home, once, before
-   the first upload; a `<distribution>-v<version>` tag scheme; the `project_urls` the satellites have never
+   the first upload; a tag scheme one level deeper than the one in service — `vX.Y.Z` publishes every
+   distribution, and `<subject>/<distribution>/vX.Y.Z` publishes one; the `project_urls` the satellites have never
    declared, Documentation first; a changelog whose first line states the break; and the pointer patches for
    retired names released from the same repository so that one place owns every `xyberos-*` name. *Here:* the
    catalogue rows, checked against the manifest rather than maintained beside it, and the release guide's
@@ -1040,19 +1059,21 @@ is what decides the repository, the publisher, and each name before the first up
 | Only the rule's cases land there | every package in this phase needs a dependency this line does not adopt, carries policy, or has its own cadence; Jinja2, OpenTelemetry, and `cryptography` are named with the reason |
 | A ported name is a rewrite with an honest first line | it declares `xyberos>=2,<3`, the old version stays published and unedited, and the changelog says what changed |
 | Compatibility is proved against what a user can install | every package's CI installs the published core and tests its own declared floor, and the compatibility job here runs the conformance suites against published artefacts |
-| A retired name points somewhere, and a reused name is not a second answer | `xyberos-db` points at `xyberos[database]` and `xyberos-metrics` at `xyberos[http]`, each with a pointer and an unchanged pin, while `xyberos-mcp` carries the server direction and exports no client |
+| A retired name points somewhere, and a reused name is not a second answer | `xyberos-db` points at `xyberos[database]` with a pointer and an unchanged pin, `xyberos-metrics` at `xyberos.http` with no release to point from, and `xyberos-mcp` carries the server direction and exports no client |
 | One repository publishes each name | no package release originates here, and the catalogue says where each one does |
 | The names are claimed before the code is written | a pre-release placeholder holds every decided name, and no placeholder is a normal release |
 | Trusted publishing is re-registered once, not once per release | the publisher list matches the ecosystem repository, and the first upload's provenance appears in the release guide |
 | Nothing in the ecosystem reaches back into core | no `[project.dependencies]` or extra entry here names a package, and the compatibility job is the only place the pair is proved |
 | A package release cannot be tagged on a red compatibility job | the job's matrix comes from the manifest, so a package marked `published` without a conformance target is refused before it is installed |
+| A name is published only when a suite this repository ships proves it | the three packages that implement a shipped seam carry the suite the job runs, and a package whose seam has no suite here stays `planned`, because a wheel installed from the index carries no tests to run |
 | The 1.x line's names are tracked in one place | `packages.toml` plus `tests/test_packages_manifest.py`, which keeps the catalogue, the feature matrix, and the release guide in step with it |
 | A package that would only wrap something is a recipe | `xyberos-templates` is published only if it owns the off-loop renderer and the engine-neutral contract; otherwise the catalogue row points at the recipe, and either form is a decision rather than a default |
 
 **Deliverables:** the packages, the ports, and the retirement patches in the ecosystem repository, with
 `packages.toml` as the manifest that names them; here, the catalogue rows checked against that manifest, the
 Extend-page links, the per-name wording in
-[the release guide](release.md#releasing-beside-the-published-1x-line), and ADR 0022 — which records the reused
+[the release guide](release.md#releasing-beside-the-published-1x-line), and
+[ADR 0022](adr/0022-ecosystem-repository-and-satellite-names.md) — which records the reused
 names, the ecosystem repository, the five conditions, and supersedes that clause of
 [ADR 0017](adr/0017-release-identity-and-lineage.md).
 
@@ -1180,8 +1201,9 @@ Three more follow from the publication decision, and each is a correction rather
 pre-repin state — `xyberos>=1.0`, unpatched — while the three names it discusses have already shipped a
 `xyberos>=1.0,<2` repin; the per-name wording has to state the version each name is actually at, or the guide
 describes a repository that no longer exists. [The plugin guide](plugins.md#the-catalogue)'s catalogue becomes
-generated-and-checked against the ecosystem repository's `packages.toml` rather than maintained by hand beside
-it, which is the same move the navigation and the reference pages already made. And
+generated-and-checked against this repository's [`packages.toml`](../packages.toml), where the manifest lives,
+rather than maintained by hand beside it, which is the same move the navigation and the reference pages already
+made. And
 [the feature matrix](../site/feature-support.md) gains a row per new extra and per package, naming the import
 path each one owns in its `Import path or tool` column — which is the column that makes the import-root rule
 visible to a reader who never opens an ADR.
@@ -1459,11 +1481,13 @@ core today. The owner's decision for this line is:
   by core or an extra.
 
 One consequence is a document change rather than a code change: [the release guide](release.md#releasing-beside-the-published-1x-line)'s
-blanket repin instruction becomes per-name, and **ADR 0022** records this decision, the five conditions, and the
-name, URL, and owner of the ecosystem repository — which is also where `packages.toml` lives — and supersedes
-that clause of ADR 0017 for these two names. ADR numbers are taken when an ADR is written rather than reserved
-in advance: 0018-0020 went to the placement rule, the storage contract, and the introspection documents, so
-this one takes the next free number when it lands.
+blanket repin instruction becomes per-name, and [ADR 0022](adr/0022-ecosystem-repository-and-satellite-names.md)
+records this decision, the five conditions, and the name, URL, and owner of the ecosystem repository —
+`xyberos/xyberos-plugins`, while `packages.toml` stays here, where the documents checked against it are — and
+supersedes that clause of ADR 0017 for these two names. ADR numbers are taken when an ADR is written rather than
+reserved in advance: 0018-0020 went to the placement rule, the storage contract, and the introspection
+documents, and this decision took **0022**, the number the plan already used for it, leaving 0021 to the
+deferred parallel-fan-out decision that the fan-out example is conditioned on.
 
 **Still open, and owned by the project owner.**
 

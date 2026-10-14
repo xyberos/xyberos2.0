@@ -59,8 +59,8 @@ otherwise, and no module may install one behind the application's back.
 
 ## The candidates, placed
 
-`here` is this repository; `there` is the ecosystem repository, whose name, URL, and owner the
-satellite-names decision records (ADR 0022 in the plan's numbering, written when Phase 10 needs it).
+`here` is this repository; `there` is the ecosystem repository, whose name, URL, and owner
+[ADR 0022](0022-ecosystem-repository-and-satellite-names.md) records: `xyberos/xyberos-plugins`.
 `module` and `extra` are both *here* and differ only in whether an extra name is involved.
 
 | Candidate | Placement |

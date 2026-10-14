@@ -224,6 +224,7 @@ nav:
       - reference/adr/0018-capability-placement-rule.md
       - reference/adr/0019-storage-contract.md
       - reference/adr/0020-introspection-documents.md
+      - reference/adr/0022-ecosystem-repository-and-satellite-names.md
   - Project:
       - Feature support: feature-support.md
       - Terminology: terminology.md

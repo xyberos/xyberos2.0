@@ -72,11 +72,10 @@ def published(manifest: dict[str, object]) -> list[str]:
 def published_jobs(manifest: dict[str, object]) -> list[dict[str, str]]:
     """Return the matrix the compatibility job runs: one entry per published package.
 
-    ``conformance`` is a dotted path to a callable the package installs — the thing that runs the
-    shipped suite against the package's own implementation and exits non-zero when it fails. An
-    entry marked
-    published without one is refused *here*, because a package the job installs and does not check
-    is worse than a package the job does not install at all.
+    ``conformance`` is Python source the job runs with ``python -c``: it runs the shipped suite
+    against the package's own implementation and exits non-zero when a check fails. An entry marked
+    published without one is refused *here*: a package the job installs and does not check is worse
+    than a package the job does not install at all.
     """
     jobs: list[dict[str, str]] = []
     for entry in packages(manifest):

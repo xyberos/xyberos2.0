@@ -292,10 +292,13 @@ the old release is neither edited nor yanked, and an environment that pins it ke
   declares. Without that pin, `pip install xyberos-auth` resolves the core to `2.0.0`, whose
   `xyberos.runtime` and `xyberos.plugins` are unrelated to what those packages were written against, and
   the install breaks with no version conflict to warn anyone — a resolver is not a reader.
-- **A retired name gets a pointer, and nothing else.** `xyberos-db` points at `xyberos[database]`, and
-  `xyberos-metrics` at `xyberos.http`. Each gets a metadata-only patch — `0.1.3`, `0.2.3` — whose
-  description names the replacement and which keeps the `xyberos>=1.0,<2` pin, published in the same
-  window as the upload. No shim, and no 2.x release under a retired name.
+- **A retired name gets a pointer, and nothing else.** `xyberos-db` `0.1.2` points at `xyberos[database]`
+  and the provider seam, in a metadata-only `0.1.3` whose description names the replacement and which keeps
+  the `xyberos>=1.0,<2` pin, published in the same window as the upload. `xyberos-metrics`, whose capability
+  ships as `xyberos.http.RequestMetricsMiddleware`, has nothing to point *from*: no release under that name
+  resolves on the index, so this line publishes no patch for it, and a `0.2.x` upload would create the name
+  rather than retire it — the second answer to one question the pointer rule exists to avoid. No shim ships,
+  and no 2.x release is cut under either name.
 - **What to tell them.** A project that depends on the 1.x API should pin `xyberos<2`; a project that
   wants this line installs `xyberos>=2` into a clean environment rather than upgrading in place.
 - **What could soften the upgrade instead of only documenting it.** A final patch on the 1.x line — a

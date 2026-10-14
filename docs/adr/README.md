@@ -48,3 +48,4 @@ backlog. Annotate anything newly satisfied, and give an owner to anything that h
 | [0018](0018-capability-placement-rule.md) | The capability-placement rule: four placements, four constraints | accepted |
 | [0019](0019-storage-contract.md) | The storage contract, and keys as the security boundary | accepted |
 | [0020](0020-introspection-documents.md) | Serialized introspection output is a versioned contract | accepted |
+| [0022](0022-ecosystem-repository-and-satellite-names.md) | The ecosystem repository is `xyberos/xyberos-plugins`; two satellites are reused and two are retired | accepted |

@@ -172,14 +172,16 @@ explicitly, and `xyberos` never looks for one ([ADR 0007](./adr/0007-trusted-plu
 supply-chain decision — entry-point loading means a dependency can change what your process does at
 import time — but it does not mean extensions are invisible. This section is the list.
 
-**Nothing beside this line is published yet.** Every name below is decided and unbuilt. The table is
+**Nothing beside this line is published yet.** Every name below is written in the ecosystem repository, or
+decided and waiting for one there, and none of them has a release: `published` in the manifest means a release
+exists, not that the code does. The table is
 generated from [`packages.toml`](../packages.toml), and `tests/test_packages_manifest.py` checks this page
 against that file, so a package cannot be added to the manifest and quietly omitted here — and this page
 cannot invent one.
 
 | Package | What it will be | Proved by | Published by |
 | --- | --- | --- | --- |
-| `xyberos-mcp` | the server direction: exposing an application's tools, and a stdio transport | its own suite against a stub server | this project |
+| `xyberos-mcp` | the server direction: exposing an application's tools over MCP, and a stdio transport only with the owner's approval | its own suite against a stub server | this project |
 | `xyberos-templates` | an engine-neutral `Templates` contract with Jinja2 shipped, a static mount, and form reading | its own tests, including the escaping pair and a render that does not block the loop | this project |
 | `xyberos-observability` | one explicit call that configures a handler and spans, fed by the runtime's event sink | its own tests, including that a redacted field stays redacted | this project |
 | `xyberos-auth` | verification only: an assertion from a shared secret or a JWKS, and a `Principal` | its own tests refusing an unsigned, an expired, and a wrong-audience assertion | this project |
@@ -188,6 +190,13 @@ cannot invent one.
 | `xyberos-openai-compatible` | a `ModelProvider` for OpenAI-compatible endpoints | `assert_model_provider_contract` | this project |
 | `xyberos-db` | retired: the capability is `xyberos[database]` and the provider seam | — | this project |
 | `xyberos-metrics` | retired: request metrics ship as `xyberos.http.RequestMetricsMiddleware` | — | this project |
+
+**Only what this repository can check can be marked published.** `packages.toml` records a `conformance`
+snippet for every published name and refuses a published name without one, because a package that is installed
+and not checked is worse than one that is not installed at all. The snippet runs a suite this repository ships,
+so the three rows above that implement a shipped seam become publishable when the package exists, and a name
+whose seam has no suite here stays planned however green its own tests are — a wheel installed from the index
+carries no tests for the job to run.
 
 **Published by this project, or listed as a community plugin.** A row marked *this project* is published
 by the people who publish `xyberos`, from the repository above, and its conformance suite is the one this

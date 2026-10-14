@@ -78,6 +78,32 @@ jobs:
     needs: manifest
     if: needs.manifest.outputs.packages != '[]'
     runs-on: ubuntu-latest
+    services:
+      # A conformance suite is the payment for a seam, and every seam so far is a provider, so a leg that
+      # needs a service is the ordinary case rather than the exception. A matrix cannot vary a job's
+      # services per entry, so both start for every leg and the one a package does not need costs a few
+      # seconds. MinIO is deliberately absent: its open-source server was archived and its image is no
+      # longer served, and this is the S3-compatible server the S3 provider was verified against.
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+      s3:
+        image: zenko/cloudserver
+        env:
+          SCALITY_ACCESS_KEY_ID: minioadmin
+          SCALITY_SECRET_ACCESS_KEY: minioadmin
+          S3BACKEND: mem
+        ports:
+          - 59000:8000
     strategy:
       fail-fast: false
       matrix:
@@ -89,5 +115,32 @@ jobs:
           python-version: "3.12"
       - run: python -m pip install --upgrade pip
       - run: python -m pip install "${{ needs.manifest.outputs.core }}" "${{ matrix.package.name }}"
+      - name: Wait for the services to accept connections
+        run: |
+          python - <<'PYEOF'
+          import socket
+          import time
+
+          def wait(port: int, timeout: float = 120.0) -> None:
+              deadline = time.monotonic() + timeout
+              while time.monotonic() < deadline:
+                  try:
+                      with socket.create_connection(("127.0.0.1", port), timeout=2):
+                          print(f"127.0.0.1:{port} accepts connections")
+                          return
+                  except OSError:
+                      time.sleep(2)
+              raise SystemExit(f"127.0.0.1:{port} never accepted a connection")
+
+          for port in (5432, 59000):
+              wait(port)
+          PYEOF
       - name: Run the conformance suite this package declares
+        env:
+          # These are the addresses the job provisions. They also happen to be the defaults the
+          # packages document, and stating them here is what keeps the job honest about what it provides.
+          XYBEROS_POSTGRES_DSN: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+          XYBEROS_STORAGE_S3_ENDPOINT: http://127.0.0.1:59000
+          XYBEROS_STORAGE_S3_ACCESS_KEY: minioadmin
+          XYBEROS_STORAGE_S3_SECRET_KEY: minioadmin
         run: python -c "${{ matrix.package.conformance }}"
