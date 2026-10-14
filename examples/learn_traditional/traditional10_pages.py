@@ -11,12 +11,13 @@ import tempfile
 from pathlib import Path
 
 from httpx import Response
+from starlette.middleware import Middleware
 from user_management.app import create_app
 from user_management.identity import PrincipalVerifier
 from user_management.migrate import migrate
 
 from xyberos.database import SqliteSettings
-from xyberos.http import HttpAdapter
+from xyberos.http import CSRFMiddleware, HttpAdapter
 from xyberos.http.testing import create_test_client
 
 SECRET = "a-secret-the-deployment-keeps"
@@ -64,6 +65,26 @@ def main() -> None:
             print("POST with markup ->", posted.status_code)
             print("the markup is escaped:", "&lt;script&gt;alert(1)&lt;/script&gt;" in rendered)
             print("and none of it is raw:", MARKUP not in rendered)
+
+        # The form the framework can protect: one middleware on the adapter, and a submission from
+        # another site never reaches the handler.
+        guarded = HttpAdapter(
+            create_app(settings=settings, secret=SECRET),
+            middleware=(Middleware(CSRFMiddleware),),
+        )
+        with create_test_client(guarded) as protected:
+            protected.headers.update(ADMIN_HEADERS)
+            cross_site = protected.post(
+                "/pages/users",
+                data={"email": "evil@example.com", "display_name": "Evil"},
+                headers={"Origin": "https://evil.example"},
+                follow_redirects=False,
+            )
+            print("cross-site post ->", cross_site.status_code)
+            print(
+                "and it never reached the form:",
+                "Evil" not in protected.get("/pages/users").text,
+            )
 
 
 if __name__ == "__main__":

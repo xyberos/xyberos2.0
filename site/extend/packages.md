@@ -250,15 +250,17 @@ have invalidated. That decision, and the refusals it sits beside, are
 ## What is deliberately not here
 
 The same request that produced `xyberos-crud` also asked for an ORM, for CSRF and session middleware, and
-for scaffolding that generates resources, routes, forms, and templates. Those are **refused**, and the
-reasons are recorded rather than implied:
+for scaffolding that generates resources, routes, forms, and templates. Applying
+[ADR 0018](../reference/adr/0018-capability-placement-rule.md)'s rule to them gives three answers rather
+than one, and the reasons are recorded rather than implied:
 
-- **No ORM, no admin UI, no session store.** [Where Xyberos fits](../reference/positioning.md) lists a
-  batteries-included application as a poor fit *because* those are absent, and points a team that wants
-  them at Django, or FastAPI with SQLAlchemy.
-- **No CSRF or session middleware.** Starlette ships both and the adapter composes with them, so the gap
-  costs an install rather than a capability. The framework declines to own the storage choice and the
-  policy ([ADR 0018](../reference/adr/0018-capability-placement-rule.md)).
+- **CSRF and sessions ship in the framework now.** Both are middleware the application passes
+  ([ADR 0024](../reference/adr/0024-sessions-and-csrf-are-middleware-in-the-http-module.md)): the
+  mechanism is `xyberos.http`, and the session *store* — which is the policy — is an extension point a
+  package beside this line implements.
+- **No ORM, no admin UI, no durable session store.** [Where Xyberos fits](../reference/positioning.md)
+  lists a batteries-included application as a poor fit *because* those are absent, and points a team
+  that wants them at Django, or FastAPI with SQLAlchemy.
 - **No scaffolding beyond `xyberos new`.** Generating an application's shape is a decision about that
   application, and a generator would make it the framework's.
 

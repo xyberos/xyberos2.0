@@ -81,8 +81,9 @@ their own identity and every check above becomes decoration.
 - The proxy removes those headers from inbound requests, and sets them only after authenticating.
 - The secret lives in the deployment's environment, not in the repository, and never in a URL: the
   signature is what makes the header a fact.
-- Nothing here is durable. A verified principal is per request, which is why nothing is cached in a
-  session, a cookie, or `contextvars` ([security guide](../../reference/security.md)).
+- Nothing here is durable. A verified principal is per request, which is why it is cached in nothing —
+  not in a session, a cookie, or `contextvars` ([security guide](../../reference/security.md)).
+  `xyberos.http.SessionMiddleware` is the right tool for *state*; a principal is not state.
 
 ## What the lesson runs
 
@@ -131,7 +132,8 @@ Three of those lines are the lesson:
 - **Answering `404` where you mean `403`.** Replacing a refusal with "not found" hides existence, which
   is sometimes the right call and always a decision — make it deliberately, as the exercise does.
 - **Letting a client supply a role.** A role in a header is only a role because the signature covered
-  it. Roles from a query parameter, a body, or a cookie are a client asserting its own permissions.
+  it. Roles from a query parameter, a body, or a cookie are a client asserting its own permissions — and
+  that holds just as much for a value read out of a session as for one read out of a query string.
 - **Checking the role in the service.** The service should not know what a route is: keep the refusal at
   the edge of the operation and pass a principal that already satisfies it. When a rule is genuinely
   about the data — "this record belongs to that subject" — it belongs in the service, scoped by the

@@ -128,14 +128,14 @@ Stage D — HTTP, APIs, and identity
 - Routes, path parameters, query parameters, and request bodies.
 - Start, configure, and serve the application.
 - Identity arrives from upstream: a component verifies a signed assertion and returns a principal, the principal is passed to the service as a required argument, and the tenant comes from the principal — never from the request payload, and never from a context variable.
-- Authorization is a product decision the application makes, and this series does not build one. XYBEROS ships no identity, session, or role model and will not (ADR 0014); the tested shape is the tenancy example, including the case where a payload that claims another tenant changes nothing.
+- Authorization is a product decision the application makes, and this series does not build one. XYBEROS ships no identity or authorization model and will not (ADR 0014); sessions and CSRF ship as middleware the application passes (ADR 0024, which changed their placement after this plan was written), and the tested identity shape is the tenancy example, including the case where a payload that claims another tenant changes nothing.
 - Protected endpoints, `401` versus `403`, and stripping the assertion header at the edge.
 
 References: [Starlette templates](https://www.starlette.io/templates/) and [Starlette static files](https://www.starlette.io/staticfiles/)
 
 Stage E — Server-rendered interfaces
 
-Boundary first: XYBEROS ships no template engine, no static-file mount, and no session or CSRF middleware. A route handler may return any Starlette `Response`, so HTML rendering works — the engine, the asset pipeline, and the session handling belong to the application, exactly like the ASGI server does. This stage uses Starlette's `Jinja2Templates` and `StaticFiles`, both of which are prerequisites rather than XYBEROS APIs. Nothing in this stage is a XYBEROS feature.
+Boundary first: XYBEROS ships no template engine and no static-file mount. A route handler may return any Starlette `Response`, so HTML rendering works — the engine and the asset pipeline belong to the application, exactly like the ASGI server does. This stage uses Starlette's `Jinja2Templates` and `StaticFiles`, both of which are prerequisites rather than XYBEROS APIs. Nothing in this stage is a XYBEROS feature. **Superseded in part by ADR 0024:** sessions and CSRF *do* ship now, as `xyberos.http` middleware the application passes, so a form stage uses `CSRFMiddleware` rather than reaching for a third-party one.
 
 - HTML templates and template inheritance.
 - HTMX for partial page updates.

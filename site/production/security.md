@@ -83,7 +83,8 @@ choice in the handler, not an accident of what was raised.
 | Concern | Who owns it | Where it is argued |
 | ------- | ----------- | ------------------ |
 | TLS, CORS, header limits, body size, rate limits | the ASGI server and the proxy | [security reference](../reference/security.md) |
-| Authentication and sessions | your identity provider and proxy | [the identity lesson](../learn/traditional/08-identity.md) |
+| Authentication | your identity provider and proxy | [the identity lesson](../learn/traditional/08-identity.md) |
+| Session state and CSRF | `xyberos.http` middleware you pass, over a store you own | [the sessions example](https://github.com/xyberos/xyberos2.0/tree/master/examples/sessions) |
 | Assertion-header hardening | the proxy must **strip** what a client sends | the same lesson, and it is the lesson's own warning |
 | Authorization | application code, at the edge, per request | [the hybrid path's principal lesson](../learn/hybrid/02-principal.md) |
 | Secret storage and rotation | a secret manager | [security reference](../reference/security.md#secrets) |

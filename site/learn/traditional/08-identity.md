@@ -14,10 +14,13 @@ prerequisites: ["/learn/traditional/07-migrations"]
 ## What you will build
 
 The first lesson about something a request carries that the application must not trust. Xyberos ships no
-identity, session, tenancy, or authorization model and will not
+identity, tenancy, or authorization model and will not
 ([ADR 0014](../../reference/adr/0014-no-identity-or-authorization-model.md)), so this lesson is not
 about a framework feature: it is about the *shape* the ADR sanctions, and the four rules that make it
-safe.
+safe. Sessions **do** ship now, as middleware the application passes
+([ADR 0024](../../reference/adr/0024-sessions-and-csrf-are-middleware-in-the-http-module.md)), and this
+lesson keeps them out of the identity path deliberately: a session remembers state, never who somebody
+is.
 
 Two of the endpoints you already have are the wrong way round for this. `GET /users/{user_id}` asks the
 caller to name a user; after this lesson the caller cannot name one at all.
@@ -25,7 +28,9 @@ caller to name a user; after this lesson the caller cannot name one at all.
 ## What you need
 
 Nothing new. The interesting part of this lesson is what it does *not* install: no auth library, no
-session store, no role model.
+role model, and no *durable* session store. `xyberos.http.SessionMiddleware` ships, and
+[the sessions example](https://github.com/xyberos/xyberos2.0/tree/master/examples/sessions) is what it
+is for; deciding who the caller is stays outside it.
 
 ## The four rules
 
@@ -129,10 +134,10 @@ somebody else -> 404 {'error': {'type': 'AccountNotLinkedError', 'message': 'no 
 
 | Provided | Refused |
 | -------- | ------- |
-| `HttpError` with the status you choose (`401` here, `403` in lesson 9) | any identity, session, or role model |
-| request-scoped providers, if a verifier should cache its work inside one request | a login form, or a place to keep a password |
-| `app.with_overrides` to fake a verifier in a test | a tenant in `contextvars`, or any ambient authority |
-| an error policy that never leaks an internal message to a client | enforcement of tenancy, or a warning when you forget to verify |
+| `HttpError` with the status you choose (`401` here, `403` in lesson 9) | any identity, role, or tenancy model |
+| sessions and CSRF, as middleware the application passes ([ADR 0024](../../reference/adr/0024-sessions-and-csrf-are-middleware-in-the-http-module.md)) | a login form, a password store, or an authorization decision |
+| request-scoped providers, if a verifier should cache its work inside one request | a tenant in `contextvars`, or any ambient authority |
+| an error policy that never leaks an internal message to a client | enforcement of tenancy for you, or a warning when you forget to verify |
 
 That list is short on purpose. A framework that owned authorization would be responsible for security it
 cannot see, and a half-built one would be worse than none.
@@ -142,9 +147,11 @@ cannot see, and a half-built one would be worse than none.
 - **Trusting a header because it is present.** `X-Authenticated-Subject: ada@idp` is a string anyone can
   send. It becomes a fact only after something checked it, and the check is what this lesson's HMAC
   stands in for: replace it with a token signature or an introspection call.
-- **Putting the principal in a session or a cookie.** A session is a second identity system with its own
-  lifetime, revocation, and failure modes; if the assertion arrives on every request, verify it on every
-  request and keep nothing.
+- **Putting the principal in a session.** `xyberos.http.SessionMiddleware` ships
+  ([ADR 0024](../../reference/adr/0024-sessions-and-csrf-are-middleware-in-the-http-module.md)), and a
+  session is the right place for *state* — a cart, a chosen theme, a draft. It is the wrong place for
+  *identity*: an assertion that arrives on every request should be verified on every request, and a
+  cached principal is a second identity system with its own lifetime, revocation, and failure modes.
 - **Scoping by a value from the payload.** A client that can name the account it reads is a client that
   can name somebody else's. `PATCH /me` refuses `id` and `external_subject` for exactly this reason.
 - **Using `bind_context` as authorization.** It is for logs and correlation. Authorization decisions

@@ -14,8 +14,10 @@ prerequisites: ["/learn/traditional/09-protected"]
 ## What you will build
 
 The application's first interface. Everything so far returned JSON, and the service underneath did not
-care; this lesson adds pages, forms, and the two shapes that make a form safe — post, then redirect, and
-re-render the form when a submission is refused.
+care; this lesson adds pages, forms, and the three shapes that make a form safe — post, then redirect;
+re-render the form when a submission is refused; and refuse a submission that came from another site,
+with the cross-site check the framework ships
+([ADR 0024](../../reference/adr/0024-sessions-and-csrf-are-middleware-in-the-http-module.md)).
 
 **This lesson is application code, not a framework feature.** Xyberos routes and serializes; it ships no
 template engine, no HTML helper, and no static-file convention. The engine here is Jinja2 through
@@ -41,6 +43,11 @@ Two dependencies the framework does not bring, and does not want to:
 Jinja2 renders the page. `python-multipart` is what Starlette parses a submitted form with: without it
 `request.form()` raises instead of reading the body, because the parser is a separate library rather
 than part of Starlette.
+
+The cross-site check brings **nothing**. `xyberos.http.CSRFMiddleware` is in the `[http]` extra the
+adapter already needs, and it needs no secret, no store, and no third-party package — which is why the
+framework ships it rather than pointing you at one
+([ADR 0024](../../reference/adr/0024-sessions-and-csrf-are-middleware-in-the-http-module.md)).
 
 ## The templates
 
@@ -83,6 +90,23 @@ administrator's assertion. In a deployment the proxy authenticates the person, s
 headers, and the page routes check them exactly as the API routes do. Nothing about the HTTP shape
 changes; the assertion just arrives from a different client.
 
+## Making the form safe against another site
+
+A browser attaches its cookies to any request a page makes — including one that a page on another site
+told it to make. The cross-site check is what refuses that, and here it is one line on the adapter —
+`HttpAdapter(app, middleware=(Middleware(CSRFMiddleware),))`. The middleware reads headers only — the
+`Origin` a browser attaches, and an optional `X-CSRF-Token` — so it never consumes the body the handler
+still has to read. A request with neither header is not a browser cross-site request, so it is allowed,
+which is why this lesson's own client, which sends no `Origin`, posts successfully throughout. The last
+two lines of the transcript are the check working: a `POST` carrying `Origin: https://evil.example`
+answers `403`, and the row it tried to create is not there.
+
+A real browser form needs one line more than this lesson shows, because a `POST` from a rendered page
+carries a genuine origin: render the token into the form with `get_csrf_token(request)` and the
+middleware compares it. That is exactly what
+[the sessions example](https://github.com/xyberos/xyberos2.0/tree/master/examples/sessions) does,
+together with the session the form belongs to.
+
 ## What the lesson runs
 
 <!-- snippet: examples/learn_traditional/traditional10_pages.py -->
@@ -116,6 +140,8 @@ and the refusal is text, not markup: True
 POST with markup -> 303
 the markup is escaped: True
 and none of it is raw: True
+cross-site post -> 403
+and it never reached the form: True
 ```
 
 | Line | What it establishes |
@@ -126,6 +152,8 @@ and none of it is raw: True
 | `the form keeps what was typed` | the re-render carries the submitted value back |
 | `the refusal is text, not markup` | an error message is escaped like any other value |
 | `the markup is escaped` / `and none of it is raw` | a display name containing `<script>` renders as text, and never as a tag |
+| `cross-site post -> 403` | a submission from another site is refused before the handler runs |
+| `and it never reached the form` | the refused write left no row: the check is a refusal, not a delay |
 
 ## Common mistakes
 
@@ -142,6 +170,9 @@ and none of it is raw: True
   field is an object, and the service's `isinstance` check is what refuses it.
 - **Forgetting the page routes in the route table review.** These routes are new endpoints with their own
   authorization, exactly like the API's.
+- **Reaching for a third-party CSRF library.** The framework ships one
+  ([ADR 0024](../../reference/adr/0024-sessions-and-csrf-are-middleware-in-the-http-module.md)); it needs
+  no store and no secret, and it composes with `SessionMiddleware` when the form belongs to a session.
 
 ## Exercise
 

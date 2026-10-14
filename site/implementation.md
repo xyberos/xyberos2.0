@@ -103,7 +103,11 @@ ADR 0007). Add a lesson that does not exist in `site.md`: **read `xyberos check`
 control" for the User Management project.
 
 **The code** refuses this on purpose. [ADR 0014](../docs/adr/0014-no-identity-or-authorization-model.md):
-no identity, tenancy, session, or authorization model, and none will be added. The sanctioned shape is
+no identity, tenancy, or authorization model, and none will be added. *Sessions and CSRF were later
+split out of that refusal by
+[ADR 0024](../docs/adr/0024-sessions-and-csrf-are-middleware-in-the-http-module.md): they ship as
+`xyberos.http` middleware, while the identity and authorization decisions stay exactly where this
+section puts them.* The sanctioned shape is
 a component that *verifies* an incoming assertion and returns a principal, the principal passed to
 services as a required argument, and the tenant taken from the principal — never from the payload or
 `contextvars`. [`examples/tenancy/`](../examples/tenancy) is that pattern, tested, including the case
@@ -139,9 +143,10 @@ library; the runtime is not involved", with no Xyberos import in the code sample
 **`site.md` §3 Stage E** teaches template inheritance, HTMX, Alpine.js, and Tailwind as part of the
 framework progression.
 
-**The code**: `xyberos.http` ships route compilation, three middlewares (correlation ID, error
-mapping, request scope), and the ASGI adapter. There is **no** template engine, **no** static-file
-mount, **no** session or CSRF middleware. A handler *may* return any Starlette `Response` —
+**The code**: `xyberos.http` ships route compilation, the ASGI adapter, and the middlewares the
+application passes (correlation ID, error mapping, request scope, request metrics, sessions, CSRF).
+There is **no** template engine and **no** static-file mount. A handler *may* return any Starlette
+`Response` —
 [`tests/http/test_adapter.py`](../tests/http/test_adapter.py) returns a `PlainTextResponse` from a
 handler and the adapter passes it through — so `HTMLResponse` and Starlette's `Jinja2Templates` work;
 they are simply application-supplied, exactly like `uvicorn` is.

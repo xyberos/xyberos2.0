@@ -19,8 +19,9 @@ from xyberos.http import HttpAdapter
 from xyberos.http.testing import create_test_client
 
 SECRET = "a-secret-the-deployment-keeps"
-#: The assertion travels with the request. There is no session and no ambient caller, which is what
-#: makes the next lesson's refusals checkable instead of described.
+#: The assertion travels with the request. There is no ambient caller — and no session standing in
+#: for one, though the framework ships sessions for state — which is what makes the next lesson's
+#: refusals checkable instead of described.
 ADA = PrincipalVerifier(SECRET).headers("ada@example.com", "acme", ["requester"])
 
 TICKETS = [
