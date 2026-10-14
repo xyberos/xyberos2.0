@@ -75,6 +75,11 @@ The inventory above is what exists. This table is what the framework *promises* 
 — which is a decision rather than a fact about the tree, so it is written by hand. Everything named
 here is either shipped, or explicitly not shipped.
 
+A distribution named in the last column is **written and awaiting its first release**. Nothing beside
+this line is on the index yet, so the inventory above lists each of them as `planned`, and that word is
+a statement about the index rather than about the code. What a reader can install today is the
+framework itself; the distributions arrive with the release that follows it.
+
 | Capability | Where it lives | Tier | Ships with |
 | ---------- | -------------- | ---- | ---------- |
 | Application composition, dependency injection, scopes, lifecycle | `xyberos` | Built-in | core |
@@ -96,25 +101,31 @@ here is either shipped, or explicitly not shipped.
 | Storage provider contract and conformance suite | `xyberos.storage.testing` | Extension point | core |
 | AI provider contract and conformance suite | `xyberos.ai.testing` | Extension point | core |
 | Plugin protocol, and the catalogue of packages that implement one | `xyberos.plugins`, [the plugin guide](reference/plugins.md) | Extension point | core |
-| HTML templates, static files, form reading, CSRF, sessions | Starlette and Jinja2 | You add it | `xyberos-templates` |
-| MCP server direction: exposing an application's tools | — | You build it | `xyberos-mcp` |
-| Logging handler and tracing spans | — | You add it | `xyberos-observability` |
-| PostgreSQL, MySQL, MariaDB providers | — | Extension point, nothing shipped | `xyberos-postgres` |
-| S3-compatible object storage | — | Extension point, nothing shipped | `xyberos-storage-s3` |
-| OpenAI-compatible chat and embedding endpoints | — | You add it | `xyberos-openai-compatible` |
+| HTML templates, static files, form reading | Starlette and Jinja2, wrapped by `xyberos-templates` | You add it | `xyberos-templates` |
+| MCP server direction: exposing an application's tools | `xyberos-mcp`, over the HTTP adapter | You add it | `xyberos-mcp` |
+| Logging handler and tracing spans | `xyberos-observability`, fed by the runtime's event sink | You add it | `xyberos-observability` |
+| PostgreSQL, MySQL, MariaDB providers | `xyberos-postgres`, proved by the database conformance suite | Extension point | `xyberos-postgres` |
+| S3-compatible object storage | `xyberos-storage-s3`, proved by the storage conformance suite | Extension point | `xyberos-storage-s3` |
+| OpenAI-compatible chat and embedding endpoints | `xyberos-openai-compatible`, proved by the AI conformance suite | Extension point | `xyberos-openai-compatible` |
 | Redis | — | You add it | — |
+| CSRF protection, server-side sessions | Starlette's own middleware, or the application | Not provided, and it will not be | — |
 | Identity, sessions, roles, tenancy model | — | Not provided, and it will not be | `xyberos-auth` verifies an assertion and stops |
 | Vector store, embeddings index, memory, retrieval, intents, agents | — | You build it | — |
 
 ## The refusals are features
 
-Three rows above are absences by decision rather than by omission, and each has a recorded reason:
+Four rows above are absences by decision rather than by omission, and each has a recorded reason:
 
 - **No identity or authorization model.** Authorization is a product decision; the framework would get
   it wrong for most users and would own security it cannot verify. The sanctioned shape — verify an
   assertion upstream, pass the principal as an argument, scope queries by it — is in
   [ADR 0014](reference/adr/0014-no-identity-or-authorization-model.md) and is tested in
   [the tenancy example](https://github.com/xyberos/xyberos2.0/tree/master/examples/tenancy).
+- **No session or CSRF middleware.** Starlette ships both and the adapter composes with them, so the
+  gap costs a reader an install rather than a capability; the framework declines to own them because
+  the storage choice and the policy belong to the application, exactly as the template engine and the
+  ASGI server do. [ADR 0018](reference/adr/0018-capability-placement-rule.md) refuses them as a class,
+  with an admin UI, OpenAPI, RAG, job queues, rate limiting, and feature flags.
 - **One database provider, and a documented extension point.** SQLite ships; the seam is any async
   SQLAlchemy dialect, and a third-party provider proves itself with `assert_provider_contract`
   ([ADR 0016](reference/adr/0016-database-providers-are-an-extension-point.md)).
@@ -141,6 +152,8 @@ The tables *below* that one are written by hand on purpose, because they are dec
 descriptions: a capability the framework refuses, and a package that does not exist yet, cannot be
 derived from a tree that does not contain them.
 
-Two 1.x names are retired for this line rather than reused. `xyberos-db` points at `xyberos[database]` and
-the provider seam, and `xyberos-metrics` points at `xyberos.http.RequestMetricsMiddleware`; both keep their
-1.x release and gain a pointer, so nothing moves under a user who pinned them.
+Two 1.x names are retired for this line rather than reused. `xyberos-db` keeps its published 1.x
+release and gains a pointer to `xyberos[database]` and the provider seam, so nothing moves under a user
+who pinned it. `xyberos-metrics` is retired with nothing to point *from*: no release under that name
+resolves on the index, so this line publishes no patch for it, and the capability ships here as
+`xyberos.http.RequestMetricsMiddleware` instead.
