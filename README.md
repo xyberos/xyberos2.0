@@ -4,14 +4,15 @@ Xyberos is an experimental, composable Python application runtime. Its planned s
 surface is application composition, typed dependencies, Starlette-backed HTTP, SQLite,
 and explicit in-process Workflow execution. Durable execution and AI adapters are optional.
 
-The project is at version **`2.0.0`**, the first release of this line.
-Phases 0–8 are complete: the architecture baseline, the application runtime, the Starlette HTTP
+The project is at version **`2.1.0`**, the second release of this line.
+Phases 0–11 are complete: the architecture baseline, the application runtime, the Starlette HTTP
 adapter with the SQLite database provider, the trusted plugin/capability model, the in-process
 workflow engine, the provider-neutral AI facade with Ollama as the first adapter, the experimental
-durable executor, the release engineering, and the boundary decisions that state who the framework is
-for. The public surface and its versioning rules are frozen in
+durable executor, the release engineering, the boundary decisions that state who the framework is
+for, object storage and the MCP client, the introspection commands, and the distributions that live
+beside this line. The public surface and its versioning rules are frozen in
 [the stability guide](https://github.com/xyberos/xyberos2.0/blob/master/docs/stability.md) and [ADR 0013](https://github.com/xyberos/xyberos2.0/blob/master/docs/adr/0013-stable-surface-and-versioning.md).
-This line publishes as **`2.0.0`** ([ADR 0017](https://github.com/xyberos/xyberos2.0/blob/master/docs/adr/0017-release-identity-and-lineage.md)): the
+This line publishes as **`2.x`** ([ADR 0017](https://github.com/xyberos/xyberos2.0/blob/master/docs/adr/0017-release-identity-and-lineage.md)): the
 `xyberos` name is held on the package index by the published 1.x line, which is a different codebase
 and cannot be installed alongside this one. The release procedure is in
 [the release guide](https://github.com/xyberos/xyberos2.0/blob/master/docs/release.md).
@@ -255,22 +256,23 @@ See [the architecture plan](https://github.com/xyberos/xyberos2.0/blob/master/do
 
 ## Status and compatibility
 
-This line publishes as `2.0.0`, the release that first promises the stable runtime and Workflow
-surfaces described in the implementation plan. The leading digit records lineage rather than maturity,
+This line publishes as `2.x`, and `2.0.0` is the release that first promised the stable runtime and
+Workflow surfaces described in the implementation plan. The leading digit records lineage rather than
+maturity,
 because the `xyberos` name is already held on the package index by the published 1.x line
 ([ADR 0017](https://github.com/xyberos/xyberos2.0/blob/master/docs/adr/0017-release-identity-and-lineage.md)).
 
 [The stability guide](https://github.com/xyberos/xyberos2.0/blob/master/docs/stability.md) lists which surface is stable, preview, or experimental, and
 how each one changes; [ADR 0013](https://github.com/xyberos/xyberos2.0/blob/master/docs/adr/0013-stable-surface-and-versioning.md) records the rules
-behind it. Until `2.0.0` exists, a minor release may break a stable name with upgrade notes; from
-`2.0.0` that needs a major release, and a minor release may break only a preview name. A patch release
+behind it. From `2.0.0` — the release that first promised the stable tier — a breaking change to a
+stable name requires a major release, and a minor release may break only a preview name. A patch release
 breaks no documented name.
 
 The project is licensed under the [Apache License 2.0](https://github.com/xyberos/xyberos2.0/blob/master/LICENSE), including its express patent
 grant. See [ADR 0012](https://github.com/xyberos/xyberos2.0/blob/master/docs/adr/0012-project-licence.md) for why that licence was chosen, and
 `CONTRIBUTING.md` for the contributor terms that are still open.
 
-This line is at `2.0.0`, and [the release guide](https://github.com/xyberos/xyberos2.0/blob/master/docs/release.md) records the procedure. A project on the published 1.x line
+This line is at `2.1.0`, and [the release guide](https://github.com/xyberos/xyberos2.0/blob/master/docs/release.md) records the procedure. A project on the published 1.x line
 should pin `xyberos<2`: that line stays installable, but it is a different codebase, the two cannot
 share an environment, and upgrading changes the API. Security reports go through
 [SECURITY.md](https://github.com/xyberos/xyberos2.0/blob/master/SECURITY.md), and changes are recorded in [the changelog](https://github.com/xyberos/xyberos2.0/blob/master/CHANGELOG.md).

@@ -6,9 +6,11 @@ leading digit means here — are in [the stability guide](docs/stability.md).
 
 ## [Unreleased]
 
-Everything below landed after `2.0.0` was uploaded, and none of it is in that release: the tag's tree
-and the published wheel are not the same snapshot, which is what the next release corrects. A package
-beside this line that declares `xyberos>=2,<3` and imports any of it needs that release, not `2.0.0`.
+## [2.1.0] - 2026-10-14
+
+Everything below landed after `2.0.0` was uploaded, and none of it was in that release: the tag's tree
+and the published wheel were not the same snapshot, which is what this release corrects. A package
+beside this line that declares `xyberos>=2,<3` and imports any of it needs `2.1.0`, not `2.0.0`.
 
 ### Added
 

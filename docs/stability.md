@@ -3,10 +3,10 @@
 > Status: Phase 7. This page states what you may rely on, what may change, and how a change is
 > announced. The decision behind it is [ADR 0013](./adr/0013-stable-surface-and-versioning.md).
 
-Xyberos is at `2.0.0`, the first release of this line, and the leading digit records lineage rather
-than maturity ([ADR 0017](./adr/0017-release-identity-and-lineage.md)). The honest summary is: **the
-stable tier is declared and frozen, and from `2.0.0` a change to a documented stable name requires a
-major release.**
+Xyberos is at `2.1.0`, and the leading digit records lineage rather than maturity
+([ADR 0017](./adr/0017-release-identity-and-lineage.md)). The honest summary is: **the stable tier is
+declared and frozen, and from `2.0.0` a change to a documented stable name requires a major
+release.**
 
 ## The three tiers
 
@@ -75,9 +75,9 @@ name is held on the package index by the already-published 1.x line, which insta
 root and cannot be co-installed ([ADR 0017](./adr/0017-release-identity-and-lineage.md)). Maturity is
 stated by the `Development Status` classifier and by the tier table above.
 
-- **`2.0.0` is the release that first promises the stable tier.** Until it exists, that tier is
-  declared intent plus tested pinning, and a minor release may break a stable name with upgrade notes.
-  From `2.0.0`, a breaking change to a stable name requires a major release.
+- **`2.0.0` was the release that first promised the stable tier.** Until it shipped, that tier was
+  declared intent plus tested pinning, and a minor release could break a stable name with upgrade
+  notes. From `2.0.0`, a breaking change to a stable name requires a major release.
 - **A minor release may break a preview name** with upgrade notes. A patch release fixes defects and
   breaks no documented name.
 - **`1.0.0` is not one of this line's versions.** It belongs to the previously published line, which
