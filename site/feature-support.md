@@ -49,17 +49,17 @@ _Generated when the site is built, and checked by `site/scripts/matrix.py --chec
 | `[http]` | `httpx>=0.27,<1`, `starlette>=0.40,<2` | `xyberos.http.adapter`, `xyberos.http.metrics`, `xyberos.http.middleware`, `xyberos.http.requests`, `xyberos.http.routing`, `xyberos.http.testing` | Routing an application's routes as an ASGI application |
 | `[ollama]` | `httpx>=0.27,<1` | `xyberos.ai.ollama` | The first AI provider: a local Ollama service |
 
-**Packages outside this repository.** Every name this line knows about, from [`packages.toml`](https://github.com/xyberos/xyberos2.0/blob/master/packages.toml) — the manifest the compatibility job also reads. `planned` means decided and not written, `published` means a release exists that the job installs and proves.
+**Packages outside this repository.** Every name this line knows about, from [`packages.toml`](https://github.com/xyberos/xyberos2.0/blob/master/packages.toml) — the manifest the compatibility job also reads. `planned` means decided and no distribution is written, `written` means the distribution exists and this line has no release of it, and `published` means a release exists that the job installs and proves.
 
 | Package | Import root | Status | Declares | Subject |
 | ------- | ----------- | ------ | -------- | ------- |
-| `xyberos-mcp` | `xyberos_mcp` | planned | `xyberos[http]` | The server direction: exposing an application's tools over MCP; a stdio transport only with the owner's approval |
-| `xyberos-templates` | `xyberos_templates` | planned | `xyberos[http]>=2,<3`, `jinja2>=3.1,<4`, `python-multipart>=0.0.18,<1` | Server-rendered pages: an engine-neutral Templates contract with Jinja2 shipped, a static mount, and form reading |
-| `xyberos-observability` | `xyberos_observability` | planned | `opentelemetry-api>=1.20,<2`, `opentelemetry-sdk>=1.20,<2` | One explicit call that configures a logging handler and spans, fed by the runtime's own event sink |
-| `xyberos-auth` | `xyberos_auth` | planned | `cryptography>=42,<47` | Verification only: an assertion from a shared secret or a JWKS, and a Principal |
-| `xyberos-postgres` | `xyberos_postgres` | planned | `asyncpg>=0.29,<1`, `sqlalchemy>=2.0,<2.1` | A DatabaseProvider for PostgreSQL, proved against the shipped conformance suite |
-| `xyberos-storage-s3` | `xyberos_storage_s3` | planned | `aioboto3>=13,<16` | A Storage provider for S3-compatible object stores, proved against the shipped conformance suite |
-| `xyberos-openai-compatible` | `xyberos_openai_compatible` | planned | `httpx>=0.27,<1` | A ModelProvider for OpenAI-compatible chat and embedding endpoints |
+| `xyberos-mcp` | `xyberos_mcp` | written | `xyberos[http]>=2,<3` | The server direction: exposing an application's tools over MCP; a stdio transport only with the owner's approval |
+| `xyberos-templates` | `xyberos_templates` | written | `xyberos[http]>=2,<3`, `jinja2>=3.1,<4`, `python-multipart>=0.0.18,<1` | Server-rendered pages: an engine-neutral Templates contract with Jinja2 shipped, a static mount, and form reading |
+| `xyberos-observability` | `xyberos_observability` | written | `opentelemetry-api>=1.20,<2`, `opentelemetry-sdk>=1.20,<2` | One explicit call that configures a logging handler and spans, fed by the runtime's own event sink |
+| `xyberos-auth` | `xyberos_auth` | written | `cryptography>=42,<47` | Verification only: an assertion from a shared secret or a JWKS, and a Principal |
+| `xyberos-postgres` | `xyberos_postgres` | written | `xyberos[database]>=2,<3`, `asyncpg>=0.29,<1`, `sqlalchemy>=2.0,<2.1` | A DatabaseProvider for PostgreSQL, proved against the shipped conformance suite |
+| `xyberos-storage-s3` | `xyberos_storage_s3` | written | `aioboto3>=13,<16` | A Storage provider for S3-compatible object stores, proved against the shipped conformance suite |
+| `xyberos-openai-compatible` | `xyberos_openai_compatible` | written | `httpx>=0.27,<1` | A ModelProvider for OpenAI-compatible chat and embedding endpoints |
 | `xyberos-db` | `xyberos_db` | retired → `xyberos[database]` | — | Retired: the capability is xyberos[database] and the provider seam |
 | `xyberos-metrics` | `xyberos_metrics` | retired → `xyberos.http` | — | Retired: request metrics ship as xyberos.http.RequestMetricsMiddleware |
 
@@ -76,9 +76,10 @@ The inventory above is what exists. This table is what the framework *promises* 
 here is either shipped, or explicitly not shipped.
 
 A distribution named in the last column is **written and awaiting its first release**. Nothing beside
-this line is on the index yet, so the inventory above lists each of them as `planned`, and that word is
-a statement about the index rather than about the code. What a reader can install today is the
-framework itself; the distributions arrive with the release that follows it.
+this line is on the index yet, so the inventory above lists each of them as `written`, and that word is
+a statement about the index rather than about the code — it is the status that means the distribution
+exists and this line has no release of it. What a reader can install today is the framework itself; the
+distributions arrive with the release that follows it.
 
 | Capability | Where it lives | Tier | Ships with |
 | ---------- | -------------- | ---- | ---------- |

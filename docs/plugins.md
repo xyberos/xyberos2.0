@@ -172,9 +172,11 @@ explicitly, and `xyberos` never looks for one ([ADR 0007](./adr/0007-trusted-plu
 supply-chain decision — entry-point loading means a dependency can change what your process does at
 import time — but it does not mean extensions are invisible. This section is the list.
 
-**Nothing beside this line is published yet.** Every name below is written in the ecosystem repository, or
-decided and waiting for one there, and none of them has a release: `published` in the manifest means a release
-exists, not that the code does. The table is
+**Nothing beside this line is published yet.** Every name below has a distribution in the ecosystem
+repository and no release of this line's content, which the manifest records as `written`; `published` would
+mean a release exists. Three names already answer on the index with the *other* line's release —
+`xyberos-mcp` `0.2.2`, `xyberos-auth` `0.1.2`, and `xyberos-observability` `0.1.2` — and the four new names
+resolve to nothing at all. The table is
 generated from [`packages.toml`](../packages.toml), and `tests/test_packages_manifest.py` checks this page
 against that file, so a package cannot be added to the manifest and quietly omitted here — and this page
 cannot invent one.
@@ -195,7 +197,7 @@ cannot invent one.
 snippet for every published name and refuses a published name without one, because a package that is installed
 and not checked is worse than one that is not installed at all. The snippet runs a suite this repository ships,
 so the three rows above that implement a shipped seam become publishable when the package exists, and a name
-whose seam has no suite here stays planned however green its own tests are — a wheel installed from the index
+whose seam has no suite here stays `written` however green its own tests are — a wheel installed from the index
 carries no tests for the job to run.
 
 **Published by this project, or listed as a community plugin.** A row marked *this project* is published

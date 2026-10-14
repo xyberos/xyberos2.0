@@ -111,10 +111,11 @@ is decided individually.
   for it would exist only to claim a name no capability needs.
 - **A name is `published` only when a suite this repository ships proves it.** `packages.toml` records a
   `conformance` snippet for every published entry, and refuses a published entry without one, so the gate is
-  what a package can be *checked* against rather than what it was tested with. Three planned names implement a
-  seam core ships a suite for — `xyberos-postgres`, `xyberos-storage-s3`, and `xyberos-openai-compatible` — and
-  the four that implement no such seam (`xyberos-mcp`, `xyberos-auth`, `xyberos-templates`,
-  `xyberos-observability`) stay `planned` until one exists. Their own tests prove them in their own repository;
+  what a package can be *checked* against rather than what it was tested with. Three of the written names
+  implement a seam core ships a suite for — `xyberos-postgres`, `xyberos-storage-s3`, and
+  `xyberos-openai-compatible` — and the four that implement no such seam (`xyberos-mcp`, `xyberos-auth`,
+  `xyberos-templates`, `xyberos-observability`) stay `written` until one exists. Their own tests prove them in
+  their own repository;
   a wheel installed from the index carries no tests, so "its own tests" is not something the compatibility job
   can run.
 - **The plan's repository reference was inferred from the core's metadata and is corrected here.** The

@@ -26,7 +26,7 @@ else:  # pragma: no cover - Python 3.10 uses the tomli fallback.
 
 MANIFEST = Path(__file__).resolve().parents[1] / "packages.toml"
 SCHEMA_VERSION = 1
-STATUSES = ("placeholder", "planned", "published", "retired")
+STATUSES = ("placeholder", "planned", "written", "published", "retired")
 
 
 def load(path: Path = MANIFEST) -> dict[str, object]:

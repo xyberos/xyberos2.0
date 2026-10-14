@@ -132,10 +132,13 @@ The upload itself, and the checks that only make sense once a release is on the 
 
 ## Deploying to PyPI
 
-> Status: planned, never performed. The source changes, the repository, the workflow, and the trusted
-> publisher are in place; what remains is the version bump, the tag, and the decision to start the run.
-> Nothing here reopens the number: [ADR 0017](./adr/0017-release-identity-and-lineage.md) decides that,
-> and this section exists so the decision survives contact with the index.
+> Status: **performed, for `2.0.0`.** The index serves `xyberos-2.0.0` — wheel and sdist — and this
+> repository carries the `v2.0.0` tag with the changelog entry the upload used as its release notes,
+> dated **2026-10-11**. The four preconditions above were met before the run rather than during it,
+> which is the order this section exists to insist on. `2.0.0` also starts the clock the packages
+> beside this line wait on: their `xyberos>=2,<3` resolves from this upload onward.
+> [ADR 0017](./adr/0017-release-identity-and-lineage.md) still decides the number, and nothing here
+> reopens it.
 
 ### Preconditions
 
@@ -282,7 +285,8 @@ the old release is neither edited nor yanked, and an environment that pins it ke
 - **What a 1.x user sees.** Their next unconstrained upgrade moves them to a rewrite. The changelog
   entry says so in its first line, and the README says it where they arrive.
 - **Every name beside this line is tracked in one file.** [`packages.toml`](../packages.toml) records each
-  name, its import root, the core range it declares, and whether it is published, planned, or retired;
+  name, its import root, the core range it declares, and its status — `placeholder`, `planned`, `written`,
+  `published`, or `retired`;
   `tests/test_packages_manifest.py` keeps this page, the plugin guide's catalogue, and the feature matrix
   in step with it. What follows is read from that file rather than from a blanket instruction.
 - **The repin has already shipped, per name.** The three satellites [ADR 0017](./adr/0017-release-identity-and-lineage.md)

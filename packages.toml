@@ -14,13 +14,19 @@
 #   * every name this line publishes begins with `xyberos-`, so the retirements and the reuses stay
 #     recognizable as this project's own.
 #
-# `status` is one of four values, and nothing is implied by their absence:
+# `status` is one of five values, and nothing is implied by their absence:
 #
 #   * `placeholder` - the name is claimed on the index with a pre-release, and no work has started.
-#   * `planned`     - the capability is decided and no release exists yet. The distribution may
-#                     already be written; `published` is about the index, not about the source.
-#   * `published`   - a release exists, so the compatibility job installs and exercises it.
-#   * `retired`     - the 1.x name stays published and points at what replaced it.
+#   * `planned`     - the capability is decided and no distribution is written yet.
+#   * `written`     - the distribution exists in the ecosystem repository and this line has no release of
+#                     it, so nothing is installable under the name from this line yet. A reused name may
+#                     already carry a 1.x release on the index; that release is the other line's code,
+#                     which is why `written` does not say `published`.
+#   * `published`   - a release of this line's content exists, so the compatibility job installs and
+#                     exercises it.
+#   * `retired`     - the name is answered by this line instead, and the published 1.x release gains a
+#                     pointer to what replaced it. `retired` is the decision: the pointer patch is an
+#                     upload, and nothing here claims one has landed.
 #
 # A `published` entry also declares `conformance`: Python source the compatibility job runs with
 # `python -c`, which exercises a suite this line ships against the package's own implementation and exits
@@ -41,15 +47,15 @@ core_requirement = "xyberos>=2,<3"
 [[package]]
 name = "xyberos-mcp"
 import_root = "xyberos_mcp"
-status = "planned"
+status = "written"
 summary = "The server direction: exposing an application's tools over MCP; a stdio transport only with the owner's approval"
-dependencies = ["xyberos[http]"]
+dependencies = ["xyberos[http]>=2,<3"]
 rationale = "expose() needs an HTTP surface, and stdio spawns a process. The shipped client refuses both on purpose."
 
 [[package]]
 name = "xyberos-templates"
 import_root = "xyberos_templates"
-status = "planned"
+status = "written"
 summary = "Server-rendered pages: an engine-neutral Templates contract with Jinja2 shipped, a static mount, and form reading"
 dependencies = ["xyberos[http]>=2,<3", "jinja2>=3.1,<4", "python-multipart>=0.0.18,<1"]
 rationale = "It needs Jinja2, which pyproject.toml records as an application's dependency rather than this line's, and a static mount and form reading need the HTTP extra's Starlette."
@@ -57,7 +63,7 @@ rationale = "It needs Jinja2, which pyproject.toml records as an application's d
 [[package]]
 name = "xyberos-observability"
 import_root = "xyberos_observability"
-status = "planned"
+status = "written"
 summary = "One explicit call that configures a logging handler and spans, fed by the runtime's own event sink"
 dependencies = ["opentelemetry-api>=1.20,<2", "opentelemetry-sdk>=1.20,<2"]
 rationale = "It needs OpenTelemetry, and the runtime configures no handler by decision."
@@ -65,7 +71,7 @@ rationale = "It needs OpenTelemetry, and the runtime configures no handler by de
 [[package]]
 name = "xyberos-auth"
 import_root = "xyberos_auth"
-status = "planned"
+status = "written"
 summary = "Verification only: an assertion from a shared secret or a JWKS, and a Principal"
 dependencies = ["cryptography>=42,<47"]
 rationale = "Real assertions are asymmetric. The policy half stays absent from the framework (ADR 0014)."
@@ -73,16 +79,16 @@ rationale = "Real assertions are asymmetric. The policy half stays absent from t
 [[package]]
 name = "xyberos-postgres"
 import_root = "xyberos_postgres"
-status = "planned"
+status = "written"
 summary = "A DatabaseProvider for PostgreSQL, proved against the shipped conformance suite"
-dependencies = ["asyncpg>=0.29,<1", "sqlalchemy>=2.0,<2.1"]
+dependencies = ["xyberos[database]>=2,<3", "asyncpg>=0.29,<1", "sqlalchemy>=2.0,<2.1"]
 conformance = "import sys; from xyberos_postgres.conformance import main; sys.exit(main())"
 rationale = "It needs a driver core will not adopt, and it answers the two SQLite-specific promises the provider guide names or refuses loudly."
 
 [[package]]
 name = "xyberos-storage-s3"
 import_root = "xyberos_storage_s3"
-status = "planned"
+status = "written"
 summary = "A Storage provider for S3-compatible object stores, proved against the shipped conformance suite"
 dependencies = ["aioboto3>=13,<16"]
 conformance = "import sys; from xyberos_storage_s3.conformance import main; sys.exit(main())"
@@ -91,7 +97,7 @@ rationale = "It needs an object-store client core will not adopt."
 [[package]]
 name = "xyberos-openai-compatible"
 import_root = "xyberos_openai_compatible"
-status = "planned"
+status = "written"
 summary = "A ModelProvider for OpenAI-compatible chat and embedding endpoints"
 dependencies = ["httpx>=0.27,<1"]
 conformance = "import sys; from xyberos_openai_compatible.conformance import main; sys.exit(main())"
@@ -104,7 +110,7 @@ status = "retired"
 summary = "Retired: the capability is xyberos[database] and the provider seam"
 dependencies = []
 replaced_by = "xyberos[database]"
-rationale = "A metadata-only pointer patch keeps the <2 pin, so nothing moves under a 1.x user."
+rationale = "A metadata-only pointer patch keeps the <2 pin, so nothing moves under a 1.x user. The patch is an upload, and it has not landed yet."
 
 [[package]]
 name = "xyberos-metrics"

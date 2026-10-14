@@ -47,6 +47,27 @@ def test_every_entry_declares_what_a_reader_and_the_job_need() -> None:
             assert entry.get("replaced_by"), f"{entry['name']!r} is retired and points nowhere"
 
 
+def test_every_status_the_manifest_may_use_is_defined_where_the_manifest_is_read() -> None:
+    """The vocabulary is code and the definitions are prose, so the two have to be kept in step.
+
+    A status is a claim about the index — written, published, retired — and a reader who has to guess
+    what one means is reading a word rather than a fact. The count in the same sentence is checked too,
+    because "one of four values" left standing beside five of them is how this drifted the first time.
+    """
+    header = MANIFEST.read_text(encoding="utf-8")
+
+    for status in ecosystem.STATUSES:
+        assert f"`{status}`" in header, f"packages.toml never defines {status!r}"
+
+    counted = re.search(r"`status` is one of (\w+) values", header)
+    assert counted, "packages.toml does not say how many statuses there are"
+    words = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6}
+    declared = words[counted.group(1)]
+    assert declared == len(ecosystem.STATUSES), (
+        f"the header says {counted.group(1)} statuses and the tool defines {len(ecosystem.STATUSES)}"
+    )
+
+
 def test_a_package_owns_its_own_import_root_and_never_a_path_inside_the_core() -> None:
     """ADR 0018, and the reason it is a rule: two distributions under `xyberos/` cannot be
     uninstalled.
