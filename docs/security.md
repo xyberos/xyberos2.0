@@ -92,9 +92,11 @@ State these to yourself before relying on the framework:
 
 - **No sandbox, ever.** Plugins, step functions, and tool handlers run in your process. Isolation is
   an operating-system or container concern.
-- **No authorization or identity model.** Xyberos has no users, roles, sessions, or tenancy. Context
+- **No authorization or identity model.** Xyberos has no users, roles, or tenancy, and it will not. It
+  does ship `SessionMiddleware` and `CSRFMiddleware` in `xyberos.http`, but those are mechanisms: a
+  session remembers a decision you made, and it is not a decision the framework made for you. Context
   values are diagnostic only and must never be used for identity, authorization, or transaction
-  handles.
+  handles ([ADR 0024](./adr/0024-sessions-and-csrf-are-middleware-in-the-http-module.md)).
 - **No secret manager.** The framework reads configuration from the environment and a file. It does
   not fetch, rotate, or audit secrets.
 - **No request size or rate limits.** Those belong to the ASGI server and the reverse proxy in front

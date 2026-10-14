@@ -29,7 +29,7 @@ happens when a test is not enough and the shape turns out to be wrong.
 | Plugin protocol and registry | `xyberos.plugins` | stable |
 | Error taxonomy | `xyberos.errors` | stable |
 | Deprecation mechanics | `xyberos.deprecation` | stable |
-| HTTP adapter (Starlette) | `xyberos.http` | preview |
+| HTTP adapter (Starlette), middleware, sessions, CSRF | `xyberos.http` | preview |
 | Object storage: contract, filesystem provider, and double | `xyberos.storage` | preview |
 | MCP client: initialize, tools/list, tools/call over streamable HTTP | `xyberos.mcp` | preview |
 | SQLite provider and migrations | `xyberos.database` | preview |

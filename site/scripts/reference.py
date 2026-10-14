@@ -44,6 +44,7 @@ _SUMMARIES = {
     "adr": "Architecture decision records, and the reason behind each refusal",
     "ai": "The provider-neutral AI facade, structured output, tools, and the Ollama adapter",
     "architecture": "The architecture review",
+    "capabilities": "What is absent by decision, and the seam or package that answers it",
     "cli": "The four commands: `new`, `check`, `run`, and `migrate`",
     "database": "Database operations with the shipped SQLite provider",
     "database-providers": "Writing a provider package that passes the conformance suite",

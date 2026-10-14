@@ -797,7 +797,8 @@ extension-point contract.
 | `xyberos-mcp` | **reused there, for the other direction** | the extra here carries the client and the package carries the server, so one name answers one question instead of two |
 | `check --json`, `--why`, `--schema`, the configuration schema | tooling here | nothing installs them; they are one binary's flags — ADR 0020 records the serialized documents as a contract |
 | Session inspection of the journal | tooling here | read-only, and retention, pruning, and scheduling stay deferred |
-| Sessions, CSRF, an admin UI, OpenAPI, RAG and vector stores, job queues, rate limiting, feature flags | refused, unchanged | reverse one and it needs its own ADR, which is what the backlog and the feature matrix record |
+| Sessions and CSRF | **moved to here**: `xyberos.http.SessionMiddleware` and `xyberos.http.CSRFMiddleware`, over a `SessionStore` contract whose implementations are a package there | [ADR 0018](adr/0018-capability-placement-rule.md) refused them on the grounds that Starlette ships both, which is true for sessions and false for CSRF. [ADR 0024](adr/0024-sessions-and-csrf-are-middleware-in-the-http-module.md) records the reversal and the split: the mechanism is here and the store policy stays with the application |
+| An admin UI, OpenAPI, RAG and vector stores, job queues, rate limiting, feature flags | refused, unchanged | reverse one and it needs its own ADR, which is what the backlog and the feature matrix record |
 
 **One row reconciles two statements the plan made in different places.** `xyberos-mcp` was described as *reused
 as a rewrite* in the owner's decisions and as *retired with a pointer* here, and its client appeared in both the

@@ -73,10 +73,12 @@ def test_every_extra_lists_the_modules_that_guard_it() -> None:
     assert guarded["ollama"] == ["xyberos.ai.ollama"]
     assert guarded["http"] == [
         "xyberos.http.adapter",
+        "xyberos.http.csrf",
         "xyberos.http.metrics",
         "xyberos.http.middleware",
         "xyberos.http.requests",
         "xyberos.http.routing",
+        "xyberos.http.sessions",
         "xyberos.http.testing",
     ]
     assert guarded["dev"] == [], "a contributor's toolchain is not guarded for by the runtime"

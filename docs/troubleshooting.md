@@ -63,6 +63,8 @@ registered it during `add_plugin`.
 | A `500` with `{"error": {"type": "InternalServerError", ...}}` | An unhandled exception reached the adapter, *or* the request arrived before startup finished. Check the log: the traceback is logged, never returned |
 | A `500` on every request in a test | The test client was used outside its context manager, so the ASGI lifespan never ran. See the [testing guide](./testing.md) |
 | A domain error returned as `500` | The error does not derive from `HttpError`. Subclass it and pass `status_code=` to control the response |
+| A `403` with `{"error": {"type": "CSRFError", ...}}` | `CSRFMiddleware` refused a state-changing request: its `Origin` (or `Referer`) named another site, or the presented `X-CSRF-Token` did not match the issued one. A proxy that rewrites `Host` needs `trusted_origins` ([the HTTP guide](./http.md#sessions-and-csrf)) |
+| `get_session` raises `ConfigurationError`, or `request.session` raises `AssertionError` | `SessionMiddleware` is not in the stack. Pass it in `HttpAdapter(app, middleware=(...))` ([the HTTP guide](./http.md#sessions-and-csrf)) |
 | A response never arrives | If the response had already started when the error happened, the adapter re-raises instead of corrupting the stream, so the failure appears in the log rather than in the body |
 
 ## Database

@@ -24,9 +24,9 @@ able to read the whole dependency surface in an afternoon.
 | An appliance, edge service, or embedded deployment | **Good fit** | ~2 600 lines of core, one conditional dependency (`tomli`, and only below Python 3.11), no bundled server |
 | Something in a regulated or air-gapped environment | **Good fit** | the dependency audit is a page long and every licence is permissive; see the [release guide](./release.md) |
 | A public API at traffic | **Poor fit** | SQLite allows one writer; see [capacity](#capacity-honestly) |
-| A multi-tenant SaaS | **Poor fit** | no identity, session, or authorization model, by decision ([ADR 0014](./adr/0014-no-identity-or-authorization-model.md)) |
+| A multi-tenant SaaS | **Poor fit** | no identity or authorization model, by decision ([ADR 0014](./adr/0014-no-identity-or-authorization-model.md)); sessions and CSRF ship as middleware, the identity model does not |
 | A distributed, queue-driven platform | **Poor fit** | durability is single-host, by decision ([ADR 0015](./adr/0015-durability-is-single-host.md)) |
-| A batteries-included application | **Poor fit** | no ORM, admin, session store, or plugin ecosystem; assemble those yourself |
+| A batteries-included application | **Poor fit** | no ORM, admin, durable session store, or plugin ecosystem; assemble those yourself |
 | A multi-replica Kubernetes deployment | **Poor fit as shipped** | one writer means one replica, unless you supply a database provider ([ADR 0016](./adr/0016-database-providers-are-an-extension-point.md)) |
 
 ## If you need X, use Y
@@ -37,9 +37,9 @@ the tools built for the job.
 | You need | Reach for | Xyberos still helps with |
 | --- | --- | --- |
 | A public API at volume | a Postgres- or MySQL-backed framework, or a provider package for `DatabaseProvider` | everything above the database: composition, config, workflow, tests |
-| Multi-tenant identity, roles, sessions | your identity provider plus a proxy, or Django's auth if you want it in-process | the sanctioned pattern in [the tenancy example](../examples/tenancy/README.md) |
+| Multi-tenant identity, roles, sessions | your identity provider plus a proxy, or Django's auth if you want it in-process | the sanctioned pattern in [the tenancy example](../examples/tenancy/README.md), and `xyberos.http.SessionMiddleware` for the session itself ([the sessions example](../examples/sessions/README.md)) |
 | Cross-host orchestration with exactly-once effects | Temporal, Argo Workflows, a managed workflow service | the *worker role*: it runs one item well, with an audit trail ([broker-driven worker](../examples/broker_worker/README.md)) |
-| An ORM, an admin UI, sessions, migrations that generate themselves | Django, or FastAPI plus SQLAlchemy and your own choices | the runtime around them; recipes are in the [database guide](./database.md) |
+| An ORM, an admin UI, sessions, migrations that generate themselves | Django, or FastAPI plus SQLAlchemy and your own choices | the runtime around them; sessions ship as middleware ([ADR 0024](./adr/0024-sessions-and-csrf-are-middleware-in-the-http-module.md)), and recipes are in the [database guide](./database.md) |
 | A plugin ecosystem with discovery | a framework where plugins are the product | an explicit, ordered, typed plugin contract ([plugin guide](./plugins.md)) |
 | A server, TLS, rate limits, request size limits | any ASGI server and your reverse proxy | nothing — that boundary is deliberately not ours |
 
@@ -102,13 +102,16 @@ place to argue with it.
 
 | Absent | Recorded in |
 | --- | --- |
-| Identity, sessions, tenancy, authorization | [ADR 0014](./adr/0014-no-identity-or-authorization-model.md) |
+| Identity, tenancy, and authorization (sessions and CSRF ship as `xyberos.http` middleware) | [ADR 0014](./adr/0014-no-identity-or-authorization-model.md), [ADR 0024](./adr/0024-sessions-and-csrf-are-middleware-in-the-http-module.md) |
 | Multi-host durability and distributed scheduling | [ADR 0015](./adr/0015-durability-is-single-host.md), [ADR 0011](./adr/0011-durable-executor-contract.md) |
 | A second database provider in core | [ADR 0016](./adr/0016-database-providers-are-an-extension-point.md) |
-| An ORM, an admin UI, a session store | this page, and [ADR 0001](./adr/0001-runtime-boundaries.md) |
+| An ORM, an admin UI, a durable session store | this page, and [ADR 0001](./adr/0001-runtime-boundaries.md) |
 | A sandbox for untrusted code | [plugin guide](./plugins.md), [security guide](./security.md) |
 | Plugin discovery through entry points | [ADR 0007](./adr/0007-trusted-plugins.md) |
 | Desktop, mobile, or edge-function packaging | this page — the target is a long-lived server process |
+
+Every row above has a way through rather than a wall around it: [what is absent, and what to do
+instead](./capabilities.md) is the index from each gap to the seam, package, or recipe that closes it.
 
 ## The honest summary
 

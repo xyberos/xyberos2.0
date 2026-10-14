@@ -184,6 +184,7 @@ nav:
       # entirely; a flat list is what the other tabs use, and it is what pruning keeps.
       - reference/ai.md
       - reference/architecture.md
+      - reference/capabilities.md
       - reference/cli.md
       - reference/database.md
       - reference/database-providers.md
@@ -227,6 +228,7 @@ nav:
       - reference/adr/0020-introspection-documents.md
       - reference/adr/0022-ecosystem-repository-and-satellite-names.md
       - reference/adr/0023-crud-package-and-the-dx-refusals.md
+      - reference/adr/0024-sessions-and-csrf-are-middleware-in-the-http-module.md
   - Project:
       - Feature support: feature-support.md
       - Terminology: terminology.md

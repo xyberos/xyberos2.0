@@ -178,11 +178,69 @@ client will receive: a handler raising a 404 `HttpError` is one 404, not a 500. 
 produced no response at all is counted as 500, which is what reaches a client unless an outer
 middleware maps it.
 
+### Sessions and CSRF
+
+Both ship as middleware classes the application passes and owns ([ADR 0024](adr/0024-sessions-and-csrf-are-middleware-in-the-http-module.md)),
+because each bundles a policy that belongs to the deployment: where session data lives, and which
+origins may post to it.
+
+```python
+import os
+
+from starlette.middleware import Middleware
+
+from xyberos.http import (
+    HttpAdapter,
+    InMemorySessionStore,
+    SessionMiddleware,
+    CSRFMiddleware,
+    get_csrf_token,
+)
+
+store = InMemorySessionStore()   # one process, and tests; a durable store is a package beside this line
+
+adapter = HttpAdapter(
+    app,
+    middleware=(
+        Middleware(SessionMiddleware, store=store, secret=os.environ["SESSION_SECRET"]),
+        Middleware(CSRFMiddleware),
+    ),
+)
+
+@app.post("/login")
+async def login(request: Request) -> dict[str, str]:
+    request.session["user"] = "ada"        # `scope["session"]`, so `request.session` is the spelling
+    return {"user": "ada"}
+
+@app.get("/form")
+async def form(request: Request) -> dict[str, str]:
+    return {"csrf_token": get_csrf_token(request)}
+```
+
+**Sessions.** `SessionMiddleware` signs a session **id** into the cookie with the standard library, so
+the module needs no `itsdangerous` and a handler's values never leave the store. The store is a
+three-member protocol — `load`, `save`, `delete` — and `InMemorySessionStore` is the shipped
+implementation: correct for one process and for tests, and not durable. A session is written **only
+when a handler changed it**, so a request that reads one costs a load and no write, and an anonymous
+request that stores nothing sets no cookie at all. `get_session(request)` is the same object as
+`request.session`, with a type a checker can use and an error that names the missing middleware.
+
+**CSRF.** `CSRFMiddleware` refuses a state-changing request whose `Origin` (or `Referer`) names another
+site, and one that presents an `X-CSRF-Token` that does not match the token issued to the browser. A
+request with neither header is not a browser cross-site request — `curl` cannot be the victim — so it
+is allowed; set `require_token=True` to demand the token anyway, and `trusted_origins` when a proxy
+rewrites `Host`. The token cookie is readable on purpose, because a page has to echo it back, and it
+carries no authority on its own.
+
+Neither middleware is installed for you, and neither is on by default — the same rule the counters
+above follow.
+
 ## Error policy
 
 | Raised | Response |
 | --- | --- |
 | `RequestValidationError` | its status (default `422`) with `type`, `message`, and `errors` |
+| `CSRFError` (from `CSRFMiddleware`) | `403` with `type` and `message` |
 | any other `HttpError` subclass | its declared `status_code` with `type` and `message` |
 | any other exception | `500` with a generic body; the traceback is logged, never returned |
 

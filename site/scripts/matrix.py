@@ -64,7 +64,8 @@ _SUMMARIES = {
     "worker, recovery",
     "xyberos.execution": "In-process workflow engine: steps, edges, retries, timeouts, "
     "cancellation, events",
-    "xyberos.http": "Starlette adapter, route compiling, middleware, request metrics, test client",
+    "xyberos.http": "Starlette adapter, route compiling, middleware, request metrics, sessions, "
+    "CSRF protection, test client",
     "xyberos.mcp": "Model Context Protocol client over streamable HTTP, and the projection of a "
     "server's tools into the AI tool model",
     "xyberos.plugins": "The plugin protocol and registry: trusted, ordered, no discovery",

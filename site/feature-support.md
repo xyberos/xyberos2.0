@@ -33,7 +33,7 @@ _Generated when the site is built, and checked by `site/scripts/matrix.py --chec
 | `xyberos.database` | SQLite provider, connection and transaction handling, Alembic runner, provider conformance suite | `[database]` |
 | `xyberos.durable` | Experimental single-host durable execution: journal, store, scheduler, worker, recovery | `[durable]` |
 | `xyberos.execution` | In-process workflow engine: steps, edges, retries, timeouts, cancellation, events | core |
-| `xyberos.http` | Starlette adapter, route compiling, middleware, request metrics, test client | `[http]` |
+| `xyberos.http` | Starlette adapter, route compiling, middleware, request metrics, sessions, CSRF protection, test client | `[http]` |
 | `xyberos.mcp` | Model Context Protocol client over streamable HTTP, and the projection of a server's tools into the AI tool model | core |
 | `xyberos.plugins` | The plugin protocol and registry: trusted, ordered, no discovery | core |
 | `xyberos.runtime` | Dependency scopes, context binding, correlation ids, deadlines | core |
@@ -46,7 +46,7 @@ _Generated when the site is built, and checked by `site/scripts/matrix.py --chec
 | `[database]` | `aiosqlite>=0.20,<1`, `alembic>=1.13,<2`, `sqlalchemy>=2.0,<2.1` | `xyberos.database.contracts`, `xyberos.database.migrations`, `xyberos.database.sqlite`, `xyberos.database.testing` | A single-file SQLAlchemy-friendly database, and the migrations that go with it |
 | `[dev]` | `build>=1.2,<2`, `hatchling>=1.25,<2`, `httpx>=0.27,<1`, `jinja2>=3.1,<4`, `mkdocs-material>=9.5,<10`, `mypy>=1.11,<2`, `pre-commit>=3.7,<5`, `python-multipart>=0.0.18,<1`, `pytest>=8,<10`, `ruff>=0.6,<1`, `tomli>=2,<3`, `types-PyYAML>=6.0,<7` | — | The contributor's toolchain, and the two libraries this line expects an *application* to bring: Jinja2 and python-multipart |
 | `[durable]` | `aiosqlite>=0.20,<1`, `alembic>=1.13,<2`, `sqlalchemy>=2.0,<2.1` | `xyberos.durable.journal`, `xyberos.durable.store` | Persistence for workflow progress, single host and at-least-once |
-| `[http]` | `httpx>=0.27,<1`, `starlette>=0.40,<2` | `xyberos.http.adapter`, `xyberos.http.metrics`, `xyberos.http.middleware`, `xyberos.http.requests`, `xyberos.http.routing`, `xyberos.http.testing` | Routing an application's routes as an ASGI application |
+| `[http]` | `httpx>=0.27,<1`, `starlette>=0.40,<2` | `xyberos.http.adapter`, `xyberos.http.csrf`, `xyberos.http.metrics`, `xyberos.http.middleware`, `xyberos.http.requests`, `xyberos.http.routing`, `xyberos.http.sessions`, `xyberos.http.testing` | Routing an application's routes as an ASGI application |
 | `[ollama]` | `httpx>=0.27,<1` | `xyberos.ai.ollama` | The first AI provider: a local Ollama service |
 
 **Packages outside this repository.** Every name this line knows about, from [`packages.toml`](https://github.com/xyberos/xyberos2.0/blob/master/packages.toml) — the manifest the compatibility job also reads. `planned` means decided and no distribution is written, `written` means the distribution exists and this line has no release of it, and `published` means a release exists that the job installs and proves.
@@ -94,7 +94,7 @@ compatibility job runs against the published pair. What each one gives you, and 
 | Object storage: filesystem provider and in-memory double | `xyberos.storage` | Built-in | core |
 | MCP tools: consuming a server's tools over streamable HTTP | `xyberos.mcp` | Built-in | core |
 | HTTP routing over Starlette | `xyberos.http` | Built-in (extra) | `[http]` |
-| Middleware: correlation id, request scope, error mapping, request metrics | `xyberos.http` | Built-in (extra) | `[http]` |
+| Middleware: correlation id, request scope, error mapping, request metrics, sessions, CSRF | `xyberos.http` | Built-in (extra) | `[http]` |
 | SQLite provider and Alembic migrations | `xyberos.database` | Built-in (extra) | `[database]` |
 | Ollama adapter | `xyberos.ai.ollama` | Built-in (extra) | `[ollama]` |
 | Test doubles: `ManualClock`, `FakeModelProvider`, `InMemoryStorage`, `temporary_database`, `create_test_client` | the `*.testing` modules | Built-in | with the module they double |
@@ -112,29 +112,32 @@ compatibility job runs against the published pair. What each one gives you, and 
 | OpenAI-compatible chat and embedding endpoints | `xyberos-openai-compatible`, proved by the AI conformance suite | Extension point | `xyberos-openai-compatible` |
 | CRUD query construction: filtering, sorting, pagination | `xyberos-crud`, over the database provider contract | You add it | `xyberos-crud` |
 | Redis | — | You add it | — |
-| CSRF protection, server-side sessions | Starlette's own middleware, or the application | Not provided, and it will not be | — |
-| Identity, sessions, roles, tenancy model | — | Not provided, and it will not be | `xyberos-auth` verifies an assertion and stops |
+| Identity, roles, tenancy model | — | Not provided, and it will not be | `xyberos-auth` verifies an assertion and stops |
 | Vector store, embeddings index, memory, retrieval, intents, agents | — | You build it | — |
 
 ## The refusals are features
 
-Four rows above are absences by decision rather than by omission, and each has a recorded reason:
+Three rows above are absences by decision rather than by omission, and each has a recorded reason:
 
 - **No identity or authorization model.** Authorization is a product decision; the framework would get
   it wrong for most users and would own security it cannot verify. The sanctioned shape — verify an
   assertion upstream, pass the principal as an argument, scope queries by it — is in
   [ADR 0014](reference/adr/0014-no-identity-or-authorization-model.md) and is tested in
   [the tenancy example](https://github.com/xyberos/xyberos2.0/tree/master/examples/tenancy).
-- **No session or CSRF middleware.** Starlette ships both and the adapter composes with them, so the
-  gap costs a reader an install rather than a capability; the framework declines to own them because
-  the storage choice and the policy belong to the application, exactly as the template engine and the
-  ASGI server do. [ADR 0018](reference/adr/0018-capability-placement-rule.md) refuses them as a class,
-  with an admin UI, OpenAPI, RAG, job queues, rate limiting, and feature flags.
 - **One database provider, and a documented extension point.** SQLite ships; the seam is any async
   SQLAlchemy dialect, and a third-party provider proves itself with `assert_provider_contract`
   ([ADR 0016](reference/adr/0016-database-providers-are-an-extension-point.md)).
 - **Durable execution is experimental.** Single host, one journal, at-least-once effects — contract
   terms rather than caveats ([ADR 0011](reference/adr/0011-durable-executor-contract.md)).
+
+**Sessions and CSRF left this list.** They were refused on the grounds that Starlette ships both, which
+is true for sessions and false for CSRF — Starlette ships no CSRF middleware, so that half never cost a
+reader an install. They now ship as `xyberos.http` middleware over a `SessionStore` contract, with the
+policy that belongs to the application — the store, the login, and the authorization model — left
+where it was ([ADR 0024](reference/adr/0024-sessions-and-csrf-are-middleware-in-the-http-module.md)).
+[The sessions example](https://github.com/xyberos/xyberos2.0/tree/master/examples/sessions) is the
+recipe, and [what is absent, and what to do instead](reference/capabilities.md) is the index from every
+gap to its answer.
 
 ## What is never implied
 
