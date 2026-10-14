@@ -8,11 +8,12 @@ name: Compatibility
 #
 # Two things it deliberately does not do:
 #
-#   * It does not skip silently. Nothing is published beside this line yet, so the package legs are
-#     skipped — a GitHub Actions matrix cannot be empty; it errors — and the manifest job says so in an
-#     annotation instead. The core leg still runs, and that is the part worth having today: installing the
-#     *published* core is a different check from installing the wheel this repository just built
-#     (`installed-artefact` in ci.yml), and it catches the one failure that test cannot — a bad upload.
+#   * It does not skip silently. A GitHub Actions matrix cannot be empty — it errors — so the package legs are
+#     gated on the manifest's published list, and an empty list is announced in an annotation rather than
+#     passing in silence. Every name beside this line is now published, so the legs run; the core leg is what
+#     makes the gate worth having even when they cannot: installing the *published* core is a different check
+#     from installing the wheel this repository just built (`installed-artefact` in ci.yml), and it catches the
+#     one failure that test cannot — a bad upload.
 #   * It does not run on every push. Drift appears on the timescale of releases, and an index install on
 #     every commit is a job people learn to ignore.
 #

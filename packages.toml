@@ -29,14 +29,25 @@
 #                     upload, and nothing here claims one has landed.
 #
 # A `published` entry also declares `conformance`: Python source the compatibility job runs with
-# `python -c`, which exercises a suite this line ships against the package's own implementation and exits
-# non-zero when a check fails. It has to exit *with* the callable's status — `from x import main; main()`
-# discards the return value and reports success on a failed check — so the shape is
-# `import sys; from <module>.conformance import main; sys.exit(main())`. The package imports the suite from
-# the installed core and owns whatever setup its backend needs, so the snippet stays short, and an entry may
-# declare it before its release exists, because the target is what the release waits on. The job refuses to
-# install a published package that does not declare one, because a package that is installed and not checked
-# is worse than one that is not installed at all.
+# `python -c`, which exits non-zero when a check fails. There are two kinds, and which one an entry uses is
+# decided by whether this line ships a suite for the seam the package implements:
+#
+#   * A **provider** of a seam this repository ships a suite for runs that suite, because the suite is the
+#     contract and it is what the package's own CI runs too. The shape is
+#     `import sys; from <module>.conformance import main; sys.exit(main())` — it has to exit *with* the
+#     callable's status, because `from x import main; main()` discards the return value and reports success
+#     on a failed check. The package imports the suite from the installed core and owns whatever setup its
+#     backend needs, so the snippet stays short.
+#   * A package that implements **no** such seam proves what can be proved from outside it: that its public
+#     names import against the core it declares, and that the installed core meets the floor it declares. The
+#     shape is `import xyberos; from <root> import <public names>; assert tuple(int(part) for part in
+#     xyberos.__version__.split('.')[:2]) >= (2, <minor>)`. Checking the floor rather than only the major is
+#     deliberate: a declared range is not a proof, because `>=2,<3` is satisfied by `2.0.0` and a package that
+#     imports a module added in `2.1.0` breaks on it with no version conflict to warn anyone.
+#
+# An entry may declare its target before its release exists, because the target is what the release waits on.
+# The job refuses to install a published package that does not declare one, because a package that is
+# installed and not checked is worse than one that is not installed at all.
 
 schema_version = 1
 
@@ -47,39 +58,43 @@ core_requirement = "xyberos>=2,<3"
 [[package]]
 name = "xyberos-mcp"
 import_root = "xyberos_mcp"
-status = "written"
+status = "published"
 summary = "The server direction: exposing an application's tools over MCP; a stdio transport only with the owner's approval"
-dependencies = ["xyberos[http]>=2,<3"]
+dependencies = ["xyberos[http]>=2.1,<3"]
+conformance = "import xyberos; from xyberos_mcp import McpServer, expose; assert tuple(int(part) for part in xyberos.__version__.split('.')[:2]) >= (2, 1), xyberos.__version__; print('xyberos-mcp: ok against', xyberos.__version__)"
 rationale = "expose() needs an HTTP surface, and stdio spawns a process. The shipped client refuses both on purpose."
 
 [[package]]
 name = "xyberos-templates"
 import_root = "xyberos_templates"
-status = "written"
+status = "published"
 summary = "Server-rendered pages: an engine-neutral Templates contract with Jinja2 shipped, a static mount, and form reading"
 dependencies = ["xyberos[http]>=2,<3", "jinja2>=3.1,<4", "python-multipart>=0.0.18,<1"]
+conformance = "import xyberos; from xyberos_templates import Jinja2Templates, Templates, TemplatesSettings; assert tuple(int(part) for part in xyberos.__version__.split('.')[:2]) >= (2, 0), xyberos.__version__; print('xyberos-templates: ok against', xyberos.__version__)"
 rationale = "It needs Jinja2, which pyproject.toml records as an application's dependency rather than this line's, and a static mount and form reading need the HTTP extra's Starlette."
 
 [[package]]
 name = "xyberos-observability"
 import_root = "xyberos_observability"
-status = "written"
+status = "published"
 summary = "One explicit call that configures a logging handler and spans, fed by the runtime's own event sink"
 dependencies = ["xyberos[http]>=2,<3", "opentelemetry-api>=1.20,<2", "opentelemetry-sdk>=1.20,<2"]
+conformance = "import xyberos; from xyberos_observability import Observability, ObservabilitySettings, RequestSpanMiddleware; assert tuple(int(part) for part in xyberos.__version__.split('.')[:2]) >= (2, 0), xyberos.__version__; print('xyberos-observability: ok against', xyberos.__version__)"
 rationale = "It needs OpenTelemetry, and the runtime configures no handler by decision."
 
 [[package]]
 name = "xyberos-auth"
 import_root = "xyberos_auth"
-status = "written"
+status = "published"
 summary = "Verification only: an assertion from a shared secret or a JWKS, and a Principal"
 dependencies = ["cryptography>=42,<47"]
+conformance = "import xyberos; from xyberos_auth import AuthSettings, Principal, PrincipalVerifier; assert tuple(int(part) for part in xyberos.__version__.split('.')[:2]) >= (2, 0), xyberos.__version__; print('xyberos-auth: ok against', xyberos.__version__)"
 rationale = "Real assertions are asymmetric. The policy half stays absent from the framework (ADR 0014)."
 
 [[package]]
 name = "xyberos-postgres"
 import_root = "xyberos_postgres"
-status = "written"
+status = "published"
 summary = "A DatabaseProvider for PostgreSQL, proved against the shipped conformance suite"
 dependencies = ["xyberos[database]>=2,<3", "asyncpg>=0.29,<1", "sqlalchemy>=2.0,<2.1"]
 conformance = "import sys; from xyberos_postgres.conformance import main; sys.exit(main())"
@@ -88,18 +103,18 @@ rationale = "It needs a driver core will not adopt, and it answers the two SQLit
 [[package]]
 name = "xyberos-storage-s3"
 import_root = "xyberos_storage_s3"
-status = "written"
+status = "published"
 summary = "A Storage provider for S3-compatible object stores, proved against the shipped conformance suite"
-dependencies = ["aioboto3>=13,<16"]
+dependencies = ["xyberos>=2.1,<3", "aioboto3>=13,<16"]
 conformance = "import sys; from xyberos_storage_s3.conformance import main; sys.exit(main())"
 rationale = "It needs an object-store client core will not adopt."
 
 [[package]]
 name = "xyberos-openai-compatible"
 import_root = "xyberos_openai_compatible"
-status = "written"
+status = "published"
 summary = "A ModelProvider for OpenAI-compatible chat and embedding endpoints"
-dependencies = ["httpx>=0.27,<1"]
+dependencies = ["xyberos>=2.1,<3", "httpx>=0.27,<1"]
 conformance = "import sys; from xyberos_openai_compatible.conformance import main; sys.exit(main())"
 rationale = "A second backend for a facade whose first is Ollama (ADR 0004); promoting it to an extra would amend that ADR."
 

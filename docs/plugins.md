@@ -193,12 +193,15 @@ cannot invent one.
 | `xyberos-db` | retired: the capability is `xyberos[database]` and the provider seam | — | this project |
 | `xyberos-metrics` | retired: request metrics ship as `xyberos.http.RequestMetricsMiddleware` | — | this project |
 
-**Only what this repository can check can be marked published.** `packages.toml` records a `conformance`
-snippet for every published name and refuses a published name without one, because a package that is installed
-and not checked is worse than one that is not installed at all. The snippet runs a suite this repository ships,
-so the three rows above that implement a shipped seam become publishable when the package exists, and a name
-whose seam has no suite here stays `written` however green its own tests are — a wheel installed from the index
-carries no tests for the job to run.
+**Every published name carries a check the job runs.** `packages.toml` records a `conformance` snippet for each
+one and refuses a published name without it, because a package that is installed and not checked is worse than
+one that is not installed at all. The snippet comes in one of two shapes, decided by whether this repository
+ships a suite for the seam the package implements: a **provider** runs that suite, so `xyberos-postgres` runs
+`assert_provider_contract` and the storage and AI packages run theirs; a package that implements **no** such
+seam imports its own public names against the core it declares and asserts that the core is this line. That
+second shape is weaker than a suite and it is not nothing: it is the check that fails when the installed core
+is older than the module the package imports, which is exactly how a release went out without
+`xyberos.storage` in it.
 
 **Published by this project, or listed as a community plugin.** A row marked *this project* is published
 by the people who publish `xyberos`, from the repository above, and its conformance suite is the one this

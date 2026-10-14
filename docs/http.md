@@ -68,6 +68,53 @@ Read query strings, headers, and bodies from the `Request`. `read_json_object(re
 a JSON object or raises a client-safe validation error, and is the recommended way to read a
 JSON body. A required parameter that cannot be supplied is never silently invented.
 
+## Validating a body or a form
+
+There is no validation library to install, because the framework already ships a JSON Schema subset for
+the AI facade: [`validate_payload`](./ai.md) is exported from `xyberos.ai` and validates any
+value, not only a model's reply. It raises `AISchemaError` rather than a `HttpError`, so the mapping
+below is the whole recipe — translate it and the adapter answers `422` with the shape the error table
+describes.
+
+```python
+from starlette.requests import Request
+from starlette.responses import JSONResponse
+
+from xyberos import RequestValidationError
+from xyberos.ai import validate_payload
+from xyberos.errors import AISchemaError
+from xyberos.http import read_json_object
+
+NEW_ITEM = {
+    "type": "object",
+    "properties": {"name": {"type": "string", "minLength": 1}, "quantity": {"type": "integer", "minimum": 1}},
+    "required": ["name"],
+    "additionalProperties": False,
+}
+
+
+@app.post("/items")
+async def create_item(request: Request) -> JSONResponse:
+    body = await read_json_object(request)  # a body that is not a JSON object is already a 422
+    try:
+        validate_payload(body, NEW_ITEM, location="the create-item body")
+    except AISchemaError as error:
+        raise RequestValidationError("the request body is invalid", errors=[str(error)]) from error
+    return JSONResponse({"created": body["name"]}, status_code=201)
+```
+
+Verified against the adapter's test client: a valid body answers `201`, a missing required property and a
+misspelled field both answer `422`, and `errors` carries the failing location —
+`"the create-item body at $ is missing the required property 'name'"`. `read_json_object` raises a
+`RequestValidationError` too, so a body that is not JSON, or is JSON but not an object, is a `422` from the
+same code path rather than a `500`.
+
+Two properties of that shape are worth keeping. `additionalProperties: False` is what makes a typo in a
+field name a `422` rather than a silently ignored key, and the schema is declared once at module level,
+so `check_schema` runs on the same object every request instead of validating a schema built per call. A
+form submission is read the same way — `xyberos-templates` gives you `read_form(request)` — and the
+object it returns goes through the same `validate_payload` call.
+
 ## Responses
 
 | Handler returns | Response |

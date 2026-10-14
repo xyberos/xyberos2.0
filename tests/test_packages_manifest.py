@@ -97,14 +97,28 @@ def test_every_package_beside_this_line_declares_the_same_core_range() -> None:
     assert requirement.startswith("xyberos>=2,<3"), requirement
 
 
-def test_the_compatibility_job_has_nothing_to_install_until_something_is_published() -> None:
-    """Published is a status in the manifest, not a guess: the job installs exactly this list."""
-    assert ecosystem.published(MANIFEST_DATA) == [
-        str(entry["name"]) for entry in ENTRIES if entry["status"] == "published"
-    ]
-    # Nothing is published beside this line yet, and the job reports that instead of guessing. When
-    # the first package lands, this assertion is the reminder to give it a conformance target.
-    assert ecosystem.published_jobs(MANIFEST_DATA) == []
+def test_the_compatibility_job_installs_exactly_what_the_manifest_publishes() -> None:
+    """Published is a status in the manifest, not a guess: the job installs exactly this list.
+
+    Deliberately silent about how long the list is. Its earlier form asserted the list was *empty*, which
+    was true before the first release and became the reason nothing noticed when seven landed.
+    """
+    published = ecosystem.published(MANIFEST_DATA)
+    jobs = ecosystem.published_jobs(MANIFEST_DATA)
+
+    assert published == [str(entry["name"]) for entry in ENTRIES if entry["status"] == "published"]
+    assert [job["name"] for job in jobs] == published, "the matrix is the published list, in order"
+
+
+def test_every_conformance_target_has_one_of_the_two_documented_shapes() -> None:
+    """A provider runs a suite this line ships; a package with no seam checks what it can."""
+    for job in ecosystem.published_jobs(MANIFEST_DATA):
+        snippet = job["conformance"]
+        provider = "import sys; from" in snippet and "sys.exit(main())" in snippet
+        self_check = "import xyberos" in snippet and "assert " in snippet
+        assert provider or self_check, (
+            f"{job['name']} declares neither documented shape: {snippet!r}"
+        )
 
 
 def test_a_published_package_without_a_conformance_target_is_refused() -> None:

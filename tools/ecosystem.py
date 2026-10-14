@@ -60,9 +60,10 @@ def core_requirement(manifest: dict[str, object]) -> str:
 def published(manifest: dict[str, object]) -> list[str]:
     """Return the names the compatibility job should install and exercise.
 
-    Nothing is published beside this line yet, so this is empty and the job reports that. An empty
-    list is a fact about the manifest rather than a failure, which is why the caller checks its
-    length instead of treating it as an error.
+    A name is here once a release of *this line's* content exists: a reused name that still serves a 1.x
+    release is not published by this line and is not installed, because the job proves a pair rather than a
+    name. An empty list is a fact about the manifest rather than a failure, which is why the caller checks
+    its length instead of treating it as an error.
     """
     return [
         str(entry["name"]) for entry in packages(manifest) if entry.get("status") == "published"
@@ -72,10 +73,11 @@ def published(manifest: dict[str, object]) -> list[str]:
 def published_jobs(manifest: dict[str, object]) -> list[dict[str, str]]:
     """Return the matrix the compatibility job runs: one entry per published package.
 
-    ``conformance`` is Python source the job runs with ``python -c``: it runs the shipped suite
-    against the package's own implementation and exits non-zero when a check fails. An entry marked
-    published without one is refused *here*: a package the job installs and does not check is worse
-    than a package the job does not install at all.
+    ``conformance`` is Python source the job runs with ``python -c``, and it comes in the two shapes the
+    manifest header documents: a provider of a seam this line ships a suite for runs that suite, and a
+    package that implements no such seam imports its own public names against the core it declares. An
+    entry marked published without one is refused *here*: a package the job installs and does not check is
+    worse than a package the job does not install at all.
     """
     jobs: list[dict[str, str]] = []
     for entry in packages(manifest):

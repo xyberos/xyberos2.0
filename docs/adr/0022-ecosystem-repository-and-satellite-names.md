@@ -109,15 +109,16 @@ is decided individually.
   repository and no release on the index, so there is nothing to point *from* and no folder to create for it.
   The capability ships here, as `xyberos.http.RequestMetricsMiddleware`, and the name stays unused. A folder
   for it would exist only to claim a name no capability needs.
-- **A name is `published` only when a suite this repository ships proves it.** `packages.toml` records a
+- **A name is `published` only when a check this repository can run proves it.** `packages.toml` records a
   `conformance` snippet for every published entry, and refuses a published entry without one, so the gate is
-  what a package can be *checked* against rather than what it was tested with. Three of the written names
-  implement a seam core ships a suite for — `xyberos-postgres`, `xyberos-storage-s3`, and
-  `xyberos-openai-compatible` — and the four that implement no such seam (`xyberos-mcp`, `xyberos-auth`,
-  `xyberos-templates`, `xyberos-observability`) stay `written` until one exists. Their own tests prove them in
-  their own repository;
-  a wheel installed from the index carries no tests, so "its own tests" is not something the compatibility job
-  can run.
+  what a package can be *checked* against rather than what it was tested with. The snippet has two shapes: a
+  package implementing a seam core ships a suite for runs that suite — `xyberos-postgres`, `xyberos-storage-s3`,
+  and `xyberos-openai-compatible` do — and one implementing no such seam imports its own public names against
+  the core it declares and asserts that the core is this line, which is what `xyberos-mcp`, `xyberos-auth`,
+  `xyberos-templates`, and `xyberos-observability` do. Their own tests prove them in their own repository, and
+  a wheel installed from the index carries none of those, so the self-check is the weaker thing the
+  compatibility job *can* run — and it is the check that fails when the installed core predates a module the
+  package imports.
 - **The plan's repository reference was inferred from the core's metadata and is corrected here.** The
   correction is [the implementation plan](../implementation.md)'s; this record is what it points at.
 - **0021 stays unwritten.** This record takes the number the plans already use for it, and 0021 remains

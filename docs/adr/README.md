@@ -49,3 +49,4 @@ backlog. Annotate anything newly satisfied, and give an owner to anything that h
 | [0019](0019-storage-contract.md) | The storage contract, and keys as the security boundary | accepted |
 | [0020](0020-introspection-documents.md) | Serialized introspection output is a versioned contract | accepted |
 | [0022](0022-ecosystem-repository-and-satellite-names.md) | The ecosystem repository is `xyberos/xyberos-plugins`; two satellites are reused and two are retired | accepted |
+| [0023](0023-crud-package-and-the-dx-refusals.md) | A CRUD package beside this line, and the DX work that stays a refusal | proposed |
