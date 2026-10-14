@@ -4,6 +4,12 @@
 
 > Accepted by the project owner on 2026-10-14, in the same instruction that started the package.
 
+> **Later decision ([ADR 0024](0024-sessions-and-csrf-are-middleware-in-the-http-module.md)).** The
+> bullet below that refuses CSRF and server-side sessions with "Starlette ships the middleware" is half
+> wrong: Starlette ships sessions, and **no** CSRF middleware. ADR 0024 ships both as `xyberos.http`
+> middleware — mechanism here, session store *there* — and leaves everything else in this ADR alone,
+> including the ORM, the models, and the admin UI refused.
+
 ## Context
 
 The framework answers "how do I build an internal tool" well and "how do I get a CRUD screen up

@@ -1,6 +1,16 @@
 # ADR 0018: The capability-placement rule
 
-**Status:** accepted
+**Status:** accepted; the sessions/CSRF row of the candidate table is superseded by
+[ADR 0024](0024-sessions-and-csrf-are-middleware-in-the-http-module.md)
+
+> **Later decision ([ADR 0024](0024-sessions-and-csrf-are-middleware-in-the-http-module.md)).** The
+> refusal of sessions and CSRF in the candidate table rested on "Starlette ships both", which is true
+> for sessions and false for CSRF: Starlette 0.52 ships no CSRF middleware, so that half of the row
+> never cost a reader an install. ADR 0024 supersedes the row and takes "sessions" out of it — CSRF is
+> a mechanism and ships as a module here (`xyberos.http.CSRFMiddleware`), and sessions ship as a
+> middleware over a `SessionStore` contract with the store placed *there*. The four placements and the
+> four constraints below are unchanged and remain in force, and an admin UI, OpenAPI, RAG, job queues,
+> rate limiting, and feature flags stay refused.
 
 ## Context
 

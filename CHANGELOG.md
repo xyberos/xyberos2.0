@@ -6,6 +6,25 @@ leading digit means here — are in [the stability guide](docs/stability.md).
 
 ## [Unreleased]
 
+### Added
+
+- **`xyberos.http.SessionMiddleware`, `xyberos.http.CSRFMiddleware`, and a `SessionStore` contract**,
+  with an in-memory store. The cookie carries a signed session *id* rather than the payload, a session
+  is written only when a handler changed it, and a state-changing request from another origin is refused
+  ([ADR 0024](docs/adr/0024-sessions-and-csrf-are-middleware-in-the-http-module.md)). The recipe is
+  [`examples/sessions`](examples/sessions/README.md).
+- **`CSRFError`** in the error taxonomy: a `403` the adapter answers like any other `HttpError`.
+- **What is absent, and what to do instead** ([`docs/capabilities.md`](docs/capabilities.md)): the index
+  from every refusal to the seam, package, or recipe that answers it, checked against `packages.toml`.
+
+### Changed
+
+- **[ADR 0024](docs/adr/0024-sessions-and-csrf-are-middleware-in-the-http-module.md) supersedes the
+  sessions/CSRF row of [ADR 0018](docs/adr/0018-capability-placement-rule.md)**, which refused them on
+  the grounds that "Starlette ships both". Starlette ships sessions and **no** CSRF middleware, so the
+  refusal's reason did not hold for half the row: the mechanism ships here, and the session store's
+  policy stays with the application.
+
 ## [2.1.0] - 2026-10-14
 
 Everything below landed after `2.0.0` was uploaded, and none of it was in that release: the tag's tree

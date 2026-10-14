@@ -45,8 +45,9 @@ backlog. Annotate anything newly satisfied, and give an owner to anything that h
 | [0015](0015-durability-is-single-host.md) | Durability is single-host; the worker role is the integration point | accepted |
 | [0016](0016-database-providers-are-an-extension-point.md) | Database providers are an extension point, not a core feature | accepted |
 | [0017](0017-release-identity-and-lineage.md) | Publish this line as `xyberos` 2.0.0 | accepted |
-| [0018](0018-capability-placement-rule.md) | The capability-placement rule: four placements, four constraints | accepted |
+| [0018](0018-capability-placement-rule.md) | The capability-placement rule: four placements, four constraints | accepted; the sessions/CSRF row is superseded by 0024 |
 | [0019](0019-storage-contract.md) | The storage contract, and keys as the security boundary | accepted |
 | [0020](0020-introspection-documents.md) | Serialized introspection output is a versioned contract | accepted |
 | [0022](0022-ecosystem-repository-and-satellite-names.md) | The ecosystem repository is `xyberos/xyberos-plugins`; two satellites are reused and two are retired | accepted |
-| [0023](0023-crud-package-and-the-dx-refusals.md) | A CRUD package beside this line, and the DX work that stays a refusal | accepted |
+| [0023](0023-crud-package-and-the-dx-refusals.md) | A CRUD package beside this line, and the DX work that stays a refusal | accepted; the sessions/CSRF half is superseded by 0024 |
+| [0024](0024-sessions-and-csrf-are-middleware-in-the-http-module.md) | Sessions and CSRF are middleware in the HTTP module | accepted |
