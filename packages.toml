@@ -121,7 +121,7 @@ rationale = "A second backend for a facade whose first is Ollama (ADR 0004); pro
 [[package]]
 name = "xyberos-crud"
 import_root = "xyberos_crud"
-status = "written"
+status = "published"
 summary = "Query construction over the provider contract: filtering, sorting, and pagination as values rather than entities"
 dependencies = ["xyberos[database]>=2,<3", "sqlalchemy>=2.0,<2.1"]
 conformance = "import xyberos; from xyberos_crud import CrudSettings, Query, apply_query, fetch_page; assert tuple(int(part) for part in xyberos.__version__.split('.')[:2]) >= (2, 0), xyberos.__version__; print('xyberos-crud: ok against', xyberos.__version__)"

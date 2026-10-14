@@ -160,6 +160,7 @@ nav:
       - Writing a module: extend/modules.md
       - Writing a plugin: extend/plugins.md
       - Writing a database provider: extend/database-providers.md
+      - The packages beside the framework: extend/packages.md
       - Multi-step work that outlives the process (experimental): extend/durable.md
   - Production:
       - production/index.md

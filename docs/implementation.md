@@ -331,7 +331,7 @@ owner's, and no artefact is published before it is made.
 | 7 | Developer experience, hardening, and release | complete (release decision pending owner sign-off) | all seven work packages: `docs/stability.md` + [ADR 0013](adr/0013-stable-surface-and-versioning.md) + `tests/test_public_surface.py` + `tests/test_compatibility.py` + `tests/test_deprecation.py` + `src/xyberos/deprecation.py`; `docs/getting-started.md`, `docs/testing.md`, `docs/troubleshooting.md`, `docs/security.md`, `examples/hello_app/`; `src/xyberos/cli/` + `docs/cli.md` + `tests/cli/`; `CHANGELOG.md`, `SECURITY.md`, `docs/release.md`, `tests/test_release_artefacts.py`; `tests/perf/` + `docs/performance.md`; the threat review with two credential-echo defects fixed |
 | 8 | Boundary legibility and extension points | complete | [ADR 0014](adr/0014-no-identity-or-authorization-model.md), [0015](adr/0015-durability-is-single-host.md), [0016](adr/0016-database-providers-are-an-extension-point.md); `docs/positioning.md`, `docs/database-providers.md`; `assert_provider_contract` in `xyberos.database.testing` + `tests/database/test_provider_contract.py`; `examples/tenancy/`, `examples/broker_worker/` and their integration tests; the write-throughput baseline |
 | 9 | Extras here, and the placement rule | complete here (retirement patches belong to the publishing release) | [ADR 0018](adr/0018-capability-placement-rule.md), [ADR 0019](adr/0019-storage-contract.md); `src/xyberos/storage/` + `tests/storage/` (44 cases), `src/xyberos/http/metrics.py` + `tests/http/test_metrics.py`, `src/xyberos/mcp/` + `tests/mcp/` (23 cases), `assert_model_provider_contract` + `assert_embedding_provider_contract` in `src/xyberos/ai/testing.py`, the opt-in live Ollama leg, `docs/storage.md`, `docs/mcp.md` |
-| 10 | The packages that stay in the ecosystem repository | complete here; all seven distributions are released | [`packages.toml`](../packages.toml) + `tools/ecosystem.py` + `tests/test_packages_manifest.py` (15 cases); [`.github/workflows/compatibility.yml`](../.github/workflows/compatibility.yml) installing the published core and all seven packages per leg; the plugin catalogue, feature matrix, and per-name release-guide wording checked against the manifest |
+| 10 | The packages that stay in the ecosystem repository | complete here; all eight distributions are released | [`packages.toml`](../packages.toml) + `tools/ecosystem.py` + `tests/test_packages_manifest.py` (15 cases); [`.github/workflows/compatibility.yml`](../.github/workflows/compatibility.yml) installing the published core and all eight packages per leg; [the packages guide](../site/extend/packages.md); the plugin catalogue, feature matrix, and per-name release-guide wording checked against the manifest |
 | 11 | Developer tooling and the contributor loop | complete here | [ADR 0020](adr/0020-introspection-documents.md); `src/xyberos/cli/{check,schema,durable}.py` + `src/xyberos/config.schema.json` + `tests/cli/test_introspection.py` + `tests/cli/test_durable_status.py` + `tests/test_config_schema.py`; the published schema copy (`site/scripts/build.py`); `.devcontainer/devcontainer.json`, `.pre-commit-config.yaml`, `tests/test_contributor_loop.py`; `tests/integration/test_first_five_minutes.py` |
 
 ### Phase 7 entry checklist
@@ -934,13 +934,14 @@ here.
 **Status:** *implemented here; the ecosystem half is written there and unpublished.* The **ecosystem half** —
 the packages, the ports, the retirement patches — is source in
 [`xyberos/xyberos-plugins`](https://github.com/xyberos/xyberos-plugins), and nothing here can publish it. All
-seven distributions are released: each passes its own gates — its suite, a strict type check, and a build that
-carries `py.typed` — and the three that implement a seam this repository ships a suite for pass that suite
-against a real service, which is a PostgreSQL server, an S3-compatible server, and a stub OpenAI-compatible
-endpoint. They needed the core's `2.1.0` rather than `2.0.0`, because the modules and error types they import
-landed after `2.0.0` was uploaded. Every one of them is `published` in the manifest, so the compatibility job
-now installs eight distributions from the index and runs each one's declared check — the first time that job
-has done anything but skip. Landed
+eight distributions are released — how to use each one is
+[the packages guide](../site/extend/packages.md) — and each passes its own gates: its suite, a strict type
+check, and a build that carries `py.typed`. The three that implement a seam this repository ships a suite for
+pass that suite against a real service, which is a PostgreSQL server, an S3-compatible server, and a stub
+OpenAI-compatible endpoint. They needed the core's `2.1.0` rather than `2.0.0`, because the modules and error
+types they import landed after `2.0.0` was uploaded. Every one of them is `published` in the manifest, so the
+compatibility job installs nine distributions from the index and runs each one's declared check — the first
+time that job has done anything but skip. Landed
 in this repository:
 [`packages.toml`](../packages.toml) as the manifest of every name beside this line, with
 `tests/test_packages_manifest.py` (15 cases) checking the plugin guide's catalogue, the feature matrix, and

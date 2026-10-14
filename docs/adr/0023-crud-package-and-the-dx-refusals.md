@@ -64,7 +64,8 @@ would be reversing the positioning decision, and would need to say so.
 
 - **The backlog's CRUD gap becomes a placement, and the four conveniences are now accounted for.** Migrations,
   forms, and validation were already shipped; the ORM and CSRF halves stay refused; this is the one addition.
-  It is written in the ecosystem repository, and its manifest row is `written` until it has a release.
+  It is written in the ecosystem repository and released as `0.1.0`, so its manifest row is `published` and
+  the compatibility job installs it with the rest.
 - **The package cannot be published until it has a check, which the self-check shape supplies.** That is the
   same gate every other package beside this line passes; it is not a weaker promise, it is the honest one.
 - **It must declare a floor that carries what it imports.** The last core release proved the range is not

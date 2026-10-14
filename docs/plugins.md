@@ -172,11 +172,10 @@ explicitly, and `xyberos` never looks for one ([ADR 0007](./adr/0007-trusted-plu
 supply-chain decision — entry-point loading means a dependency can change what your process does at
 import time — but it does not mean extensions are invisible. This section is the list.
 
-**Nothing beside this line is published yet.** Every name below has a distribution in the ecosystem
-repository and no release of this line's content, which the manifest records as `written`; `published` would
-mean a release exists. Three names already answer on the index with the *other* line's release —
-`xyberos-mcp` `0.2.2`, `xyberos-auth` `0.1.2`, and `xyberos-observability` `0.1.2` — and the four new names
-resolve to nothing at all. The table is
+**Every name below is published.** The manifest records each as `published`, which means a release of
+*this* line's content exists rather than that a name answers on the index: three of these names also serve a
+1.x release, and that release is the other line's code. How to use them, with the install line for each, is
+[the packages guide](../site/extend/packages.md). The table is
 generated from [`packages.toml`](../packages.toml), and `tests/test_packages_manifest.py` checks this page
 against that file, so a package cannot be added to the manifest and quietly omitted here — and this page
 cannot invent one.

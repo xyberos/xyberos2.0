@@ -161,6 +161,27 @@ columns in place, so use `op.batch_alter_table(...)`, which rebuilds the table; 
 behavior is proven before it reaches production data. Run migrations with
 `python examples/sqlite_crud/migrate.py [path]` to see the whole flow.
 
+## Collection queries
+
+A collection endpoint usually needs the same three things: the caller's filters, the caller's sort order,
+and one page of rows. [`xyberos-crud`](https://github.com/xyberos/xyberos-plugins/tree/master/crud) turns a
+query string into a bounded statement: a `PageRequest` is clamped to the deployment's maximum, and a field
+name is resolved only through the allowlist the caller supplies — a dictionary key, never SQL text.
+
+```python
+from xyberos_crud import CrudSettings, Query, fetch_page
+
+FILTERABLE = {"status": orders.c.status, "created_at": orders.c.created_at}
+SETTINGS = CrudSettings(max_limit=100, default_limit=25)
+
+query = Query.from_parameters(dict(request.query_params), filterable=FILTERABLE, settings=SETTINGS)
+page = await fetch_page(provider, select(orders), query, filterable=FILTERABLE, settings=SETTINGS)
+```
+
+It is a package beside this line rather than a core module because the operator set is policy, and it
+returns a statement rather than entities — it is not an ORM
+([ADR 0023](./adr/0023-crud-package-and-the-dx-refusals.md)).
+
 ## Testing
 
 ```python

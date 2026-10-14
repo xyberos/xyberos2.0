@@ -135,7 +135,7 @@ The upload itself, and the checks that only make sense once a release is on the 
 > Status: **performed, for `2.0.0` and `2.1.0`.** The index serves both — wheel and sdist — and this
 > repository carries the `v2.0.0` tag with the changelog entry the upload used as its release notes, dated
 > **2026-10-11**. The four preconditions above were met before the first run rather than during it, which is
-> the order this section exists to insist on. The ecosystem followed: all seven distributions beside this line
+> the order this section exists to insist on. The ecosystem followed: all eight distributions beside this line
 > are published from [`xyberos/xyberos-plugins`](https://github.com/xyberos/xyberos-plugins), each against the
 > core range it declares. [ADR 0017](./adr/0017-release-identity-and-lineage.md) still decides the number, and
 > nothing here reopens it.

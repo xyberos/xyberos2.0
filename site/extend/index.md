@@ -20,6 +20,7 @@ deployment order — lives in [Production](../production/index.md) rather than h
 | [Writing a module](modules.md) | the whole convention for a composable unit — one `register(app)` function — and the two properties that make it compose with anything |
 | [Writing a plugin](plugins.md) | the trusted-code boundary, metadata and compatibility, configuration precedence, requirement ordering, the eight refusals, and how to test and publish a distribution |
 | [Writing a database provider](database-providers.md) | the three-member contract, the semantics behind each promise, error mapping, and the conformance suite that refuses a provider that breaks it even while passing one that does not |
+| [The packages beside the framework](packages.md) | the eight published distributions, what each one gives you, the install line, and how each is proved against the published core |
 | [Multi-step work that outlives the process](durable.md) | the one experimental surface, and its contract terms rather than caveats |
 
 ## Where the topics that used to be planned went

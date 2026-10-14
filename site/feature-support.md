@@ -60,7 +60,7 @@ _Generated when the site is built, and checked by `site/scripts/matrix.py --chec
 | `xyberos-postgres` | `xyberos_postgres` | published | `xyberos[database]>=2,<3`, `asyncpg>=0.29,<1`, `sqlalchemy>=2.0,<2.1` | A DatabaseProvider for PostgreSQL, proved against the shipped conformance suite |
 | `xyberos-storage-s3` | `xyberos_storage_s3` | published | `xyberos>=2.1,<3`, `aioboto3>=13,<16` | A Storage provider for S3-compatible object stores, proved against the shipped conformance suite |
 | `xyberos-openai-compatible` | `xyberos_openai_compatible` | published | `xyberos>=2.1,<3`, `httpx>=0.27,<1` | A ModelProvider for OpenAI-compatible chat and embedding endpoints |
-| `xyberos-crud` | `xyberos_crud` | written | `xyberos[database]>=2,<3`, `sqlalchemy>=2.0,<2.1` | Query construction over the provider contract: filtering, sorting, and pagination as values rather than entities |
+| `xyberos-crud` | `xyberos_crud` | published | `xyberos[database]>=2,<3`, `sqlalchemy>=2.0,<2.1` | Query construction over the provider contract: filtering, sorting, and pagination as values rather than entities |
 | `xyberos-db` | `xyberos_db` | retired → `xyberos[database]` | — | Retired: the capability is xyberos[database] and the provider seam |
 | `xyberos-metrics` | `xyberos_metrics` | retired → `xyberos.http` | — | Retired: request metrics ship as xyberos.http.RequestMetricsMiddleware |
 
@@ -79,8 +79,9 @@ here is either shipped, or explicitly not shipped.
 Every distribution named in the last column is **released**, which is the status the inventory above reports as
 `published`. What a reader installs is the framework plus the one package a capability needs —
 `pip install xyberos xyberos-templates`, for instance — and each release carries a check this repository's
-compatibility job runs against the published pair, described in
-[the plugin guide](reference/plugins.md#the-catalogue).
+compatibility job runs against the published pair. What each one gives you, and the install line, is
+[the packages guide](extend/packages.md); the manifest that generates the inventory above is
+[`packages.toml`](https://github.com/xyberos/xyberos2.0/blob/master/packages.toml).
 
 | Capability | Where it lives | Tier | Ships with |
 | ---------- | -------------- | ---- | ---------- |
