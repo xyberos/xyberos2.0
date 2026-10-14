@@ -25,6 +25,7 @@ __all__ = [
     "AITransportError",
     "AIUnsupportedCapabilityError",
     "ConfigurationError",
+    "CSRFError",
     "DatabaseConfigurationError",
     "DatabaseConnectionError",
     "DatabaseError",
@@ -148,6 +149,17 @@ class HttpError(XyberosError):
 
 class RouteRegistrationError(HttpError):
     """Raised when a route or its handler signature cannot be registered."""
+
+
+class CSRFError(HttpError):
+    """Raised when a state-changing request fails the cross-site request check.
+
+    Subclasses :class:`HttpError` with a fixed ``403``, because a refused request is a client error
+    with a status the adapter already knows how to answer.
+    """
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message, status_code=403)
 
 
 class RequestValidationError(HttpError):
