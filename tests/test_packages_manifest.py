@@ -100,8 +100,9 @@ def test_every_package_beside_this_line_declares_the_same_core_range() -> None:
 def test_the_compatibility_job_installs_exactly_what_the_manifest_publishes() -> None:
     """Published is a status in the manifest, not a guess: the job installs exactly this list.
 
-    Deliberately silent about how long the list is. Its earlier form asserted the list was *empty*, which
-    was true before the first release and became the reason nothing noticed when seven landed.
+    Deliberately silent about how long the list is. Its earlier form asserted the list was *empty*,
+    which was true before the first release and became the reason nothing noticed when the packages
+    landed.
     """
     published = ecosystem.published(MANIFEST_DATA)
     jobs = ecosystem.published_jobs(MANIFEST_DATA)
