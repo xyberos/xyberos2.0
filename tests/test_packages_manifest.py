@@ -50,9 +50,10 @@ def test_every_entry_declares_what_a_reader_and_the_job_need() -> None:
 def test_every_status_the_manifest_may_use_is_defined_where_the_manifest_is_read() -> None:
     """The vocabulary is code and the definitions are prose, so the two have to be kept in step.
 
-    A status is a claim about the index — written, published, retired — and a reader who has to guess
-    what one means is reading a word rather than a fact. The count in the same sentence is checked too,
-    because "one of four values" left standing beside five of them is how this drifted the first time.
+    A status is a claim about the index — written, published, retired — and a reader who has to
+    guess what one means is reading a word rather than a fact. The count in the same sentence is
+    checked too, because "one of four values" left standing beside five of them is how this drifted
+    the first time.
     """
     header = MANIFEST.read_text(encoding="utf-8")
 
@@ -64,7 +65,8 @@ def test_every_status_the_manifest_may_use_is_defined_where_the_manifest_is_read
     words = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6}
     declared = words[counted.group(1)]
     assert declared == len(ecosystem.STATUSES), (
-        f"the header says {counted.group(1)} statuses and the tool defines {len(ecosystem.STATUSES)}"
+        f"the header says {counted.group(1)} statuses "
+        f"and the tool defines {len(ecosystem.STATUSES)}"
     )
 
 
