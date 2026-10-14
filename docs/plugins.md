@@ -190,6 +190,7 @@ cannot invent one.
 | `xyberos-postgres` | a `DatabaseProvider` for PostgreSQL | `assert_provider_contract` | this project |
 | `xyberos-storage-s3` | a `Storage` provider for S3-compatible stores | `assert_storage_contract` | this project |
 | `xyberos-openai-compatible` | a `ModelProvider` for OpenAI-compatible endpoints | `assert_model_provider_contract` | this project |
+| `xyberos-crud` | filtering, sorting, and pagination over the database provider contract, as values rather than entities | its own tests, including that a field name is resolved only through the caller's allowlist | this project |
 | `xyberos-db` | retired: the capability is `xyberos[database]` and the provider seam | — | this project |
 | `xyberos-metrics` | retired: request metrics ship as `xyberos.http.RequestMetricsMiddleware` | — | this project |
 

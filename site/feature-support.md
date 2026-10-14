@@ -60,6 +60,7 @@ _Generated when the site is built, and checked by `site/scripts/matrix.py --chec
 | `xyberos-postgres` | `xyberos_postgres` | published | `xyberos[database]>=2,<3`, `asyncpg>=0.29,<1`, `sqlalchemy>=2.0,<2.1` | A DatabaseProvider for PostgreSQL, proved against the shipped conformance suite |
 | `xyberos-storage-s3` | `xyberos_storage_s3` | published | `xyberos>=2.1,<3`, `aioboto3>=13,<16` | A Storage provider for S3-compatible object stores, proved against the shipped conformance suite |
 | `xyberos-openai-compatible` | `xyberos_openai_compatible` | published | `xyberos>=2.1,<3`, `httpx>=0.27,<1` | A ModelProvider for OpenAI-compatible chat and embedding endpoints |
+| `xyberos-crud` | `xyberos_crud` | written | `xyberos[database]>=2,<3`, `sqlalchemy>=2.0,<2.1` | Query construction over the provider contract: filtering, sorting, and pagination as values rather than entities |
 | `xyberos-db` | `xyberos_db` | retired → `xyberos[database]` | — | Retired: the capability is xyberos[database] and the provider seam |
 | `xyberos-metrics` | `xyberos_metrics` | retired → `xyberos.http` | — | Retired: request metrics ship as xyberos.http.RequestMetricsMiddleware |
 
@@ -108,6 +109,7 @@ compatibility job runs against the published pair, described in
 | PostgreSQL, MySQL, MariaDB providers | `xyberos-postgres`, proved by the database conformance suite | Extension point | `xyberos-postgres` |
 | S3-compatible object storage | `xyberos-storage-s3`, proved by the storage conformance suite | Extension point | `xyberos-storage-s3` |
 | OpenAI-compatible chat and embedding endpoints | `xyberos-openai-compatible`, proved by the AI conformance suite | Extension point | `xyberos-openai-compatible` |
+| CRUD query construction: filtering, sorting, pagination | `xyberos-crud`, over the database provider contract | You add it | `xyberos-crud` |
 | Redis | — | You add it | — |
 | CSRF protection, server-side sessions | Starlette's own middleware, or the application | Not provided, and it will not be | — |
 | Identity, sessions, roles, tenancy model | — | Not provided, and it will not be | `xyberos-auth` verifies an assertion and stops |

@@ -119,6 +119,15 @@ conformance = "import sys; from xyberos_openai_compatible.conformance import mai
 rationale = "A second backend for a facade whose first is Ollama (ADR 0004); promoting it to an extra would amend that ADR."
 
 [[package]]
+name = "xyberos-crud"
+import_root = "xyberos_crud"
+status = "written"
+summary = "Query construction over the provider contract: filtering, sorting, and pagination as values rather than entities"
+dependencies = ["xyberos[database]>=2,<3", "sqlalchemy>=2.0,<2.1"]
+conformance = "import xyberos; from xyberos_crud import CrudSettings, Query, apply_query, fetch_page; assert tuple(int(part) for part in xyberos.__version__.split('.')[:2]) >= (2, 0), xyberos.__version__; print('xyberos-crud: ok against', xyberos.__version__)"
+rationale = "The filter operators and the pagination style are policy, which is why ADR 0023 places it beside this line rather than in core. It reached the first release of this line, so its floor is that release rather than a later one: the whole suite passes against core 2.0.0."
+
+[[package]]
 name = "xyberos-db"
 import_root = "xyberos_db"
 status = "retired"

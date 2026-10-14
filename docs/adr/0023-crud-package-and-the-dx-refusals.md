@@ -1,6 +1,8 @@
 # ADR 0023: A CRUD package beside this line, and the DX work that stays a refusal
 
-**Status:** proposed
+**Status:** accepted
+
+> Accepted by the project owner on 2026-10-14, in the same instruction that started the package.
 
 ## Context
 
@@ -33,7 +35,7 @@ What remains is the fourth item, and it is the only one that is neither shipped 
 
 ## Decision
 
-**Propose one package: `xyberos-crud`, carrying query construction over `DatabaseProvider` and nothing
+**Place one package: `xyberos-crud`, carrying query construction over `DatabaseProvider` and nothing
 else.** It is placed as a *package there* by [ADR 0018](0018-capability-placement-rule.md)'s rule, because it
 carries policy — which filter operators exist, and whether pagination is offset-based or keyset — and that is
 the stated criterion for the placement.
@@ -60,9 +62,9 @@ would be reversing the positioning decision, and would need to say so.
 
 ## Consequences
 
-- **The backlog's CRUD gap becomes a placement.** The four conveniences are now: three shipped, two refused,
-  one proposed. Nothing in this document ships, and no manifest row exists until the owner accepts it and the
-  distribution is written.
+- **The backlog's CRUD gap becomes a placement, and the four conveniences are now accounted for.** Migrations,
+  forms, and validation were already shipped; the ORM and CSRF halves stay refused; this is the one addition.
+  It is written in the ecosystem repository, and its manifest row is `written` until it has a release.
 - **The package cannot be published until it has a check, which the self-check shape supplies.** That is the
   same gate every other package beside this line passes; it is not a weaker promise, it is the honest one.
 - **It must declare a floor that carries what it imports.** The last core release proved the range is not
