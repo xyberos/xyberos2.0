@@ -6,6 +6,48 @@ leading digit means here — are in [the stability guide](docs/stability.md).
 
 ## [Unreleased]
 
+Everything below landed after `2.0.0` was uploaded, and none of it is in that release: the tag's tree
+and the published wheel are not the same snapshot, which is what the next release corrects. A package
+beside this line that declares `xyberos>=2,<3` and imports any of it needs that release, not `2.0.0`.
+
+### Added
+
+- **`xyberos.storage`**: the `Storage` contract, a local-filesystem provider, an in-memory double, and
+  `assert_storage_contract` — the suite a third-party provider proves itself with. Keys are the security
+  boundary ([ADR 0019](docs/adr/0019-storage-contract.md)).
+- **`xyberos.mcp`**: an MCP client over streamable HTTP, and the projection of a server's tools into the
+  AI tool model. It is a dependency-free module, so it needs no extra.
+- **`xyberos.http.RequestMetricsMiddleware`**: per-route and per-status counters as a middleware class
+  the application passes. This is the capability `xyberos-metrics` used to provide, which is why that
+  name is retired with a pointer rather than released again.
+- **`assert_model_provider_contract`** and **`assert_embedding_provider_contract`** in
+  `xyberos.ai.testing`: the suite an adapter author runs against their own backend. Every capability is
+  checked from both sides — one the provider claims must work, and one it does not claim must be refused
+  rather than attempted.
+- **Introspection output** ([ADR 0020](docs/adr/0020-introspection-documents.md)): `check --json`,
+  `check --why`, `check --schema`, the `config.schema.json` the package ships, and `durable status`. The
+  provider descriptions the CLI explains a resolution path from are part of the runtime's own
+  diagnostics, so there is one answer to "what depends on what" rather than two.
+- **The storage and MCP error types** in the taxonomy: `StorageError` with its configuration, key,
+  not-found, and size-limit subclasses, and `McpError` with its configuration, protocol, and transport
+  subclasses.
+- **The capability-placement rule** ([ADR 0018](docs/adr/0018-capability-placement-rule.md)), which
+  decides whether the next capability is an extra here, a module here, a package beside this line, or a
+  refusal.
+- **A documentation site**: the learning paths, the production pages, and a reference tree generated
+  from `docs/` rather than maintained twice ([the site plan](site/implementation.md)).
+
+### Changed
+
+- **`[http]` allows `starlette>=0.40,<2`.** The ceiling was `<1`, below the major the adapter is written
+  against.
+- **`SQLiteSettings.read_only`** opens the file through SQLite's `mode=ro` URI, so a diagnostic that
+  reads a production database cannot change it. Only `busy_timeout` is applied, because the other
+  PRAGMAs write to the file's header.
+- **`[dev]` gained what the interface lessons and the site need** — `jinja2`, `python-multipart`,
+  `mkdocs-material`, `pre-commit`, and `types-PyYAML`. The first two are still an application's
+  dependencies rather than this package's, which is why they are here rather than in an extra.
+
 ## [2.0.0] - 2026-10-11
 
 `2.0.0` is not an upgrade of the published `1.x` line: it is a different codebase under the same name,
